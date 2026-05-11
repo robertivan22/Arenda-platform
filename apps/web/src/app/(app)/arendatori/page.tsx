@@ -1,124 +1,104 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import { Plus, Search, Download } from 'lucide-react'
-import { apiGet } from '@/lib/api-client'
+import { Plus, Search, FileText } from 'lucide-react'
+import { lessors, type Lessor } from '@/lib/mockStore'
+import { generateLessorPDF } from '@/lib/pdfGenerator'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { DataTable } from '@/components/data-display/DataTable'
 import { StatusBadge } from '@/components/data-display/StatusBadge'
-import type { ColumnDef } from '@tanstack/react-table'
-
-interface LessorRow {
-  id: string
-  code: string
-  displayName: string
-  type: string
-  cnpCui: string
-  county: string
-  locality: string
-  phone: string
-  status: string
-  contractsCount: number
-  parcelsCount: number
-}
-
-const columns: ColumnDef<LessorRow>[] = [
-  { accessorKey: 'code', header: 'Cod', size: 80 },
-  {
-    accessorKey: 'displayName',
-    header: 'Nume arendator',
-    cell: ({ getValue }) => (
-      <span className="font-medium text-gray-900">{getValue<string>()}</span>
-    ),
-  },
-  {
-    accessorKey: 'type',
-    header: 'Tip',
-    cell: ({ getValue }) => <StatusBadge status={getValue<string>()} />,
-  },
-  { accessorKey: 'cnpCui', header: 'CNP/CUI' },
-  { accessorKey: 'county', header: 'Județ' },
-  { accessorKey: 'locality', header: 'Localitate' },
-  { accessorKey: 'phone', header: 'Telefon' },
-  { accessorKey: 'contractsCount', header: 'Contracte', size: 90 },
-  { accessorKey: 'parcelsCount', header: 'Parcele', size: 80 },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    cell: ({ getValue }) => <StatusBadge status={getValue<string>()} />,
-  },
-]
 
 export default function LessorsListPage() {
   const router = useRouter()
-  const [page, setPage] = useState(0)
   const [search, setSearch] = useState('')
+  const [rows, setRows] = useState<Lessor[]>([])
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['lessors', page, search],
-    queryFn: () =>
-      apiGet<{ items: LessorRow[]; total: number }>('/lessors', {
-        page: page + 1,
-        limit: 50,
-        search: search || undefined,
-      }),
-  })
+  useEffect(() => { setRows(lessors.list()) }, [])
+
+  const filtered = rows.filter(r =>
+    !search || r.displayName.toLowerCase().includes(search.toLowerCase()) ||
+    r.cnpCui?.includes(search) || r.code?.includes(search)
+  )
 
   return (
     <div>
       <PageHeader
         title="Arendatori"
-        subtitle={data?.data?.total ? `${data.data.total} înregistrări` : undefined}
+        subtitle={`${filtered.length} înregistrări`}
         actions={
-          <>
-            <button
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 text-gray-700"
-              title="Export"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export
-            </button>
-            <button
-              onClick={() => router.push('/arendatori/nou')}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded font-medium transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Arendator nou
-            </button>
-          </>
+          <button
+            onClick={() => router.push('/arendatori/nou')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded font-medium transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Arendator nou
+          </button>
         }
       />
 
-      {/* Filters bar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-3 mb-4 flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="bg-white rounded-lg border border-gray-200 p-3 mb-4">
+        <div className="relative max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             placeholder="Caută după nume, CNP, cod..."
             value={search}
-            onChange={e => {
-              setSearch(e.target.value)
-              setPage(0)
-            }}
+            onChange={e => setSearch(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
-        {/* TODO: county filter, type filter, status filter */}
       </div>
 
-      <DataTable
-        data={data?.data?.items ?? []}
-        columns={columns}
-        total={data?.data?.total}
-        pageIndex={page}
-        pageSize={50}
-        onPaginationChange={p => setPage(p.pageIndex)}
-        isLoading={isLoading}
-        onRowClick={row => router.push(`/arendatori/${row.id}/sumar`)}
-      />
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Cod</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Nume</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Tip</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">CNP/CUI</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Județ</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Localitate</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Telefon</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Contracte</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Status</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Acțiuni</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr><td colSpan={10} className="px-3 py-8 text-center text-gray-400">Nicio înregistrare</td></tr>
+            )}
+            {filtered.map(row => (
+              <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <td className="px-3 py-2 text-gray-500 font-mono text-xs">{row.code}</td>
+                <td className="px-3 py-2">
+                  <button onClick={() => router.push(`/arendatori/${row.id}/sumar`)} className="font-medium text-gray-900 hover:text-brand-600 text-left">
+                    {row.displayName}
+                  </button>
+                </td>
+                <td className="px-3 py-2"><StatusBadge status={row.type} /></td>
+                <td className="px-3 py-2 font-mono text-xs">{row.cnpCui}</td>
+                <td className="px-3 py-2">{row.county}</td>
+                <td className="px-3 py-2">{row.locality}</td>
+                <td className="px-3 py-2">{row.mobile || row.phone}</td>
+                <td className="px-3 py-2 text-center">{row.contractsCount}</td>
+                <td className="px-3 py-2"><StatusBadge status={row.status} /></td>
+                <td className="px-3 py-2">
+                  <button
+                    onClick={() => generateLessorPDF(row)}
+                    className="flex items-center gap-1 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 text-gray-600"
+                    title="Generează contract PDF"
+                  >
+                    <FileText className="w-3 h-3" />
+                    PDF Contract
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

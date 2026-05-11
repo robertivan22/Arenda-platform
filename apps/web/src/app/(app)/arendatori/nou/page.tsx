@@ -2,23 +2,22 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useMutation } from '@tanstack/react-query'
-import { apiPost } from '@/lib/api-client'
+import { lessors } from '@/lib/mockStore'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 
 type LessorType = 'NATURAL' | 'LEGAL' | 'PFA'
-type Gender = 'MALE' | 'FEMALE'
+type Gender = 'MALE' | 'FEMALE' | ''
 
 export default function NewLessorPage() {
   const router = useRouter()
-
   const [type, setType] = useState<LessorType>('NATURAL')
+  const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     firstName: '', lastName: '', companyName: '',
     cnpCui: '', iban: '', bankName: '',
-    gender: '' as Gender | '',
+    gender: '' as Gender,
     county: '', locality: '',
     address: '', phone: '', mobile: '', email: '',
     notes: '',
@@ -28,24 +27,12 @@ export default function NewLessorPage() {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  // No API calls for county/locality — free text
-
-  const mutation = useMutation({
-    mutationFn: (payload: unknown) => apiPost<{ id: string }>('/lessors', payload),
-    onSuccess: res => {
-      toast.success('Arendatorul a fost creat cu succes.')
-      router.push(`/arendatori/${res.data.id}/sumar`)
-    },
-    onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? 'Eroare la salvare.'
-      toast.error(msg)
-    },
-  })
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    mutation.mutate({ type, ...form })
+    setSaving(true)
+    const item = lessors.create({ type, ...form })
+    toast.success('Arendatorul a fost creat cu succes.')
+    router.push(`/arendatori/${item.id}/sumar`)
   }
 
   const inputCls = 'w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500'
@@ -61,57 +48,34 @@ export default function NewLessorPage() {
       </div>
 
       <form onSubmit={handleSubmit}>
-        {/* Tip persoană */}
         <div className="form-section">
           <div className="form-section-title">Tip persoană</div>
           <div className="flex gap-3">
             {(['NATURAL', 'LEGAL', 'PFA'] as LessorType[]).map(t => (
               <label key={t} className="flex items-center gap-2 cursor-pointer text-sm">
-                <input
-                  type="radio"
-                  name="type"
-                  value={t}
-                  checked={type === t}
-                  onChange={() => setType(t)}
-                  className="accent-brand-500"
-                />
+                <input type="radio" name="type" value={t} checked={type === t} onChange={() => setType(t)} className="accent-brand-500" />
                 {t === 'NATURAL' ? 'Persoană fizică' : t === 'LEGAL' ? 'Persoană juridică' : 'PFA'}
               </label>
             ))}
           </div>
         </div>
 
-        {/* Date identitate */}
         <div className="form-section">
           <div className="form-section-title">Date identitate</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {type === 'NATURAL' || type === 'PFA' ? (
+            {type !== 'LEGAL' ? (
               <>
-                <div>
-                  <label className={labelCls}>Nume *</label>
-                  <input className={inputCls} value={form.lastName} onChange={e => set('lastName', e.target.value)} required />
-                </div>
-                <div>
-                  <label className={labelCls}>Prenume *</label>
-                  <input className={inputCls} value={form.firstName} onChange={e => set('firstName', e.target.value)} required />
-                </div>
+                <div><label className={labelCls}>Nume *</label><input className={inputCls} value={form.lastName} onChange={e => set('lastName', e.target.value)} required /></div>
+                <div><label className={labelCls}>Prenume *</label><input className={inputCls} value={form.firstName} onChange={e => set('firstName', e.target.value)} required /></div>
               </>
             ) : (
-              <div className="col-span-2">
-                <label className={labelCls}>Denumire firmă *</label>
-                <input className={inputCls} value={form.companyName} onChange={e => set('companyName', e.target.value)} required />
-              </div>
+              <div className="col-span-2"><label className={labelCls}>Denumire firmă *</label><input className={inputCls} value={form.companyName} onChange={e => set('companyName', e.target.value)} required /></div>
             )}
-
-            <div>
-              <label className={labelCls}>{type === 'LEGAL' ? 'CUI' : 'CNP'} *</label>
-              <input className={inputCls} value={form.cnpCui} onChange={e => set('cnpCui', e.target.value)} required />
-            </div>
-
+            <div><label className={labelCls}>{type === 'LEGAL' ? 'CUI' : 'CNP'} *</label><input className={inputCls} value={form.cnpCui} onChange={e => set('cnpCui', e.target.value)} required /></div>
             {type === 'NATURAL' && (
               <div>
                 <label className={labelCls}>Gen</label>
-                <select className={inputCls} value={form.gender} onChange={e => set('gender', e.target.value as Gender)}>
+                <select className={inputCls} value={form.gender} onChange={e => set('gender', e.target.value)}>
                   <option value="">—</option>
                   <option value="MALE">Masculin</option>
                   <option value="FEMALE">Feminin</option>
@@ -121,85 +85,42 @@ export default function NewLessorPage() {
           </div>
         </div>
 
-        {/* Adresă */}
         <div className="form-section">
           <div className="form-section-title">Adresă</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div>
-              <label className={labelCls}>Județ *</label>
-              <input className={inputCls} value={form.county} onChange={e => set('county', e.target.value)} placeholder="ex: Cluj" required />
-            </div>
-            <div>
-              <label className={labelCls}>Localitate *</label>
-              <input className={inputCls} value={form.locality} onChange={e => set('locality', e.target.value)} placeholder="ex: Cluj-Napoca" required />
-            </div>
-            <div>
-              <label className={labelCls}>Adresă stradă</label>
-              <input className={inputCls} value={form.address} onChange={e => set('address', e.target.value)} />
-            </div>
+            <div><label className={labelCls}>Județ *</label><input className={inputCls} value={form.county} onChange={e => set('county', e.target.value)} placeholder="ex: Cluj" required /></div>
+            <div><label className={labelCls}>Localitate *</label><input className={inputCls} value={form.locality} onChange={e => set('locality', e.target.value)} placeholder="ex: Cluj-Napoca" required /></div>
+            <div><label className={labelCls}>Adresă stradă</label><input className={inputCls} value={form.address} onChange={e => set('address', e.target.value)} /></div>
           </div>
         </div>
 
-        {/* Contact */}
         <div className="form-section">
           <div className="form-section-title">Date contact</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div>
-              <label className={labelCls}>Telefon fix</label>
-              <input className={inputCls} type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}>Mobil</label>
-              <input className={inputCls} type="tel" value={form.mobile} onChange={e => set('mobile', e.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}>Email</label>
-              <input className={inputCls} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
-            </div>
+            <div><label className={labelCls}>Telefon fix</label><input className={inputCls} type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} /></div>
+            <div><label className={labelCls}>Mobil</label><input className={inputCls} type="tel" value={form.mobile} onChange={e => set('mobile', e.target.value)} /></div>
+            <div><label className={labelCls}>Email</label><input className={inputCls} type="email" value={form.email} onChange={e => set('email', e.target.value)} /></div>
           </div>
         </div>
 
-        {/* Date bancare */}
         <div className="form-section">
           <div className="form-section-title">Date bancare</div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>IBAN</label>
-              <input className={inputCls} value={form.iban} onChange={e => set('iban', e.target.value.replace(/\s/g, '').toUpperCase())} placeholder="RO49AAAA1B31007593840000" />
-            </div>
-            <div>
-              <label className={labelCls}>Bancă</label>
-              <input className={inputCls} value={form.bankName} onChange={e => set('bankName', e.target.value)} />
-            </div>
+            <div><label className={labelCls}>IBAN</label><input className={inputCls} value={form.iban} onChange={e => set('iban', e.target.value.replace(/\s/g, '').toUpperCase())} placeholder="RO49AAAA1B31007593840000" /></div>
+            <div><label className={labelCls}>Bancă</label><input className={inputCls} value={form.bankName} onChange={e => set('bankName', e.target.value)} /></div>
           </div>
         </div>
 
-        {/* Observații */}
         <div className="form-section">
           <div className="form-section-title">Observații</div>
-          <textarea
-            className={`${inputCls} min-h-20`}
-            value={form.notes}
-            onChange={e => set('notes', e.target.value)}
-            rows={3}
-          />
+          <textarea className={inputCls} rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} />
         </div>
 
-        {/* Submit */}
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={mutation.isPending}
-            className="flex items-center gap-2 px-5 py-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium rounded transition-colors disabled:opacity-60"
-          >
-            {mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+        <div className="flex gap-3 mt-6">
+          <button type="submit" disabled={saving} className="px-5 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50">
             Salvează arendator
           </button>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="px-4 py-2 text-sm border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
-          >
+          <button type="button" onClick={() => router.back()} className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
             Anulează
           </button>
         </div>

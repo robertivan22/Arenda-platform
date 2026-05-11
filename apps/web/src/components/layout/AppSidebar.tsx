@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState } from 'react'
-import { useAuthStore } from '@/store/auth.store'
+
 
 interface NavItem {
   label: string
@@ -111,7 +111,6 @@ const NAV_ITEMS: NavItem[] = [
 
 export function AppSidebar() {
   const pathname = usePathname()
-  const { hasPermission } = useAuthStore()
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   function toggleGroup(label: string) {
@@ -138,9 +137,9 @@ export function AppSidebar() {
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-2 scrollbar-thin">
         {NAV_ITEMS.map(item => {
-          if (item.permission && !hasPermission(item.permission)) return null
+          if (item.permission) return null
 
-          // Leaf item (no children)
+          // Leaf item - keep going
           if (!item.children) {
             const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
             return (
