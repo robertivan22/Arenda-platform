@@ -189,7 +189,6 @@ export function AppSidebar() {
               {isOpen && (
                 <div className="ml-0 bg-sidebar-hover/30">
                   {item.children.map(child => {
-                    if (child.permission && !hasPermission(child.permission)) return null
                     const childActive = pathname === child.href || pathname.startsWith(child.href + '/')
                     return (
                       <Link
