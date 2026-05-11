@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, Building2,
+  BarChart3, ChevronDown, Building2, X,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState } from 'react'
+import { useSidebarStore } from '@/store/sidebar.store'
 
 
 interface NavItem {
@@ -61,6 +62,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const { open, close } = useSidebarStore()
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   function toggleGroup(label: string) {
@@ -73,15 +75,27 @@ export function AppSidebar() {
   }
 
   return (
-    <nav className="w-56 bg-sidebar-bg flex flex-col h-full select-none flex-shrink-0">
+    <nav className={clsx(
+      'w-56 bg-sidebar-bg flex flex-col h-full select-none flex-shrink-0 z-30',
+      // On mobile: fixed overlay, slide in/out
+      'fixed md:relative inset-y-0 left-0 transition-transform duration-200',
+      open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+    )}>
       {/* Logo / Brand */}
-      <div className="px-4 py-4 border-b border-sidebar-hover">
+      <div className="px-4 py-4 border-b border-sidebar-hover flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Building2 className="w-6 h-6 text-brand-400" />
           <span className="text-sidebar-text font-semibold text-sm tracking-wide">
             Arenda<span className="text-brand-400">Pro</span>
           </span>
         </div>
+        {/* Close button — mobile only */}
+        <button
+          onClick={close}
+          className="md:hidden p-1 rounded text-sidebar-muted hover:text-sidebar-text hover:bg-sidebar-hover transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -94,6 +108,7 @@ export function AppSidebar() {
               <Link
                 key={item.label}
                 href={item.href!}
+                onClick={close}
                 className={clsx(
                   'flex items-center gap-2.5 px-4 py-2 text-sm transition-colors',
                   active
@@ -142,6 +157,7 @@ export function AppSidebar() {
                       <Link
                         key={child.href}
                         href={child.href}
+                        onClick={close}
                         className={clsx(
                           'flex items-center gap-2 pl-10 pr-4 py-1.5 text-xs transition-colors',
                           childActive
