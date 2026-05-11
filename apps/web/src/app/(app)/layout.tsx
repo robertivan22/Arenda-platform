@@ -1,23 +1,7 @@
-'use client'
-
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { AppTopbar } from '@/components/layout/AppTopbar'
-import { useAuthStore } from '@/store/auth.store'
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuthStore()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.replace('/login')
-    }
-  }, [isAuthenticated, router])
-
-  if (!isAuthenticated) return null
-
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Left Sidebar */}
