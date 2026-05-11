@@ -4,8 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  ShoppingBag, BarChart3, Headphones, Settings, ChevronDown,
-  Building2,
+  BarChart3, ChevronDown, Building2,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState } from 'react'
@@ -15,8 +14,7 @@ interface NavItem {
   label: string
   href?: string
   icon: React.ElementType
-  permission?: string
-  children?: { label: string; href: string; permission?: string }[]
+  children?: { label: string; href: string }[]
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -28,84 +26,36 @@ const NAV_ITEMS: NavItem[] = [
   {
     label: 'Arendatori',
     icon: Users,
-    permission: 'lessor:read',
     children: [
       { label: 'Lista arendatori', href: '/arendatori' },
-      { label: 'Lista + contracte', href: '/arendatori/lista-contracte' },
-      { label: 'Adaugă arendator', href: '/arendatori/nou', permission: 'lessor:create' },
-      { label: 'Opriți de la plată', href: '/arendatori/opriti-plata' },
-      { label: 'Liste APIA', href: '/arendatori/apia' },
-      { label: 'Adeverințe primărie', href: '/arendatori/adeverinte' },
+      { label: 'Adaugă arendator', href: '/arendatori/nou' },
     ],
   },
   {
     label: 'Contracte',
     icon: FileText,
-    permission: 'contract:read',
     children: [
       { label: 'Lista contracte', href: '/contracte' },
-      { label: 'Contract nou', href: '/contracte/nou', permission: 'contract:create' },
+      { label: 'Contract nou', href: '/contracte/nou' },
     ],
   },
   {
     label: 'Parcele',
     icon: MapPin,
-    permission: 'parcel:read',
     children: [
       { label: 'Lista parcele', href: '/parcele' },
-      { label: 'Parcelă nouă', href: '/parcele/nou', permission: 'parcel:create' },
+      { label: 'Parcelă nouă', href: '/parcele/nou' },
     ],
-  },
-  {
-    label: 'Plăți restante',
-    href: '/plati/restante',
-    icon: CreditCard,
-    permission: 'payment:read',
   },
   {
     label: 'Plăți',
+    href: '/plati',
     icon: CreditCard,
-    permission: 'payment:read',
-    children: [
-      { label: 'Dashboard plăți', href: '/plati' },
-      { label: 'Loturi plăți', href: '/plati/loturi' },
-      { label: 'Numerar', href: '/plati/numerar' },
-      { label: 'Bancă', href: '/plati/banca' },
-      { label: 'Mandat poștal', href: '/plati/mandat-postal' },
-      { label: 'Produse agricole', href: '/plati/produse' },
-      { label: 'Borderou', href: '/plati/borderou' },
-      { label: 'Monetar zilnic', href: '/plati/monetar-zilnic' },
-    ],
-  },
-  {
-    label: 'Oferte cumpărare',
-    href: '/oferte-cumparare',
-    icon: ShoppingBag,
-    permission: 'lessor:read',
   },
   {
     label: 'Rapoarte',
     href: '/rapoarte',
     icon: BarChart3,
-    permission: 'report:read',
-  },
-  {
-    label: 'Asistență tehnică',
-    href: '/asistenta-tehnica',
-    icon: Headphones,
-  },
-  {
-    label: 'Administrare',
-    icon: Settings,
-    permission: 'admin:users:manage',
-    children: [
-      { label: 'Utilizatori', href: '/admin/utilizatori' },
-      { label: 'Roluri', href: '/admin/roluri' },
-      { label: 'Nomenclatoare', href: '/admin/nomenclatoare' },
-      { label: 'Template-uri', href: '/admin/template-uri' },
-      { label: 'Setări tenant', href: '/admin/setari-tenant' },
-      { label: 'Jurnal audit', href: '/admin/jurnal-audit' },
-    ],
   },
 ]
 
@@ -137,9 +87,7 @@ export function AppSidebar() {
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-2 scrollbar-thin">
         {NAV_ITEMS.map(item => {
-          if (item.permission) return null
-
-          // Leaf item - keep going
+          // Leaf item
           if (!item.children) {
             const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
             return (
