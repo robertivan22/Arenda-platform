@@ -1,0 +1,25 @@
+{
+  "name": "arenda-platform",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "db:migrate": "pnpm --filter @arenda/api db:migrate",
+    "db:seed": "pnpm --filter @arenda/api db:seed",
+    "db:studio": "pnpm --filter @arenda/api db:studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0",
+    "prettier": "^3.2.0",
+    "@types/node": "^20.12.0"
+  }
+}

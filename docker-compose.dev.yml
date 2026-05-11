@@ -1,0 +1,24 @@
+version: '3.9'
+
+# Dev override — start only infra, run API+Web locally via pnpm dev
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB:       arenda
+      POSTGRES_USER:     arenda
+      POSTGRES_PASSWORD: arenda_dev_pw
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  # Exclude app services in dev — run them with pnpm dev instead
+  api:
+    profiles:
+      - donotstart
+
+  web:
+    profiles:
+      - donotstart

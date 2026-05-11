@@ -1,0 +1,59 @@
+export enum PersonType {
+  INDIVIDUAL = 'INDIVIDUAL',
+  LEGAL_ENTITY = 'LEGAL_ENTITY',
+}
+
+export enum LessorStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  ARCHIVED = 'ARCHIVED',
+}
+
+export enum ContractStatus {
+  DRAFT = 'DRAFT',
+  ACTIVE = 'ACTIVE',
+  SUSPENDED = 'SUSPENDED',
+  TERMINATED = 'TERMINATED',
+  EXPIRED = 'EXPIRED',
+  ARCHIVED = 'ARCHIVED',
+}
+
+export enum ParcelStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  TRANSFERRED = 'TRANSFERRED',
+  ARCHIVED = 'ARCHIVED',
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+  BLOCKED = 'BLOCKED',
+}
+
+export enum UserStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  SUSPENDED = 'SUSPENDED',
+}
+
+export enum AuditAction {
+  CREATE = 'CREATE',
+  UPDATE = 'UPDATE',
+  DELETE = 'DELETE',
+  ARCHIVE = 'ARCHIVE',
+  RESTORE = 'RESTORE',
+  LOGIN = 'LOGIN',
+  LOGOUT = 'LOGOUT',
+  EXPORT = 'EXPORT',
+  GENERATE_DOCUMENT = 'GENERATE_DOCUMENT',
+  APPROVE = 'APPROVE',
+  REJECT = 'REJECT',
+  SEND = 'SEND',
+  BLOCK = 'BLOCK',
+  UNBLOCK = 'UNBLOCK',
+  UPLOAD = 'UPLOAD',
+  DOWNLOAD = 'DOWNLOAD',
+}

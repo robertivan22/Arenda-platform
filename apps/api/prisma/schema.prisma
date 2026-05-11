@@ -1,0 +1,1343 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum PersonType {
+  INDIVIDUAL
+  LEGAL_ENTITY
+}
+
+enum LessorStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+  EXPIRED
+  ARCHIVED
+}
+
+enum ParcelStatus {
+  ACTIVE
+  INACTIVE
+  TRANSFERRED
+  ARCHIVED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  CANCELLED
+  BLOCKED
+}
+
+enum PaymentBatchStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  PROCESSING
+  COMPLETED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  OVERDUE
+  CANCELLED
+  STORNO
+}
+
+enum SpvStatus {
+  DRAFT
+  VALIDATED
+  QUEUED
+  SENT
+  ACCEPTED
+  REJECTED
+  RETRY
+}
+
+enum DeclarationStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  EXPORTED
+  ARCHIVED
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  RETRYING
+  CANCELLED
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  ARCHIVE
+  RESTORE
+  LOGIN
+  LOGOUT
+  EXPORT
+  GENERATE_DOCUMENT
+  APPROVE
+  REJECT
+  SEND
+  BLOCK
+  UNBLOCK
+  UPLOAD
+  DOWNLOAD
+}
+
+// ─────────────────────────────────────────────
+// PLATFORM / AUTH
+// ─────────────────────────────────────────────
+
+model Tenant {
+  id        String       @id @default(uuid())
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  logoUrl   String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  settings       TenantSetting[]
+  users          User[]
+  zones          Zone[]
+  lessors        Lessor[]
+  contracts      Contract[]
+  parcels        Parcel[]
+  paymentBatches PaymentBatch[]
+  invoices       Invoice[]
+  spvJobs        SpvTransmissionJob[]
+  declarations   DeclarationRun[]
+  files          File[]
+  auditLogs      AuditLog[]
+  backgroundJobs BackgroundJob[]
+
+  @@map("tenants")
+}
+
+model TenantSetting {
+  id        String   @id @default(uuid())
+  tenantId  String
+  key       String
+  value     String
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@map("tenant_settings")
+}
+
+model User {
+  id           String     @id @default(uuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  firstName    String
+  lastName     String
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  isDeleted    Boolean    @default(false)
+  deletedAt    DateTime?
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  userRoles UserRole[]
+  auditLogs AuditLog[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  code        String  @unique
+  resource    String
+  action      String
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  id       String @id @default(uuid())
+  userId   String
+  roleId   String
+  tenantId String
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId, tenantId])
+  @@index([userId])
+  @@index([tenantId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ─────────────────────────────────────────────
+// NOMENCLATURE
+// ─────────────────────────────────────────────
+
+model County {
+  id         String     @id @default(uuid())
+  code       String     @unique
+  name       String
+  localities Locality[]
+
+  @@map("counties")
+}
+
+model Locality {
+  id         String  @id @default(uuid())
+  countyId   String
+  name       String
+  postalCode String?
+
+  county    County          @relation(fields: [countyId], references: [id])
+  uats      UAT[]
+  addresses LessorAddress[]
+
+  @@index([countyId])
+  @@map("localities")
+}
+
+model UAT {
+  id         String  @id @default(uuid())
+  localityId String
+  name       String
+  sirutaCode String? @unique
+
+  locality    Locality    @relation(fields: [localityId], references: [id])
+  mayoralties Mayoralty[]
+
+  @@index([localityId])
+  @@map("uats")
+}
+
+model Mayoralty {
+  id                 String  @id @default(uuid())
+  uatId              String
+  name               String
+  registrationPrefix String?
+
+  uat       UAT        @relation(fields: [uatId], references: [id])
+  contracts Contract[]
+
+  @@index([uatId])
+  @@map("mayoralties")
+}
+
+model Zone {
+  id          String  @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  parcels Parcel[]
+
+  @@index([tenantId])
+  @@map("zones")
+}
+
+model LandUseCategory {
+  id      String @id @default(uuid())
+  code    String @unique
+  name    String
+
+  parcels Parcel[]
+
+  @@map("land_use_categories")
+}
+
+model ContractType {
+  id         String  @id @default(uuid())
+  tenantId   String?
+  name       String
+  templateId String?
+  isSystem   Boolean @default(false)
+
+  contracts Contract[]
+
+  @@map("contract_types")
+}
+
+model PaymentMethod {
+  id       String  @id @default(uuid())
+  code     String  @unique
+  name     String
+  isActive Boolean @default(true)
+
+  batches  PaymentBatch[]
+  payments Payment[]
+
+  @@map("payment_methods")
+}
+
+model ProductCatalog {
+  id          String  @id @default(uuid())
+  tenantId    String
+  name        String
+  unit        String
+  description String?
+  isActive    Boolean @default(true)
+
+  productPayments ProductPayment[]
+
+  @@index([tenantId])
+  @@map("product_catalog")
+}
+
+model TaxRuleVersion {
+  id          String    @id @default(uuid())
+  tenantId    String?
+  ruleType    String
+  validFrom   DateTime
+  validTo     DateTime?
+  payloadJson Json
+  description String?
+  createdAt   DateTime  @default(now())
+  createdBy   String?
+
+  cassCalculations   CassCalculation[]
+  withholdingRecords WithholdingTaxRecord[]
+
+  @@index([ruleType, validFrom])
+  @@map("tax_rule_versions")
+}
+
+// ─────────────────────────────────────────────
+// LESSORS
+// ─────────────────────────────────────────────
+
+model Lessor {
+  id             String       @id @default(uuid())
+  tenantId       String
+  personType     PersonType   @default(INDIVIDUAL)
+  lastName       String
+  firstName      String?
+  cnpCui         String
+  idSeries       String?
+  idNumber       String?
+  idIssuedBy     String?
+  idIssueDate    DateTime?
+  status         LessorStatus @default(ACTIVE)
+  paymentBlocked Boolean      @default(false)
+  blockReason    String?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  createdBy      String?
+  updatedBy      String?
+  isDeleted      Boolean      @default(false)
+  deletedAt      DateTime?
+  deletedBy      String?
+
+  tenant          Tenant                     @relation(fields: [tenantId], references: [id])
+  address         LessorAddress?
+  contact         LessorContact?
+  bankAccounts    LessorBankAccount[]
+  authorizedReps  AuthorizedRepresentative[]
+  purchaseOffers  PurchaseOffer[]
+  messages        LessorMessage[]
+  contracts       Contract[]
+  parcelLinks     ParcelLessorLink[]
+  payments        Payment[]
+  garnishments    Garnishment[]
+  landTaxRecords  LandTaxRecord[]
+  bonusPayments   BonusPayment[]
+  cassCalculations CassCalculation[]
+  withholdingRecords WithholdingTaxRecord[]
+
+  @@unique([tenantId, cnpCui])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, paymentBlocked])
+  @@map("lessors")
+}
+
+model LessorAddress {
+  id         String  @id @default(uuid())
+  lessorId   String  @unique
+  localityId String?
+  countyId   String?
+  uatId      String?
+  streetType String?
+  streetName String?
+  number     String?
+  block      String?
+  staircase  String?
+  apartment  String?
+  floor      String?
+  postalCode String?
+
+  lessor   Lessor    @relation(fields: [lessorId], references: [id])
+  locality Locality? @relation(fields: [localityId], references: [id])
+
+  @@map("lessor_addresses")
+}
+
+model LessorContact {
+  id        String  @id @default(uuid())
+  lessorId  String  @unique
+  mobile    String?
+  telephone String?
+  email     String?
+
+  lessor Lessor @relation(fields: [lessorId], references: [id])
+
+  @@map("lessor_contacts")
+}
+
+model LessorBankAccount {
+  id               String   @id @default(uuid())
+  lessorId         String
+  bankName         String?
+  iban             String?
+  holderSamePerson Boolean  @default(true)
+  holderName       String?
+  holderIdentifier String?
+  isPrimary        Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  lessor Lessor @relation(fields: [lessorId], references: [id])
+
+  @@index([lessorId])
+  @@map("lessor_bank_accounts")
+}
+
+model AuthorizedRepresentative {
+  id           String    @id @default(uuid())
+  lessorId     String
+  lastName     String
+  firstName    String
+  cnp          String?
+  relationType String?
+  validFrom    DateTime?
+  validTo      DateTime?
+  documentRef  String?
+  notes        String?
+  createdAt    DateTime  @default(now())
+
+  lessor Lessor @relation(fields: [lessorId], references: [id])
+
+  @@index([lessorId])
+  @@map("authorized_representatives")
+}
+
+model PurchaseOffer {
+  id         String    @id @default(uuid())
+  tenantId   String
+  lessorId   String
+  parcelId   String?
+  offerDate  DateTime
+  pricePerHa Decimal?  @db.Decimal(12, 2)
+  status     String    @default("PENDING")
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  createdBy  String?
+
+  lessor Lessor  @relation(fields: [lessorId], references: [id])
+  parcel Parcel? @relation(fields: [parcelId], references: [id])
+
+  @@index([tenantId, lessorId])
+  @@map("purchase_offers")
+}
+
+model LessorMessage {
+  id        String   @id @default(uuid())
+  lessorId  String
+  tenantId  String
+  userId    String?
+  content   String
+  direction String   @default("OUTBOUND")
+  sentAt    DateTime @default(now())
+
+  lessor Lessor @relation(fields: [lessorId], references: [id])
+
+  @@index([lessorId])
+  @@map("lessor_messages")
+}
+
+// ─────────────────────────────────────────────
+// CONTRACTS
+// ─────────────────────────────────────────────
+
+model Contract {
+  id                    String         @id @default(uuid())
+  tenantId              String
+  lessorId              String
+  contractTypeId        String?
+  mayoraltyId           String?
+  mayoraltyRegNo        String?
+  mayoraltyRegDate      DateTime?
+  startDate             DateTime?
+  expiryDate            DateTime?
+  durationYears         Int?
+  paymentStartsNextYear Boolean        @default(false)
+  anafWithholding       Boolean        @default(false)
+  status                ContractStatus @default(DRAFT)
+  observations          String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  createdBy             String?
+  updatedBy             String?
+  isDeleted             Boolean        @default(false)
+  deletedAt             DateTime?
+  deletedBy             String?
+
+  tenant        Tenant                @relation(fields: [tenantId], references: [id])
+  lessor        Lessor                @relation(fields: [lessorId], references: [id])
+  contractType  ContractType?         @relation(fields: [contractTypeId], references: [id])
+  mayoralty     Mayoralty?            @relation(fields: [mayoraltyId], references: [id])
+  versions      ContractVersion[]
+  addenda       ContractAddendum[]
+  termination   ContractTermination?
+  rates         ContractRate[]
+  parcelLinks   ParcelContractLink[]
+  statusHistory ContractStatusHistory[]
+  payments      Payment[]
+  invoices      Invoice[]
+
+  @@index([tenantId])
+  @@index([tenantId, lessorId])
+  @@index([tenantId, status])
+  @@index([tenantId, expiryDate])
+  @@map("contracts")
+}
+
+model ContractVersion {
+  id              String   @id @default(uuid())
+  contractId      String
+  versionNo       Int
+  payloadSnapshot Json
+  createdBy       String?
+  createdAt       DateTime @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@unique([contractId, versionNo])
+  @@index([contractId])
+  @@map("contract_versions")
+}
+
+model ContractAddendum {
+  id            String    @id @default(uuid())
+  contractId    String
+  addendumNo    Int
+  description   String?
+  effectiveDate DateTime?
+  status        String    @default("DRAFT")
+  createdBy     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@index([contractId])
+  @@map("contract_addenda")
+}
+
+model ContractTermination {
+  id              String    @id @default(uuid())
+  contractId      String    @unique
+  terminationDate DateTime
+  reason          String?
+  status          String    @default("DRAFT")
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdBy       String?
+  createdAt       DateTime  @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@map("contract_terminations")
+}
+
+model ContractRate {
+  id         String    @id @default(uuid())
+  contractId String
+  kgPerHa    Decimal?  @db.Decimal(10, 3)
+  eurPerHa   Decimal?  @db.Decimal(10, 2)
+  ronPerHa   Decimal?  @db.Decimal(10, 2)
+  taxPerHa   Decimal?  @db.Decimal(10, 2)
+  validFrom  DateTime
+  validTo    DateTime?
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@index([contractId])
+  @@map("contract_rates")
+}
+
+model ContractStatusHistory {
+  id         String   @id @default(uuid())
+  contractId String
+  fromStatus String?
+  toStatus   String
+  changedBy  String?
+  changedAt  DateTime @default(now())
+  reason     String?
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@index([contractId])
+  @@map("contract_status_history")
+}
+
+// ─────────────────────────────────────────────
+// PARCELS
+// ─────────────────────────────────────────────
+
+model Parcel {
+  id                String       @id @default(uuid())
+  tenantId          String
+  tarla             String?
+  parcela           String?
+  blocFizic         String?
+  leasedSurface     Decimal?     @db.Decimal(10, 4)
+  totalSurface      Decimal?     @db.Decimal(10, 4)
+  gpsLat            Decimal?     @db.Decimal(10, 7)
+  gpsLng            Decimal?     @db.Decimal(10, 7)
+  titleNumber       String?
+  titleDate         DateTime?
+  intabulated       Boolean      @default(false)
+  titleHolder       String?
+  heirs             String?
+  boundaryNorth     String?
+  boundaryEast      String?
+  boundarySouth     String?
+  boundaryWest      String?
+  zoneId            String?
+  landUseCategoryId String?
+  apiaDeclared      Boolean      @default(false)
+  commodatSurface   Decimal?     @db.Decimal(10, 4)
+  observations      String?
+  status            ParcelStatus @default(ACTIVE)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  createdBy         String?
+  updatedBy         String?
+  isDeleted         Boolean      @default(false)
+  deletedAt         DateTime?
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  zone            Zone?            @relation(fields: [zoneId], references: [id])
+  landUseCategory LandUseCategory? @relation(fields: [landUseCategoryId], references: [id])
+  contractLinks   ParcelContractLink[]
+  lessorLinks     ParcelLessorLink[]
+  history         ParcelHistory[]
+  purchaseOffers  PurchaseOffer[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("parcels")
+}
+
+model ParcelContractLink {
+  id              String    @id @default(uuid())
+  parcelId        String
+  contractId      String
+  surfaceAssigned Decimal?  @db.Decimal(10, 4)
+  validFrom       DateTime?
+  validTo         DateTime?
+
+  parcel   Parcel   @relation(fields: [parcelId], references: [id])
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@unique([parcelId, contractId])
+  @@index([contractId])
+  @@map("parcel_contract_links")
+}
+
+model ParcelLessorLink {
+  id             String   @id @default(uuid())
+  parcelId       String
+  lessorId       String
+  ownershipShare Decimal? @db.Decimal(5, 2)
+
+  parcel Parcel @relation(fields: [parcelId], references: [id])
+  lessor Lessor @relation(fields: [lessorId], references: [id])
+
+  @@unique([parcelId, lessorId])
+  @@map("parcel_lessor_links")
+}
+
+model ParcelHistory {
+  id        String   @id @default(uuid())
+  parcelId  String
+  fieldName String
+  oldValue  String?
+  newValue  String?
+  changedBy String?
+  changedAt DateTime @default(now())
+
+  parcel Parcel @relation(fields: [parcelId], references: [id])
+
+  @@index([parcelId])
+  @@map("parcel_history")
+}
+
+// ─────────────────────────────────────────────
+// PAYMENTS
+// ─────────────────────────────────────────────
+
+model PaymentBatch {
+  id              String             @id @default(uuid())
+  tenantId        String
+  batchRef        String
+  paymentMethodId String?
+  periodFrom      DateTime?
+  periodTo        DateTime?
+  status          PaymentBatchStatus @default(DRAFT)
+  approvedBy      String?
+  approvedAt      DateTime?
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  createdBy       String?
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+  payments      Payment[]
+  ledgers       PaymentLedger[]
+
+  @@unique([tenantId, batchRef])
+  @@index([tenantId])
+  @@map("payment_batches")
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  tenantId        String
+  batchId         String?
+  contractId      String?
+  lessorId        String
+  paymentMethodId String?
+  amountRon       Decimal?      @db.Decimal(12, 2)
+  amountEur       Decimal?      @db.Decimal(12, 2)
+  surfacePaid     Decimal?      @db.Decimal(10, 4)
+  periodFrom      DateTime?
+  periodTo        DateTime?
+  status          PaymentStatus @default(PENDING)
+  notes           String?
+  proofFileId     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  createdBy       String?
+
+  batch         PaymentBatch?           @relation(fields: [batchId], references: [id])
+  contract      Contract?               @relation(fields: [contractId], references: [id])
+  lessor        Lessor                  @relation(fields: [lessorId], references: [id])
+  paymentMethod PaymentMethod?          @relation(fields: [paymentMethodId], references: [id])
+  allocations   PaymentAllocation[]
+  cashDisposition CashPaymentDisposition?
+  bankOrder     BankPaymentOrder?
+  postalMandate PostalMandate?
+  productPayment ProductPayment?
+  withholdingTax WithholdingTaxRecord?
+  bonusPayments BonusPayment[]
+
+  @@index([tenantId])
+  @@index([tenantId, lessorId])
+  @@index([tenantId, status])
+  @@index([batchId])
+  @@map("payments")
+}
+
+model PaymentAllocation {
+  id             String  @id @default(uuid())
+  paymentId      String
+  obligationType String
+  obligationRef  String
+  amount         Decimal @db.Decimal(12, 2)
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+  @@map("payment_allocations")
+}
+
+model CashPaymentDisposition {
+  id            String    @id @default(uuid())
+  paymentId     String    @unique
+  dispositionNo String
+  date          DateTime
+  printedAt     DateTime?
+  status        String    @default("PENDING")
+  fileId        String?
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@map("cash_payment_dispositions")
+}
+
+model BankPaymentOrder {
+  id        String    @id @default(uuid())
+  paymentId String    @unique
+  orderNo   String
+  date      DateTime
+  bankRef   String?
+  status    String    @default("PENDING")
+  fileId    String?
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@map("bank_payment_orders")
+}
+
+model PostalMandate {
+  id         String    @id @default(uuid())
+  paymentId  String    @unique
+  mandateNo  String
+  postOffice String?
+  sentDate   DateTime?
+  status     String    @default("PENDING")
+  fileId     String?
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@map("postal_mandates")
+}
+
+model ProductPayment {
+  id         String  @id @default(uuid())
+  paymentId  String  @unique
+  productId  String?
+  quantity   Decimal @db.Decimal(12, 3)
+  unit       String
+  unitPrice  Decimal @db.Decimal(12, 2)
+  totalValue Decimal @db.Decimal(12, 2)
+
+  payment      Payment        @relation(fields: [paymentId], references: [id])
+  product      ProductCatalog? @relation(fields: [productId], references: [id])
+  dispatchNote GoodsDispatchNote?
+
+  @@map("product_payments")
+}
+
+model GoodsDispatchNote {
+  id               String    @id @default(uuid())
+  productPaymentId String    @unique
+  avizNo           String
+  dispatchDate     DateTime
+  receiverName     String?
+  status           String    @default("DRAFT")
+  fileId           String?
+
+  productPayment ProductPayment @relation(fields: [productPaymentId], references: [id])
+
+  @@map("goods_dispatch_notes")
+}
+
+model PaymentLedger {
+  id          String   @id @default(uuid())
+  tenantId    String
+  batchId     String
+  bordereauNo String
+  generatedAt DateTime @default(now())
+  fileId      String?
+
+  batch PaymentBatch @relation(fields: [batchId], references: [id])
+
+  @@map("payment_ledgers")
+}
+
+model DailyCashReport {
+  id         String   @id @default(uuid())
+  tenantId   String
+  reportDate DateTime
+  monetarNo  String
+  totalCash  Decimal  @db.Decimal(12, 2)
+  fileId     String?
+  createdAt  DateTime @default(now())
+  createdBy  String?
+
+  @@index([tenantId, reportDate])
+  @@map("daily_cash_reports")
+}
+
+// ─────────────────────────────────────────────
+// FINANCIAL DOCUMENTS
+// ─────────────────────────────────────────────
+
+model Invoice {
+  id          String        @id @default(uuid())
+  tenantId    String
+  contractId  String?
+  lessorId    String?
+  invoiceNo   String
+  invoiceDate DateTime
+  dueDate     DateTime?
+  totalRon    Decimal       @db.Decimal(12, 2)
+  totalEur    Decimal?      @db.Decimal(12, 2)
+  vatRate     Decimal?      @db.Decimal(5, 2)
+  status      InvoiceStatus @default(DRAFT)
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  createdBy   String?
+  isDeleted   Boolean       @default(false)
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  contract    Contract?    @relation(fields: [contractId], references: [id])
+  lines       InvoiceLine[]
+  creditNotes CreditNote[]
+  spvJob      SpvTransmissionJob?
+
+  @@unique([tenantId, invoiceNo])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  description String
+  surface     Decimal? @db.Decimal(10, 4)
+  unitPrice   Decimal  @db.Decimal(12, 4)
+  total       Decimal  @db.Decimal(12, 2)
+  vatRate     Decimal? @db.Decimal(5, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+model CreditNote {
+  id           String   @id @default(uuid())
+  tenantId     String
+  invoiceId    String
+  creditNoteNo String
+  date         DateTime
+  reason       String?
+  totalRon     Decimal  @db.Decimal(12, 2)
+  status       String   @default("DRAFT")
+  createdAt    DateTime @default(now())
+  createdBy    String?
+
+  invoice CreditNote? @relation("CreditNoteInvoice", fields: [creditNoteNo], references: [creditNoteNo], map: "credit_note_invoice_fk")
+  ownInvoice Invoice  @relation(fields: [invoiceId], references: [id])
+  lines    CreditNoteLine[]
+  selfRef  CreditNote[] @relation("CreditNoteInvoice")
+
+  @@unique([tenantId, creditNoteNo])
+  @@index([invoiceId])
+  @@map("credit_notes")
+}
+
+model CreditNoteLine {
+  id           String  @id @default(uuid())
+  creditNoteId String
+  description  String
+  amount       Decimal @db.Decimal(12, 2)
+
+  creditNote CreditNote @relation(fields: [creditNoteId], references: [id])
+
+  @@map("credit_note_lines")
+}
+
+// ─────────────────────────────────────────────
+// FISCAL
+// ─────────────────────────────────────────────
+
+model SpvTransmissionJob {
+  id              String    @id @default(uuid())
+  tenantId        String
+  invoiceId       String    @unique
+  status          SpvStatus @default(DRAFT)
+  queuedAt        DateTime?
+  sentAt          DateTime?
+  responsePayload Json?
+  retryCount      Int       @default(0)
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant  Tenant               @relation(fields: [tenantId], references: [id])
+  invoice Invoice              @relation(fields: [invoiceId], references: [id])
+  logs    SpvTransmissionLog[]
+
+  @@index([tenantId, status])
+  @@map("spv_transmission_jobs")
+}
+
+model SpvTransmissionLog {
+  id        String   @id @default(uuid())
+  jobId     String
+  eventType String
+  payload   Json?
+  timestamp DateTime @default(now())
+
+  job SpvTransmissionJob @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+  @@map("spv_transmission_logs")
+}
+
+model DeclarationRun {
+  id              String            @id @default(uuid())
+  tenantId        String
+  declarationType String
+  period          String
+  status          DeclarationStatus @default(DRAFT)
+  approvedBy      String?
+  approvedAt      DateTime?
+  exportedAt      DateTime?
+  exportFileId    String?
+  createdAt       DateTime          @default(now())
+  createdBy       String?
+
+  tenant Tenant               @relation(fields: [tenantId], references: [id])
+  items  DeclarationRunItem[]
+
+  @@index([tenantId, declarationType])
+  @@map("declaration_runs")
+}
+
+model DeclarationRunItem {
+  id            String @id @default(uuid())
+  runId         String
+  entityType    String
+  entityId      String
+  computedValue Json
+  status        String @default("PENDING")
+
+  run DeclarationRun @relation(fields: [runId], references: [id])
+
+  @@index([runId])
+  @@map("declaration_run_items")
+}
+
+model CassCalculation {
+  id            String   @id @default(uuid())
+  tenantId      String
+  lessorId      String
+  period        String
+  grossIncome   Decimal  @db.Decimal(12, 2)
+  cassBase      Decimal  @db.Decimal(12, 2)
+  cassAmount    Decimal  @db.Decimal(12, 2)
+  ruleVersionId String?
+  calculatedAt  DateTime @default(now())
+
+  lessor      Lessor          @relation(fields: [lessorId], references: [id])
+  ruleVersion TaxRuleVersion? @relation(fields: [ruleVersionId], references: [id])
+
+  @@index([tenantId, lessorId, period])
+  @@map("cass_calculations")
+}
+
+model WithholdingTaxRecord {
+  id            String  @id @default(uuid())
+  tenantId      String
+  paymentId     String  @unique
+  lessorId      String
+  grossAmount   Decimal @db.Decimal(12, 2)
+  taxRate       Decimal @db.Decimal(5, 4)
+  taxAmount     Decimal @db.Decimal(12, 2)
+  period        String
+  ruleVersionId String?
+
+  payment     Payment         @relation(fields: [paymentId], references: [id])
+  lessor      Lessor          @relation(fields: [lessorId], references: [id])
+  ruleVersion TaxRuleVersion? @relation(fields: [ruleVersionId], references: [id])
+
+  @@index([tenantId, lessorId])
+  @@map("withholding_tax_records")
+}
+
+model Garnishment {
+  id                  String    @id @default(uuid())
+  tenantId            String
+  lessorId            String
+  authority           String
+  amount              Decimal   @db.Decimal(12, 2)
+  deductionPerPayment Decimal?  @db.Decimal(12, 2)
+  status              String    @default("ACTIVE")
+  startDate           DateTime
+  endDate             DateTime?
+  notes               String?
+  createdAt           DateTime  @default(now())
+  createdBy           String?
+
+  lessor Lessor @relation(fields: [lessorId], references: [id])
+
+  @@index([tenantId, lessorId])
+  @@map("garnishments")
+}
+
+model LandTaxRecord {
+  id         String  @id @default(uuid())
+  tenantId   String
+  lessorId   String
+  parcelId   String?
+  taxYear    Int
+  amount     Decimal @db.Decimal(12, 2)
+  paidAmount Decimal @default(0) @db.Decimal(12, 2)
+  status     String  @default("UNPAID")
+  createdAt  DateTime @default(now())
+
+  lessor Lessor @relation(fields: [lessorId], references: [id])
+
+  @@index([tenantId, lessorId, taxYear])
+  @@map("land_tax_records")
+}
+
+model BonusPayment {
+  id         String   @id @default(uuid())
+  tenantId   String
+  lessorId   String
+  contractId String?
+  paymentId  String?
+  amount     Decimal  @db.Decimal(12, 2)
+  reason     String?
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  createdBy  String?
+
+  lessor  Lessor   @relation(fields: [lessorId], references: [id])
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([tenantId, lessorId])
+  @@map("bonus_payments")
+}
+
+// ─────────────────────────────────────────────
+// DOCUMENT STORAGE
+// ─────────────────────────────────────────────
+
+model File {
+  id              String    @id @default(uuid())
+  tenantId        String
+  storageProvider String
+  storageKey      String
+  filename        String
+  mimeType        String
+  sizeBytes       BigInt
+  checksum        String?
+  uploadedBy      String?
+  uploadedAt      DateTime  @default(now())
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  retentionUntil  DateTime?
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  fileLinks FileLink[]
+
+  @@index([tenantId])
+  @@map("files")
+}
+
+model FileLink {
+  id         String   @id @default(uuid())
+  fileId     String
+  entityType String
+  entityId   String
+  label      String?
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  file File @relation(fields: [fileId], references: [id])
+
+  @@index([entityType, entityId])
+  @@map("file_links")
+}
+
+model GeneratedDocument {
+  id               String   @id @default(uuid())
+  tenantId         String
+  entityType       String
+  entityId         String
+  docType          String
+  templateId       String?
+  docNo            String?
+  generatedAt      DateTime @default(now())
+  generatedBy      String?
+  fileId           String?
+  currentVersionId String?
+
+  versions GeneratedDocumentVersion[]
+
+  @@index([tenantId, entityType, entityId])
+  @@map("generated_documents")
+}
+
+model GeneratedDocumentVersion {
+  id          String   @id @default(uuid())
+  documentId  String
+  versionNo   Int
+  fileId      String?
+  generatedAt DateTime @default(now())
+
+  document GeneratedDocument @relation(fields: [documentId], references: [id])
+
+  @@unique([documentId, versionNo])
+  @@map("generated_document_versions")
+}
+
+model DocumentTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  docType   String
+  name      String
+  version   Int      @default(1)
+  content   String   @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  @@index([tenantId, docType])
+  @@map("document_templates")
+}
+
+model DocumentNumbering {
+  id         String   @id @default(uuid())
+  tenantId   String
+  docType    String
+  year       Int
+  prefix     String?
+  lastNumber Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, docType, year])
+  @@map("document_numbering")
+}
+
+// ─────────────────────────────────────────────
+// PLATFORM OPS
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  tenantId   String
+  userId     String?
+  action     AuditAction
+  entityType String
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  requestId  String?
+  timestamp  DateTime    @default(now())
+  metadata   Json?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, timestamp])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, userId])
+  @@map("audit_logs")
+}
+
+model BackgroundJob {
+  id          String    @id @default(uuid())
+  tenantId    String?
+  jobType     String
+  payload     Json
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  lastError   String?
+  scheduledAt DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  resultRef   String?
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([status, scheduledAt])
+  @@index([tenantId])
+  @@map("background_jobs")
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  tenantId  String
+  userId    String
+  type      String
+  title     String
+  content   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, userId, readAt])
+  @@map("notifications")
+}
