@@ -2,14 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { apiGet, apiPost } from '@/lib/api-client'
+import { useMutation } from '@tanstack/react-query'
+import { apiPost } from '@/lib/api-client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
 import { ArrowLeft, Loader2 } from 'lucide-react'
-
-interface County { id: string; name: string }
-interface Locality { id: string; name: string }
 
 type LessorType = 'NATURAL' | 'LEGAL' | 'PFA'
 type Gender = 'MALE' | 'FEMALE'
@@ -22,7 +19,7 @@ export default function NewLessorPage() {
     firstName: '', lastName: '', companyName: '',
     cnpCui: '', iban: '', bankName: '',
     gender: '' as Gender | '',
-    countyId: '', localityId: '',
+    county: '', locality: '',
     address: '', phone: '', mobile: '', email: '',
     notes: '',
   })
@@ -31,18 +28,7 @@ export default function NewLessorPage() {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  // Nomenclature data
-  const { data: counties } = useQuery({
-    queryKey: ['counties'],
-    queryFn: () => apiGet<County[]>('/nomenclature/counties'),
-    staleTime: Infinity,
-  })
-
-  const { data: localities } = useQuery({
-    queryKey: ['localities', form.countyId],
-    queryFn: () => apiGet<Locality[]>(`/nomenclature/localities?countyId=${form.countyId}`),
-    enabled: !!form.countyId,
-  })
+  // No API calls for county/locality — free text
 
   const mutation = useMutation({
     mutationFn: (payload: unknown) => apiPost<{ id: string }>('/lessors', payload),
@@ -141,21 +127,11 @@ export default function NewLessorPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div>
               <label className={labelCls}>Județ *</label>
-              <select className={inputCls} value={form.countyId} onChange={e => set('countyId', e.target.value)} required>
-                <option value="">Selectați județ</option>
-                {counties?.data?.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <input className={inputCls} value={form.county} onChange={e => set('county', e.target.value)} placeholder="ex: Cluj" required />
             </div>
             <div>
               <label className={labelCls}>Localitate *</label>
-              <select className={inputCls} value={form.localityId} onChange={e => set('localityId', e.target.value)} required disabled={!form.countyId}>
-                <option value="">Selectați localitate</option>
-                {localities?.data?.map(l => (
-                  <option key={l.id} value={l.id}>{l.name}</option>
-                ))}
-              </select>
+              <input className={inputCls} value={form.locality} onChange={e => set('locality', e.target.value)} placeholder="ex: Cluj-Napoca" required />
             </div>
             <div>
               <label className={labelCls}>Adresă stradă</label>
