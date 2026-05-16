@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     .from('parcels')
     .select(`
       id,
-      parcel_code,
+      bloc_fizic,
       tarla_nr,
       parcel_nr,
       surface,
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       contractEndDate:   contract?.end_date   ?? '',
       parcelTarla:      p.tarla_nr ?? '',
       parcelParcela:    p.parcel_nr ?? '',
-      parcelBlocFizic:  p.parcel_code ?? '',
+      parcelBlocFizic:  p.bloc_fizic ?? '',
       leasedSurfaceHa:  Number(p.surface_rented ?? p.surface ?? 0),
       countyName:       p.county   ?? '—',
       localityName:     p.locality ?? '—',

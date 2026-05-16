@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS contracts (
 CREATE TABLE IF NOT EXISTS parcels (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id             uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  parcel_code         text,
+  bloc_fizic          text,
   tarla_nr            text,
   parcel_nr           text,
   county              text NOT NULL DEFAULT '',
@@ -116,7 +116,7 @@ ALTER TABLE contracts
 
 ALTER TABLE parcels
   ADD COLUMN IF NOT EXISTS user_id            uuid REFERENCES auth.users(id) ON DELETE CASCADE,
-  ADD COLUMN IF NOT EXISTS parcel_code        text,
+  ADD COLUMN IF NOT EXISTS bloc_fizic         text,
   ADD COLUMN IF NOT EXISTS tarla_nr           text,
   ADD COLUMN IF NOT EXISTS parcel_nr          text,
   ADD COLUMN IF NOT EXISTS county             text NOT NULL DEFAULT '',

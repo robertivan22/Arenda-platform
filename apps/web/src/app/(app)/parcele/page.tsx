@@ -7,7 +7,7 @@ import { Plus, Search, Pencil } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 
 interface Parcel {
-  id: string; parcel_code: string | null; tarla_nr: string | null; parcel_nr: string | null
+  id: string; bloc_fizic: string | null; tarla_nr: string | null; parcel_nr: string | null
   county: string; locality: string; surface: number; status: string
   lessor_name: string
 }
@@ -20,7 +20,7 @@ export default function ParceleListPage() {
   useEffect(() => {
     createClient()
       .from('parcels')
-      .select('id, parcel_code, tarla_nr, parcel_nr, county, locality, surface, status, lessors(first_name, last_name, company_name, type)')
+      .select('id, bloc_fizic, tarla_nr, parcel_nr, county, locality, surface, status, lessors(first_name, last_name, company_name, type)')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         if (data) setRows((data as any[]).map(p => ({
@@ -35,7 +35,7 @@ export default function ParceleListPage() {
   const filtered = rows.filter(r => {
     if (!search) return true
     const q = search.toLowerCase()
-    return (r.parcel_code ?? '').toLowerCase().includes(q) ||
+    return (r.bloc_fizic ?? '').toLowerCase().includes(q) ||
       r.lessor_name.toLowerCase().includes(q) ||
       r.locality.toLowerCase().includes(q)
   })
@@ -62,7 +62,7 @@ export default function ParceleListPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              {['Cod parcela','Tarla','Nr. parcela','Judet','Localitate','Suprafata (ha)','Arendator','Status',''].map(h => (
+              {['Bloc Fizic','Tarla','Nr. parcela','Judet','Localitate','Suprafata (ha)','Arendator','Status',''].map(h => (
                 <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -71,7 +71,7 @@ export default function ParceleListPage() {
             {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-400">Nicio parcela inregistrata</td></tr>}
             {filtered.map(row => (
               <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="px-3 py-2 font-mono text-xs">{row.parcel_code ?? '-'}</td>
+                <td className="px-3 py-2 font-mono text-xs">{row.bloc_fizic ?? '-'}</td>
                 <td className="px-3 py-2">{row.tarla_nr ?? '-'}</td>
                 <td className="px-3 py-2">{row.parcel_nr ?? '-'}</td>
                 <td className="px-3 py-2">{row.county}</td>

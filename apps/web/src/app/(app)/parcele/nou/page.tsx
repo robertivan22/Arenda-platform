@@ -18,7 +18,7 @@ export default function NewParcelPage() {
   const [lessorsList, setLessorsList] = useState<LessorOption[]>([])
   const [contractsList, setContractsList] = useState<ContractOption[]>([])
   const [form, setForm] = useState({
-    parcelCode: '', tarlaNr: '', parcelNr: '',
+    blocFizic: '', tarlaNr: '', parcelNr: '',
     county: '', locality: '', landUseCategory: 'Arabil',
     surface: '', surfaceRented: '',
     lessorId: '', contractId: '',
@@ -47,7 +47,7 @@ export default function NewParcelPage() {
     if (!user) { toast.error('Neautentificat.'); setSaving(false); return }
     const { error } = await db.from('parcels').insert({
       user_id: user.id,
-      parcel_code: form.parcelCode || null,
+      bloc_fizic: form.blocFizic || null,
       tarla_nr: form.tarlaNr || null,
       parcel_nr: form.parcelNr || null,
       county: form.county,
@@ -80,7 +80,7 @@ export default function NewParcelPage() {
         <div className="form-section">
           <div className="form-section-title">Identificare cadastrala</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div><label className={labelCls}>Cod parcela</label><input className={inputCls} value={form.parcelCode} onChange={e => set('parcelCode', e.target.value)} /></div>
+            <div><label className={labelCls}>Bloc Fizic (APIA/LPIS)</label><input className={inputCls} placeholder="ex: AB001-0001" value={form.blocFizic} onChange={e => set('blocFizic', e.target.value)} /></div>
             <div><label className={labelCls}>Tarla nr.</label><input className={inputCls} value={form.tarlaNr} onChange={e => set('tarlaNr', e.target.value)} /></div>
             <div><label className={labelCls}>Parcela nr.</label><input className={inputCls} value={form.parcelNr} onChange={e => set('parcelNr', e.target.value)} /></div>
           </div>
