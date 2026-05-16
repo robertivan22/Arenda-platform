@@ -1,28 +1,26 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { apiGet } from '@/lib/api-client'
+import { createClient } from '@/lib/supabase/client'
 
 interface LessorDetail {
   id: string
   code: string
-  displayName: string
   type: string
   status: string
-  cnpCui: string
-  birthDate: string | null
+  first_name: string
+  last_name: string
+  company_name: string | null
+  cnp: string
   gender: string | null
-  maritalStatus: string | null
-  nationality: string | null
-  iban: string | null
-  bankName: string | null
-  notes: string | null
   county: string
   locality: string
   address: string | null
-  registeredAt: string
-  createdAt: string
+  iban: string | null
+  bank_name: string | null
+  notes: string | null
+  created_at: string
 }
 
 function Field({ label, value }: { label: string; value?: string | null }) {
@@ -37,17 +35,25 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 
 export default function LessorSumarTabClient() {
   const { id } = useParams<{ id: string }>()
+  const [l, setL] = useState<LessorDetail | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['lessor', id],
-    queryFn: () => apiGet<LessorDetail>(`/lessors/${id}`),
-  })
+  useEffect(() => {
+    if (!id) return
+    createClient()
+      .from('lessors')
+      .select('*')
+      .eq('id', id)
+      .single()
+      .then(({ data }) => {
+        if (data) setL(data as LessorDetail)
+        setLoading(false)
+      })
+  }, [id])
 
-  if (isLoading) {
+  if (loading) {
     return <div className="text-sm text-gray-400">Se încarcă...</div>
   }
-
-  const l = data?.data
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -57,11 +63,17 @@ export default function LessorSumarTabClient() {
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
           <Field label="Cod intern" value={l?.code} />
           <Field label="Tip persoană" value={l?.type} />
-          <Field label="CNP / CUI" value={l?.cnpCui} />
-          <Field label="Data nașterii" value={l?.birthDate?.split('T')[0]} />
+          <Field label="CNP / CUI" value={l?.cnp} />
           <Field label="Gen" value={l?.gender} />
-          <Field label="Stare civilă" value={l?.maritalStatus} />
-          <Field label="Cetățenie" value={l?.nationality} />
+          {l?.type !== 'LEGAL' && (
+            <>
+              <Field label="Nume" value={l?.last_name} />
+              <Field label="Prenume" value={l?.first_name} />
+            </>
+          )}
+          {l?.type === 'LEGAL' && (
+            <Field label="Denumire firmă" value={l?.company_name} />
+          )}
         </dl>
       </div>
 
@@ -80,7 +92,7 @@ export default function LessorSumarTabClient() {
         <div className="form-section-title">Date bancare</div>
         <dl className="grid grid-cols-1 gap-y-3">
           <Field label="IBAN" value={l?.iban} />
-          <Field label="Bancă" value={l?.bankName} />
+          <Field label="Bancă" value={l?.bank_name} />
         </dl>
       </div>
 

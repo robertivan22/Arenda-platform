@@ -1,38 +1,63 @@
-import type { Lessor } from './mockStore'
-import { contracts, parcels } from './mockStore'
+import { createClient } from '@/lib/supabase/client'
 
-export function generateLessorPDF(lessor: Lessor) {
-  const lessorContracts = contracts.list().filter(c => c.lessorId === lessor.id)
-  const lessorParcels = parcels.list().filter(p => p.lessorId === lessor.id)
+interface LessorForPdf {
+  id: string; type: string; first_name: string; last_name: string; company_name: string | null
+  cnp: string; county: string; locality: string; address: string | null
+  mobile: string | null; email: string | null; iban: string | null; bank_name: string | null
+}
+
+interface ContractForPdf {
+  contract_number: string; contract_type: string; start_date: string; end_date: string
+  annual_rent: number; status: string
+}
+
+interface ParcelForPdf {
+  parcel_code: string | null; tarla_nr: string | null; parcel_nr: string | null
+  county: string; locality: string; land_use_category: string | null; surface: number
+}
+
+export async function generateLessorPDF(lessorId: string) {
+  const db = createClient()
+  const [{ data: lessorData }, { data: contractsData }, { data: parcelsData }] = await Promise.all([
+    db.from('lessors').select('*').eq('id', lessorId).single(),
+    db.from('contracts').select('contract_number, contract_type, start_date, end_date, annual_rent, status').eq('lessor_id', lessorId),
+    db.from('parcels').select('parcel_code, tarla_nr, parcel_nr, county, locality, land_use_category, surface').eq('lessor_id', lessorId),
+  ])
+  if (!lessorData) return
+
+  const lessor = lessorData as LessorForPdf
+  const displayName = lessor.type === 'LEGAL' ? (lessor.company_name ?? '') : `${lessor.last_name} ${lessor.first_name}`.trim()
+  const lessorContracts = (contractsData ?? []) as ContractForPdf[]
+  const lessorParcels = (parcelsData ?? []) as ParcelForPdf[]
   const today = new Date().toLocaleDateString('ro-RO')
-  const totalSurface = lessorParcels.reduce((s, p) => s + parseFloat(p.surface || '0'), 0).toFixed(4)
-  const totalRent = lessorContracts.reduce((s, c) => s + parseFloat(c.annualRent || '0'), 0).toFixed(2)
+  const totalSurface = lessorParcels.reduce((s, p) => s + Number(p.surface || 0), 0).toFixed(4)
+  const totalRent = lessorContracts.reduce((s, c) => s + Number(c.annual_rent || 0), 0).toFixed(2)
 
   const contractRows = lessorContracts.map(c => `
     <tr>
-      <td style="padding:6px 8px;border:1px solid #ddd">${c.contractNumber}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd">${c.contractType}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd">${c.startDate}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd">${c.endDate}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd;text-align:right">${c.annualRent} RON</td>
+      <td style="padding:6px 8px;border:1px solid #ddd">${c.contract_number}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd">${c.contract_type}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd">${c.start_date}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd">${c.end_date}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd;text-align:right">${Number(c.annual_rent).toFixed(2)} RON</td>
       <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${c.status}</td>
     </tr>`).join('') || '<tr><td colspan="6" style="padding:6px 8px;border:1px solid #ddd;text-align:center;color:#999">Niciun contract</td></tr>'
 
   const parcelRows = lessorParcels.map(p => `
     <tr>
-      <td style="padding:6px 8px;border:1px solid #ddd">${p.parcelCode}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd">${p.tarlaNr}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd">${p.parcelNr}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd">${p.parcel_code ?? ''}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd">${p.tarla_nr ?? ''}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd">${p.parcel_nr ?? ''}</td>
       <td style="padding:6px 8px;border:1px solid #ddd">${p.county} / ${p.locality}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd">${p.landUseCategory}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd;text-align:right">${p.surface} ha</td>
+      <td style="padding:6px 8px;border:1px solid #ddd">${p.land_use_category ?? ''}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd;text-align:right">${Number(p.surface).toFixed(4)} ha</td>
     </tr>`).join('') || '<tr><td colspan="6" style="padding:6px 8px;border:1px solid #ddd;text-align:center;color:#999">Nicio parcelă</td></tr>'
 
   const html = `<!DOCTYPE html>
 <html lang="ro">
 <head>
   <meta charset="UTF-8">
-  <title>Contract arendă — ${lessor.displayName}</title>
+  <title>Contract arendă — ${displayName}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: Arial, sans-serif; font-size: 11pt; color: #222; padding: 40px; }
@@ -68,11 +93,11 @@ export function generateLessorPDF(lessor: Lessor) {
 
 <div class="section">
   <div class="section-title">I. PĂRȚILE CONTRACTANTE</div>
-  <p class="clause"><strong>ARENDATORUL:</strong> ${lessor.displayName}, ${lessor.type === 'NATURAL' ? 'persoană fizică' : lessor.type === 'PFA' ? 'PFA' : 'persoană juridică'}, 
-  ${lessor.type !== 'LEGAL' ? `CNP: ${lessor.cnpCui}` : `CUI: ${lessor.cnpCui}`}, 
+  <p class="clause"><strong>ARENDATORUL:</strong> ${displayName}, ${lessor.type === 'NATURAL' ? 'persoană fizică' : lessor.type === 'PFA' ? 'PFA' : 'persoană juridică'}, 
+  ${lessor.type !== 'LEGAL' ? `CNP: ${lessor.cnp}` : `CUI: ${lessor.cnp}`}, 
   domiciliat/ă în ${lessor.locality}, ${lessor.county}, ${lessor.address || ''}, 
   ${lessor.mobile ? `tel: ${lessor.mobile}` : ''}${lessor.email ? `, email: ${lessor.email}` : ''},
-  IBAN: ${lessor.iban || '___________________________'}, Bancă: ${lessor.bankName || '_______________'}.</p>
+  IBAN: ${lessor.iban || '___________________________'}, Bancă: ${lessor.bank_name || '_______________'}.</p>
 
   <p class="clause" style="margin-top:10px"><strong>ARENDAȘUL:</strong> S.C. __________________________ S.R.L., CUI __________________, 
   cu sediul în ______________________________, reprezentată prin ______________________________, 
@@ -168,7 +193,7 @@ export function generateLessorPDF(lessor: Lessor) {
 <div class="signatures">
   <div class="sig-box">
     <p style="font-size:10pt;font-weight:bold">ARENDATOR</p>
-    <p style="font-size:9pt;color:#555;margin-top:4px">${lessor.displayName}</p>
+    <p style="font-size:9pt;color:#555;margin-top:4px">${displayName}</p>
     <div class="sig-line">Semnătură și ștampilă</div>
     <div class="sig-line">Data: _______________</div>
   </div>

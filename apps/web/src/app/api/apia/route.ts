@@ -32,13 +32,18 @@ export async function POST(req: NextRequest) {
     .from('parcels')
     .select(`
       id,
-      parcel_number,
-      area_ha,
+      parcel_code,
+      tarla_nr,
+      parcel_nr,
+      surface,
+      surface_rented,
       county,
       locality,
-      category,
-      lessor:lessors!parcels_lessor_id_fkey(cnp, first_name, last_name),
-      contract:contracts!parcels_contract_id_fkey(contract_number, start_date, end_date)
+      land_use_category,
+      lessor_id,
+      contract_id,
+      lessors(cnp, first_name, last_name),
+      contracts(contract_number, start_date, end_date)
     `)
     .eq('user_id', user.id)
 
@@ -47,8 +52,8 @@ export async function POST(req: NextRequest) {
   }
 
   const rows = (parcels ?? []).map((p: any) => {
-    const lessor   = Array.isArray(p.lessor)   ? p.lessor[0]   : p.lessor
-    const contract = Array.isArray(p.contract) ? p.contract[0] : p.contract
+    const lessor   = Array.isArray(p.lessors)   ? p.lessors[0]   : p.lessors
+    const contract = Array.isArray(p.contracts) ? p.contracts[0] : p.contracts
     return {
       lessorCnp:        lessor?.cnp        ?? '',
       lessorLastName:   lessor?.last_name  ?? '—',
@@ -56,11 +61,13 @@ export async function POST(req: NextRequest) {
       contractNumber:   contract?.contract_number ?? '—',
       contractStartDate: contract?.start_date ?? '',
       contractEndDate:   contract?.end_date   ?? '',
-      parcelNumber:     p.parcel_number ?? '',
-      leasedSurfaceHa:  Number(p.area_ha ?? 0),
+      parcelTarla:      p.tarla_nr ?? '',
+      parcelParcela:    p.parcel_nr ?? '',
+      parcelBlocFizic:  p.parcel_code ?? '',
+      leasedSurfaceHa:  Number(p.surface_rented ?? p.surface ?? 0),
       countyName:       p.county   ?? '—',
       localityName:     p.locality ?? '—',
-      landUseCategory:  p.category ?? '—',
+      landUseCategory:  p.land_use_category ?? '—',
       apiaDeclared:     false,
     }
   })

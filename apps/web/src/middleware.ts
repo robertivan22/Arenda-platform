@@ -67,7 +67,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/contracte') ||
     pathname.startsWith('/parcele') ||
     pathname.startsWith('/plati') ||
-    pathname.startsWith('/rapoarte')
+    pathname.startsWith('/rapoarte') ||
+    pathname.startsWith('/declaratii') ||
+    pathname.startsWith('/profil')
 
   if (!user && isAppPage) {
     // Not logged in — redirect to login

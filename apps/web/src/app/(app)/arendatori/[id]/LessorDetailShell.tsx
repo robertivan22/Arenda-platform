@@ -1,12 +1,12 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { apiGet } from '@/lib/api-client'
+import { createClient } from '@/lib/supabase/client'
 import { clsx } from 'clsx'
 import { StatusBadge } from '@/components/data-display/StatusBadge'
 import { ArrowLeft } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 interface LessorSummary {
   id: string
@@ -32,14 +32,30 @@ export function LessorDetailShell({ children }: { children: React.ReactNode }) {
   const { id } = useParams<{ id: string }>()
   const pathname = usePathname()
   const router = useRouter()
+  const [lessor, setLessor] = useState<LessorSummary | null>(null)
 
-  const { data } = useQuery({
-    queryKey: ['lessor', id],
-    queryFn: () => apiGet<LessorSummary>(`/lessors/${id}`),
-    enabled: !!id,
-  })
-
-  const lessor = data?.data
+  useEffect(() => {
+    if (!id) return
+    createClient()
+      .from('lessors')
+      .select('id, code, type, first_name, last_name, company_name, status')
+      .eq('id', id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          const d = data as any
+          setLessor({
+            id: d.id,
+            code: d.code ?? '',
+            type: d.type,
+            status: d.status,
+            displayName: d.type === 'LEGAL'
+              ? (d.company_name ?? '')
+              : `${d.last_name ?? ''} ${d.first_name ?? ''}`.trim(),
+          })
+        }
+      })
+  }, [id])
 
   return (
     <div>

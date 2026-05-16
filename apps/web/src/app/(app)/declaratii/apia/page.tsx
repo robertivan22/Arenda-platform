@@ -42,7 +42,10 @@ export default function ApiaPage() {
     setLoading(true)
     setDataset(null)
     try {
-      const { data: { session } } = await createClient().auth.getSession()
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Neautentificat.')
+      const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token ?? ''
       const res = await fetch('/api/apia', {
         method: 'POST',

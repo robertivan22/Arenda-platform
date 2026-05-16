@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { AlertTriangle, FileSpreadsheet, Download, Check, FileCode, ChevronDown, ChevronUp, ShieldCheck, ShieldAlert, XCircle, Loader2, FileText } from 'lucide-react'
 import { toast } from 'sonner'
@@ -80,25 +80,36 @@ export default function D112Page() {
   const [month, setMonth] = useState(currentMonth === 1 ? 12 : currentMonth - 1)
   const [loading, setLoading] = useState(false)
   const [dataset, setDataset] = useState<D112Dataset | null>(null)
-  const [payer, setPayer] = useState<PayerInfo>(() => {
-    if (typeof window !== 'undefined') {
-      try { return { ...DEFAULT_PAYER, ...JSON.parse(localStorage.getItem('d112_payer') ?? '{}') } } catch { /**/ }
-    }
-    return DEFAULT_PAYER
-  })
+  const [payer, setPayer] = useState<PayerInfo>(DEFAULT_PAYER)
   const [showPayerForm, setShowPayerForm] = useState(false)
   const [validationMsgs, setValidationMsgs] = useState<VMsg[] | null>(null)
   const [validating, setValidating] = useState(false)
+  const [payerKey, setPayerKey] = useState<string | null>(null)
+
+  // Load payer info namespaced per user
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      const key = `d112_payer_${user.id}`
+      setPayerKey(key)
+      try {
+        const saved = localStorage.getItem(key)
+        if (saved) setPayer({ ...DEFAULT_PAYER, ...JSON.parse(saved) })
+      } catch { /**/ }
+    })
+  }, [])
 
   function savePayer(updated: PayerInfo) {
     setPayer(updated)
-    localStorage.setItem('d112_payer', JSON.stringify(updated))
+    if (payerKey) localStorage.setItem(payerKey, JSON.stringify(updated))
   }
 
   async function generate() {
     setLoading(true)
     setDataset(null)
     try {
+      const { data: { user } } = await createClient().auth.getUser()
+      if (!user) throw new Error('Neautentificat.')
       const { data: { session } } = await createClient().auth.getSession()
       const token = session?.access_token ?? ''
       const res = await fetch('/api/d112', {

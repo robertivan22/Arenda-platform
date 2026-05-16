@@ -1,20 +1,16 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { apiGet } from '@/lib/api-client'
+import { createClient } from '@/lib/supabase/client'
 
 interface ContactInfo {
   phone: string | null
   mobile: string | null
   email: string | null
   address: string | null
-  postalCode: string | null
   county: string
   locality: string
-  countryBirth: string | null
-  countyBirth: string | null
-  localityBirth: string | null
 }
 
 function Field({ label, value }: { label: string; value?: string | null }) {
@@ -29,15 +25,23 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 
 export default function LessorContactTabClient() {
   const { id } = useParams<{ id: string }>()
+  const [l, setL] = useState<ContactInfo | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['lessor', id],
-    queryFn: () => apiGet<ContactInfo>(`/lessors/${id}`),
-  })
+  useEffect(() => {
+    if (!id) return
+    createClient()
+      .from('lessors')
+      .select('phone, mobile, email, address, county, locality')
+      .eq('id', id)
+      .single()
+      .then(({ data }) => {
+        if (data) setL(data as ContactInfo)
+        setLoading(false)
+      })
+  }, [id])
 
-  if (isLoading) return <div className="text-sm text-gray-400">Se încarcă...</div>
-
-  const l = data?.data
+  if (loading) return <div className="text-sm text-gray-400">Se încarcă...</div>
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -56,16 +60,6 @@ export default function LessorContactTabClient() {
           <Field label="Județ" value={l?.county} />
           <Field label="Localitate" value={l?.locality} />
           <Field label="Adresă stradă" value={l?.address} />
-          <Field label="Cod poștal" value={l?.postalCode} />
-        </dl>
-      </div>
-
-      <div className="form-section">
-        <div className="form-section-title">Loc naștere</div>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-          <Field label="Țară naștere" value={l?.countryBirth} />
-          <Field label="Județ naștere" value={l?.countyBirth} />
-          <Field label="Localitate naștere" value={l?.localityBirth} />
         </dl>
       </div>
     </div>
