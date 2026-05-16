@@ -983,8 +983,7 @@ model CreditNote {
   id           String   @id @default(uuid())
   tenantId     String
   invoiceId    String
-  creditNoteNo String
-  date         DateTime
+  creditNoteNo String   @unique
   reason       String?
   totalRon     Decimal  @db.Decimal(12, 2)
   status       String   @default("DRAFT")
