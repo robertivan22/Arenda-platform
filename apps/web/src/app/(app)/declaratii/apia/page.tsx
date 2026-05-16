@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { AlertTriangle, Tractor, Download, Check } from 'lucide-react'
 import { toast } from 'sonner'
+import { api } from '@/lib/api-client'
 
 interface ApiaRow {
   lessorCnp: string
