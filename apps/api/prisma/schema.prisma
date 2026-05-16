@@ -371,6 +371,7 @@ model TaxRuleVersion {
 
   cassCalculations   CassCalculation[]
   withholdingRecords WithholdingTaxRecord[]
+  declarationDetails DeclarationRunItemDetail[]
 
   @@index([ruleType, validFrom])
   @@map("tax_rule_versions")
@@ -1057,11 +1058,15 @@ model DeclarationRun {
   period          String
   status          DeclarationStatus @default(DRAFT)
   approvedBy      String?
+  approvedById    String?
   approvedAt      DateTime?
   exportedAt      DateTime?
   exportFileId    String?
+  reviewNotes     String?
+  metadataJson    Json?
   createdAt       DateTime          @default(now())
   createdBy       String?
+  createdById     String?
 
   tenant Tenant               @relation(fields: [tenantId], references: [id])
   items  DeclarationRunItem[]
@@ -1079,6 +1084,7 @@ model DeclarationRunItem {
   status        String @default("PENDING")
 
   run DeclarationRun @relation(fields: [runId], references: [id])
+  detail DeclarationRunItemDetail?
 
   @@index([runId])
   @@map("declaration_run_items")
@@ -1341,3 +1347,92 @@ model Notification {
   @@index([tenantId, userId, readAt])
   @@map("notifications")
 }
+
+// ─────────────────────────────────────────────
+// DECLARATIONS / FISCAL COMPLIANCE MODULE
+// ─────────────────────────────────────────────
+
+model ApiaCampaign {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  campaignYear       Int
+  submissionDeadline DateTime?
+  configJson         Json?
+  createdAt          DateTime @default(now())
+
+  exports ApiaExport[]
+
+  @@unique([tenantId, campaignYear])
+  @@index([tenantId])
+  @@map("apia_campaigns")
+}
+
+model ApiaExport {
+  id             String    @id @default(uuid())
+  tenantId       String
+  campaignId     String
+  status         String    @default("DRAFT")
+  rowCount       Int?
+  totalSurfaceHa Decimal?  @db.Decimal(12, 4)
+  fileId         String?
+  generatedAt    DateTime?
+  approvedBy     String?
+  approvedAt     DateTime?
+  notes          String?
+  warnings       Json?
+  exportJson     Json?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+
+  campaign ApiaCampaign @relation(fields: [campaignId], references: [id])
+
+  @@index([tenantId])
+  @@map("apia_exports")
+}
+
+/// County-level average agricultural prices published annually by ANAF/MADR.
+/// Used to value in-kind (natura) arendă payments for tax base calculation.
+/// Must be updated annually by an admin when ANAF/MADR publishes new values.
+model CountyAgriculturePrice {
+  id          String    @id @default(uuid())
+  countyCode  String
+  year        Int
+  productType String    @default("WHEAT_CORN_MIX")
+  pricePerKg  Decimal   @db.Decimal(10, 4)
+  sourceRef   String?
+  validFrom   DateTime
+  validTo     DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([countyCode, year, productType])
+  @@index([countyCode, year])
+  @@map("county_agriculture_prices")
+}
+
+/// Extended declaration run item — enriches the base DeclarationRunItem
+/// with pre-computed fiscal values and traceability fields.
+/// Uses a one-to-one link via runItemId.
+model DeclarationRunItemDetail {
+  id                String   @id @default(uuid())
+  runItemId         String   @unique
+  lessorId          String?
+  contractId        String?
+  paymentIds        String[]
+  grossAmountRon    Decimal? @db.Decimal(12, 2)
+  deductionAmountRon Decimal? @db.Decimal(12, 2)
+  netTaxableRon     Decimal? @db.Decimal(12, 2)
+  withholdingTaxRon Decimal? @db.Decimal(12, 2)
+  cassBaseRon       Decimal? @db.Decimal(12, 2)
+  cassWarning       String?
+  ruleVersionId     String?
+  legalBasis        String?
+  warnings          Json?
+  requiresReview    Boolean  @default(false)
+  paymentType       String?
+
+  runItem     DeclarationRunItem @relation(fields: [runItemId], references: [id])
+  ruleVersion TaxRuleVersion?    @relation(fields: [ruleVersionId], references: [id])
+
+  @@map("declaration_run_item_details")
+}
+

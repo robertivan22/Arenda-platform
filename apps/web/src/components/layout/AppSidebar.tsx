@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, Building2, X,
+  BarChart3, ChevronDown, Building2, X, FileSpreadsheet,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState } from 'react'
@@ -57,6 +57,16 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Rapoarte',
     href: '/rapoarte',
     icon: BarChart3,
+  },
+  {
+    label: 'Declarații',
+    icon: FileSpreadsheet,
+    children: [
+      { label: 'Dashboard fiscal', href: '/declaratii' },
+      { label: 'D112 — Impozit arendă', href: '/declaratii/d112' },
+      { label: 'Export APIA', href: '/declaratii/apia' },
+      { label: 'Istoric declarații', href: '/declaratii/istoric' },
+    ],
   },
 ]
 
