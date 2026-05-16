@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'edge'
@@ -35,21 +35,34 @@ export async function POST(req: NextRequest) {
   const lastDay = new Date(year, month, 0).getDate()
   const periodTo = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
 
-  // Step 1: fetch all payments (no join - avoid FK name ambiguity)
-  const { data: payments, error: paymentsError } = await supabase
+  // Try fetching with user_id filter first
+  const { data: paymentsWithUser, error: err1 } = await supabase
     .from('payments')
-    .select('id, amount, status, paid_date, due_date, contract_id, lessor_id')
+    .select('id, amount, status, paid_date, due_date, contract_id, lessor_id, user_id')
     .eq('user_id', user.id)
+
+  // Also try without user_id filter to detect if column exists / RLS handles it
+  const { data: paymentsAll, error: err2 } = await supabase
+    .from('payments')
+    .select('id, amount, status, paid_date, due_date, contract_id, lessor_id, user_id')
+    .limit(5)
+
+  // Use whichever returned data
+  const payments = (paymentsWithUser && paymentsWithUser.length > 0)
+    ? paymentsWithUser
+    : (paymentsAll ?? [])
+
+  const paymentsError = err1 && err2 ? err1 : null
 
   if (paymentsError) {
     return NextResponse.json({
       error: 'Eroare interogare plati: ' + paymentsError.message,
-      _debug: { paymentsError }
+      _debug: { err1, err2, userId: user.id }
     }, { status: 500 })
   }
 
-  // Step 2: fetch lessors separately by ID
-  const lessorIds = [...new Set((payments ?? []).map((p: any) => p.lessor_id).filter(Boolean))]
+  // Fetch lessors separately by ID
+  const lessorIds = [...new Set(payments.map((p: any) => p.lessor_id).filter(Boolean))]
   const lessorMap = new Map<string, { cnp: string; first_name: string; last_name: string }>()
   if (lessorIds.length > 0) {
     const { data: lessors } = await supabase
@@ -67,8 +80,7 @@ export async function POST(req: NextRequest) {
       s.includes('platit') || s.includes('paid')
   }
 
-  const allPayments = payments ?? []
-  const paymentsInPeriod = allPayments.filter((p: any) => {
+  const paymentsInPeriod = payments.filter((p: any) => {
     if (!isPaid(p.status)) return false
     const dateStr: string | null = p.paid_date ?? p.due_date ?? null
     if (!dateStr) return false
@@ -82,7 +94,7 @@ export async function POST(req: NextRequest) {
     'DRAFT - necesita validare contabil inainte de depunere.',
   ]
 
-  if (allPayments.length === 0) {
+  if (payments.length === 0) {
     return NextResponse.json({
       dataset: {
         periodYear: year, periodMonth: month,
@@ -92,27 +104,42 @@ export async function POST(req: NextRequest) {
         warnings: [], generatedAt: new Date().toISOString(),
         status: 'DRAFT', requiresAccountantReview: true,
       },
-      _debug: { totalInDB: 0, userId: user.id, periodFrom, periodTo }
+      _debug: {
+        msg: 'Zero payments found in DB',
+        userId: user.id,
+        err1: err1?.message,
+        err2: err2?.message,
+        paymentsWithUserCount: paymentsWithUser?.length ?? 'error',
+        paymentsAllCount: paymentsAll?.length ?? 'error',
+        periodFrom, periodTo,
+      }
     })
   }
 
   if (paymentsInPeriod.length === 0) {
-    const note = `Nu exista plati in ${String(month).padStart(2, '0')}/${year}. Exista ${allPayments.length} plati - verificati statusul si data.`
     return NextResponse.json({
       dataset: {
         periodYear: year, periodMonth: month,
         rows: [], totalGrossRon: 0, totalWithholdingTaxRon: 0,
         rowsWithWarnings: 0, rowsIncomplete: 0,
-        applicabilityNotes: [...applicabilityNotes, note],
+        applicabilityNotes: [...applicabilityNotes,
+          `Nu exista plati in ${String(month).padStart(2, '0')}/${year}. Exista ${payments.length} plati - verificati statusul si data.`
+        ],
         warnings: [], generatedAt: new Date().toISOString(),
         status: 'DRAFT', requiresAccountantReview: true,
       },
       _debug: {
-        totalInDB: allPayments.length,
+        totalInDB: payments.length,
         userId: user.id,
-        statuses: [...new Set(allPayments.map((p: any) => p.status))],
-        dates: allPayments.slice(0, 10).map((p: any) => ({
-          id: p.id, status: p.status, paid_date: p.paid_date, due_date: p.due_date, lessor_id: p.lessor_id
+        statuses: [...new Set(payments.map((p: any) => p.status))],
+        sample: payments.slice(0, 5).map((p: any) => ({
+          id: p.id,
+          status: p.status,
+          paid_date: p.paid_date,
+          due_date: p.due_date,
+          lessor_id: p.lessor_id,
+          user_id: p.user_id,
+          amount: p.amount,
         })),
         periodFrom, periodTo,
       }

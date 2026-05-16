@@ -10,7 +10,6 @@ import { clsx } from 'clsx'
 import { useState } from 'react'
 import { useSidebarStore } from '@/store/sidebar.store'
 
-
 interface NavItem {
   label: string
   href?: string
@@ -29,7 +28,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Users,
     children: [
       { label: 'Lista arendatori', href: '/arendatori' },
-      { label: 'AdaugÄƒ arendator', href: '/arendatori/nou' },
+      { label: 'Adauga arendator', href: '/arendatori/nou' },
     ],
   },
   {
@@ -45,11 +44,11 @@ const NAV_ITEMS: NavItem[] = [
     icon: MapPin,
     children: [
       { label: 'Lista parcele', href: '/parcele' },
-      { label: 'ParcelÄƒ nouÄƒ', href: '/parcele/nou' },
+      { label: 'Parcela noua', href: '/parcele/nou' },
     ],
   },
   {
-    label: 'PlÄƒÈ›i',
+    label: 'Plati',
     href: '/plati',
     icon: CreditCard,
   },
@@ -59,13 +58,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: BarChart3,
   },
   {
-    label: 'DeclaraÈ›ii',
+    label: 'Declaratii',
     icon: FileSpreadsheet,
     children: [
       { label: 'Dashboard fiscal', href: '/declaratii' },
-      { label: 'D112 â€” Impozit arendÄƒ', href: '/declaratii/d112' },
+      { label: 'D112 - Impozit arenda', href: '/declaratii/d112' },
       { label: 'Export APIA', href: '/declaratii/apia' },
-      { label: 'Istoric declaraÈ›ii', href: '/declaratii/istoric' },
+      { label: 'Istoric declaratii', href: '/declaratii/istoric' },
     ],
   },
 ]
@@ -87,7 +86,6 @@ export function AppSidebar() {
   return (
     <nav className={clsx(
       'w-56 bg-sidebar-bg flex flex-col h-full select-none flex-shrink-0 z-30',
-      // On mobile: fixed overlay, slide in/out
       'fixed md:relative inset-y-0 left-0 transition-transform duration-200',
       open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
     )}>
@@ -99,7 +97,6 @@ export function AppSidebar() {
             Arenda<span className="text-brand-400">Pro</span>
           </span>
         </div>
-        {/* Close button â€” mobile only */}
         <button
           onClick={close}
           className="md:hidden p-1 rounded text-sidebar-muted hover:text-sidebar-text hover:bg-sidebar-hover transition-colors"
@@ -111,7 +108,6 @@ export function AppSidebar() {
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-2 scrollbar-thin">
         {NAV_ITEMS.map(item => {
-          // Leaf item
           if (!item.children) {
             const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
             return (
@@ -132,7 +128,6 @@ export function AppSidebar() {
             )
           }
 
-          // Group item with children
           const groupActive = isGroupActive(item)
           const isOpen = collapsed[item.label] !== undefined
             ? !collapsed[item.label]
@@ -187,7 +182,7 @@ export function AppSidebar() {
         })}
       </div>
 
-      {/* Footer */}
+      {/* Footer — Profil */}
       <div className="border-t border-sidebar-hover">
         <Link
           href="/profil"
@@ -209,4 +204,3 @@ export function AppSidebar() {
     </nav>
   )
 }
-
