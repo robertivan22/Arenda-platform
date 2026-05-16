@@ -35,6 +35,8 @@ export async function POST(req: NextRequest) {
   const lastDay = new Date(year, month, 0).getDate()
   const periodTo = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
 
+  // Fetch all PAID payments for this user — filter by date client-side
+  // because paid_date may be NULL even when status=PAID (only due_date is set)
   const { data: payments, error } = await supabase
     .from('payments')
     .select(`
@@ -42,13 +44,20 @@ export async function POST(req: NextRequest) {
       amount,
       status,
       paid_date,
+      due_date,
       contract_id,
       lessor:lessors!payments_lessor_id_fkey(cnp, first_name, last_name)
     `)
     .eq('user_id', user.id)
-    .in('status', ['PAID', 'paid'])
-    .gte('paid_date', periodFrom)
-    .lte('paid_date', periodTo)
+    .in('status', ['PAID', 'paid', 'Platit', 'PLATIT', 'platit'])
+
+  // Filter in-memory: use paid_date if available, else fall back to due_date
+  const paymentsInPeriod = (payments ?? []).filter((p: any) => {
+    const dateStr: string | null = p.paid_date ?? p.due_date ?? null
+    if (!dateStr) return false
+    const d = dateStr.slice(0, 10)  // YYYY-MM-DD
+    return d >= periodFrom && d <= periodTo
+  })
 
   if (error) {
     return NextResponse.json({ error: 'Eroare interogare pl\u0103\u021bi: ' + error.message }, { status: 500 })
@@ -61,19 +70,35 @@ export async function POST(req: NextRequest) {
   ]
 
   if (!payments || payments.length === 0) {
+    const note = 'Nu există plăți cu status PAID în această perioadă.'
     return NextResponse.json({
       dataset: {
         periodYear: year, periodMonth: month,
         rows: [], totalGrossRon: 0, totalWithholdingTaxRon: 0,
         rowsWithWarnings: 0, rowsIncomplete: 0,
-        applicabilityNotes: [...applicabilityNotes, 'Nu exist\u0103 pl\u0103\u021bi cu status PAID \u00een aceast\u0103 perioad\u0103.'],
+        applicabilityNotes: [...applicabilityNotes, note],
         warnings: [], generatedAt: new Date().toISOString(),
         status: 'DRAFT', requiresAccountantReview: true,
       },
     })
   }
 
-  const rows = payments.map((p: any) => {
+  if (paymentsInPeriod.length === 0) {
+    const totalPaid = payments.length
+    const note = `Nu există plăți în ${String(month).padStart(2, '0')}/${year}. ${totalPaid > 0 ? `Există ${totalPaid} plăți în alte perioade — verificați data plății (paid_date) sau data scadenței (due_date).` : ''}`
+    return NextResponse.json({
+      dataset: {
+        periodYear: year, periodMonth: month,
+        rows: [], totalGrossRon: 0, totalWithholdingTaxRon: 0,
+        rowsWithWarnings: 0, rowsIncomplete: 0,
+        applicabilityNotes: [...applicabilityNotes, note],
+        warnings: [], generatedAt: new Date().toISOString(),
+        status: 'DRAFT', requiresAccountantReview: true,
+      },
+    })
+  }
+
+  const rows = paymentsInPeriod.map((p: any) => {
     const lessor = Array.isArray(p.lessor) ? p.lessor[0] : p.lessor
     const warnings: string[] = []
 
