@@ -1,3 +1,11 @@
+/**
+ * App layout — wraps all authenticated pages.
+ *
+ * The middleware already redirects unauthenticated users to /login,
+ * so this layout can be a simple Server Component without extra checks.
+ * The sidebar and topbar are client components that can call useAuthStore
+ * to get the current Supabase user for display.
+ */
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { AppTopbar } from '@/components/layout/AppTopbar'
 import { SidebarOverlay } from '@/components/layout/SidebarOverlay'
