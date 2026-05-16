@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { AlertTriangle, FileSpreadsheet, Download, Check, FileCode, ChevronDown, ChevronUp, ShieldCheck, ShieldAlert, XCircle, Loader2 } from 'lucide-react'
+import { AlertTriangle, FileSpreadsheet, Download, Check, FileCode, ChevronDown, ChevronUp, ShieldCheck, ShieldAlert, XCircle, Loader2, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { validateD112, buildD112ValidationInput, type VMsg } from '@/lib/d112Validator'
+import { generateD112Pdf, buildD112PdfInput } from '@/lib/d112Pdf'
 
 interface PayerInfo {
   cif: string
@@ -371,6 +372,13 @@ ${asigurati}
             >
               <FileCode className="w-4 h-4" />
               Export XML (ANAF D112)
+            </button>
+            <button
+              onClick={() => { if (dataset) generateD112Pdf(buildD112PdfInput(dataset, payer)) }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-400 text-red-700 hover:bg-red-50 rounded font-medium"
+            >
+              <FileText className="w-4 h-4" />
+              Export PDF
             </button>
             <button
               onClick={runValidation}
