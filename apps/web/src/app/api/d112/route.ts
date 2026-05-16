@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
       lessorCnp:        cnp,
       lessorLastName:   lessor?.lastName  ?? '—',
       lessorFirstName:  lessor?.firstName ?? '—',
-      contractId:       (Array.isArray(payment.contract) ? payment.contract[0]?.id : payment.contract?.id) ?? payment.contractId ?? '',
+      contractId:       (payment.contractId as string) ?? '',
       paymentIds:       [payment.id],
       paymentType,
       grossAmountRon:   gross,
