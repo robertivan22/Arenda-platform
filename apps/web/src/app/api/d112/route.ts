@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
   const lastDay = new Date(year, month, 0).getDate()
   const periodTo = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
 
-  // Fetch all PAID payments for this user — filter by date client-side
-  // because paid_date may be NULL even when status=PAID (only due_date is set)
+  // Fetch ALL payments for this user — filter status in-memory to handle
+  // any status variant: PAID, paid, Plătit, Platit, platit, etc.
   const { data: payments, error } = await supabase
     .from('payments')
     .select(`
@@ -49,10 +49,17 @@ export async function POST(req: NextRequest) {
       lessor:lessors!payments_lessor_id_fkey(cnp, first_name, last_name)
     `)
     .eq('user_id', user.id)
-    .in('status', ['PAID', 'paid', 'Platit', 'PLATIT', 'platit'])
 
-  // Filter in-memory: use paid_date if available, else fall back to due_date
+  // Status check — case-insensitive, accept any "paid/platit" variant
+  function isPaid(status: string | null): boolean {
+    if (!status) return false
+    const s = status.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    return s === 'paid' || s === 'platit' || s === 'platita'
+  }
+
+  // Filter in-memory: only paid, use paid_date if available, else due_date
   const paymentsInPeriod = (payments ?? []).filter((p: any) => {
+    if (!isPaid(p.status)) return false
     const dateStr: string | null = p.paid_date ?? p.due_date ?? null
     if (!dateStr) return false
     const d = dateStr.slice(0, 10)  // YYYY-MM-DD
@@ -84,8 +91,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (paymentsInPeriod.length === 0) {
-    const totalPaid = payments.length
-    const note = `Nu există plăți în ${String(month).padStart(2, '0')}/${year}. ${totalPaid > 0 ? `Există ${totalPaid} plăți în alte perioade — verificați data plății (paid_date) sau data scadenței (due_date).` : ''}`
+    const allPayments = payments ?? []
+    const note = allPayments.length > 0
+      ? `Nu există plăți în ${String(month).padStart(2, '0')}/${year}. Există ${allPayments.length} plăți în alte perioade — verificați data plății/scadenței.`
+      : 'Nu există plăți înregistrate.'
     return NextResponse.json({
       dataset: {
         periodYear: year, periodMonth: month,
@@ -95,6 +104,14 @@ export async function POST(req: NextRequest) {
         warnings: [], generatedAt: new Date().toISOString(),
         status: 'DRAFT', requiresAccountantReview: true,
       },
+      // debug info — remove after diagnosis
+      _debug: {
+        totalInDB: allPayments.length,
+        statuses: [...new Set(allPayments.map((p: any) => p.status))],
+        dates: allPayments.map((p: any) => ({ id: p.id, paid_date: p.paid_date, due_date: p.due_date, status: p.status })),
+        periodFrom,
+        periodTo,
+      }
     })
   }
 
