@@ -29,23 +29,23 @@ export async function POST(req: NextRequest) {
 
   // Fetch active contracts with parcel and lessor data
   const { data: contracts, error } = await supabase
-    .from('Contract')
+    .from('contracts')
     .select(`
       id,
       contractNumber,
       startDate,
       endDate,
-      lessor:Lessor(cnp, lastName, firstName),
-      parcelLinks:ParcelContractLink(
-        parcel:Parcel(
+      lessor:lessors!contracts_lessor_id_fkey(cnpCui, lastName, firstName),
+      parcelLinks:parcel_contract_links(
+        parcel:parcels(
           tarla,
           parcela,
           blocFizic,
           surfaceHa,
-          landUseCategory:LandUseCategory(name),
-          locality:Locality(
+          landUseCategory:land_use_categories(name),
+          locality:localities(
             name,
-            county:County(name)
+            county:counties(name)
           )
         )
       )
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       const landUseCat = Array.isArray(parcel.landUseCategory) ? parcel.landUseCategory[0] : parcel.landUseCategory
 
       rows.push({
-        lessorCnp: lessor?.cnp ?? '',
+        lessorCnp: lessor?.cnpCui ?? '',
         lessorLastName: lessor?.lastName ?? '—',
         lessorFirstName: lessor?.firstName ?? '—',
         contractNumber: contract.contractNumber ?? contract.id,

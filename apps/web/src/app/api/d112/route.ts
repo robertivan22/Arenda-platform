@@ -73,23 +73,22 @@ export async function POST(req: NextRequest) {
 
   // Fetch payments in period — join lessor + contract
   const { data: payments, error: paymentsErr } = await supabase
-    .from('Payment')
+    .from('payments')
     .select(`
       id,
-      grossAmountRon,
+      amountRon,
       paymentMethodId,
       status,
       periodFrom,
       periodTo,
       contractId,
-      contract:Contract(id, tenantId),
-      lessor:Lessor(
+      lessor:lessors!payments_lessor_id_fkey(
         id,
-        cnp,
+        cnpCui,
         lastName,
         firstName
       ),
-      productPayment:ProductPayment(id)
+      productPayment:product_payments(id)
     `)
     .in('status', ['COMPLETED', 'APPROVED'])
     .gte('periodFrom', periodFrom)
@@ -136,12 +135,12 @@ export async function POST(req: NextRequest) {
       warnings.push('Arendator lipsă pe plată')
     }
 
-    const cnp: string = lessor?.cnp ?? ''
+    const cnp: string = lessor?.cnpCui ?? ''
     if (!cnp || cnp.length !== 13) {
       warnings.push('CNP arendator lipsă sau invalid')
     }
 
-    const gross = Number(payment.grossAmountRon ?? 0)
+    const gross = Number(payment.amountRon ?? 0)
     if (gross <= 0) {
       warnings.push('Suma brută zero sau negativă')
     }
