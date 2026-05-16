@@ -18,7 +18,9 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@arenda/shared": ["../../packages/shared/src/index.ts"]
+      "@arenda/shared": ["../../packages/shared/src/index.ts"],
+      "@prisma/client": ["./node_modules/.prisma/client"]
     }
-  }
+  },
+  "exclude": ["node_modules", "dist", "prisma/seed"]
 }
