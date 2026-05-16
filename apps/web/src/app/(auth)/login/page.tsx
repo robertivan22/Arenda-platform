@@ -205,10 +205,7 @@ export default function LoginPage() {
       </div>
     </div>
   )
-}
-
-
-  async function handlePasswordLogin(e: React.FormEvent) {
+}(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     try {

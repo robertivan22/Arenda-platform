@@ -187,14 +187,6 @@ export function AppSidebar() {
   )
 }
 
-
-interface NavItem {
-  label: string
-  href?: string
-  icon: React.ElementType
-  children?: { label: string; href: string }[]
-}
-
 const NAV_ITEMS: NavItem[] = [
   {
     label: 'Dashboard',
