@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { AlertTriangle, FileSpreadsheet, Download, Check, FileCode, ChevronDown, ChevronUp } from 'lucide-react'
+import { AlertTriangle, FileSpreadsheet, Download, Check, FileCode, ChevronDown, ChevronUp, ShieldCheck, ShieldAlert, XCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { validateD112, buildD112ValidationInput, type VMsg } from '@/lib/d112Validator'
 
 interface PayerInfo {
   cif: string
@@ -85,6 +86,8 @@ export default function D112Page() {
     return DEFAULT_PAYER
   })
   const [showPayerForm, setShowPayerForm] = useState(false)
+  const [validationMsgs, setValidationMsgs] = useState<VMsg[] | null>(null)
+  const [validating, setValidating] = useState(false)
 
   function savePayer(updated: PayerInfo) {
     setPayer(updated)
@@ -110,6 +113,22 @@ export default function D112Page() {
       toast.error(e.message ?? 'Eroare la generare D112.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  function runValidation() {
+    if (!dataset) return
+    setValidating(true)
+    try {
+      const input = buildD112ValidationInput(dataset, payer)
+      const msgs = validateD112(input)
+      setValidationMsgs(msgs)
+      const errors = msgs.filter(m => m.level === 'ERR').length
+      const warns = msgs.filter(m => m.level === 'ATT').length
+      if (errors === 0) toast.success(`Validare completă — ${warns} avertizări, nicio eroare fatală.`)
+      else toast.error(`Validare: ${errors} erori fatale (ERR). Fișierul XML nu va fi acceptat de ANAF.`)
+    } finally {
+      setValidating(false)
     }
   }
 
@@ -353,10 +372,71 @@ ${asigurati}
               <FileCode className="w-4 h-4" />
               Export XML (ANAF D112)
             </button>
+            <button
+              onClick={runValidation}
+              disabled={validating}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-green-500 text-green-700 hover:bg-green-50 disabled:opacity-50 rounded font-medium"
+            >
+              {validating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+              Validare ANAF
+            </button>
           </>
         )}
       </div>
 
+
+      {/* Validation results panel */}
+      {validationMsgs !== null && (() => {
+        const errors = validationMsgs.filter(m => m.level === 'ERR')
+        const warns  = validationMsgs.filter(m => m.level === 'ATT')
+        const isOk   = errors.length === 0
+        return (
+          <div className={`mb-4 rounded-lg border overflow-hidden ${
+            isOk ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'
+          }`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between px-4 py-2.5 ${
+              isOk ? 'bg-green-100' : 'bg-red-100'
+            }`}>
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                {isOk
+                  ? <><ShieldCheck className="w-4 h-4 text-green-600" /><span className="text-green-800">Validare ANAF — nicio eroare fatală</span></>
+                  : <><ShieldAlert className="w-4 h-4 text-red-600" /><span className="text-red-800">Validare ANAF — {errors.length} erori fatale (ERR)</span></>}
+              </span>
+              <span className="text-xs text-gray-500">
+                {errors.length} ERR &bull; {warns.length} ATT &bull; DUKValidator J26.0.3
+              </span>
+            </div>
+            {/* Messages */}
+            {validationMsgs.length > 0 && (
+              <div className="divide-y divide-gray-200 max-h-72 overflow-y-auto">
+                {validationMsgs.map((m, i) => (
+                  <div key={i} className={`flex gap-2 px-4 py-2 text-xs ${
+                    m.level === 'ERR' ? 'bg-red-50 text-red-800'
+                    : 'bg-amber-50 text-amber-800'
+                  }`}>
+                    {m.level === 'ERR'
+                      ? <XCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-red-500" />
+                      : <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-500" />}
+                    <div>
+                      <span className="font-mono font-bold mr-1.5">[{m.code}]</span>
+                      {m.msg}
+                      {m.cnp && !m.cnp.startsWith('NECNP') && (
+                        <span className="ml-1.5 font-mono text-gray-500">CNP: {m.cnp}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {errors.length === 0 && warns.length === 0 && (
+                  <div className="px-4 py-2 text-xs text-green-700">
+                    Toate verificările au trecut. Fișierul XML poate fi importat în aplicația ANAF D112.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Results */}
       {dataset && (
