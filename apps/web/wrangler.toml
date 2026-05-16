@@ -4,4 +4,4 @@ compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
 
 [vars]
-NEXT_PUBLIC_API_URL = "https://arenda-api.your-worker.workers.dev"
+NEXT_PUBLIC_API_URL = "https://YOUR-APP.up.railway.app"
