@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -79,31 +79,31 @@ export default function DashboardPage() {
     load()
   }, [])
 
-  const dash = loading ? '—' : undefined
+  const dash = loading ? 'â€”' : undefined
 
   return (
     <div>
       {/* Page title */}
       <div className="mb-5">
         <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Vizualizare generală platformă</p>
+        <p className="text-sm text-gray-500 mt-0.5">Vizualizare generalÄƒ platformÄƒ</p>
       </div>
 
       {/* Hero banner */}
       <div className="rounded-2xl mb-6 overflow-hidden relative" style={{ background: 'linear-gradient(135deg, #1e3a22 0%, #2d6a4f 100%)' }}>
         <div className="px-8 py-7 flex items-center justify-between">
           <div className="relative z-10">
-            <p className="text-amber-400 text-xs font-semibold uppercase tracking-wider mb-2">Bun venit înapoi</p>
-            <h2 className="text-2xl font-bold text-white mb-2">Platforma ta agricolă</h2>
+            <p className="text-amber-400 text-xs font-semibold uppercase tracking-wider mb-2">Bun venit Ã®napoi</p>
+            <h2 className="text-2xl font-bold text-white mb-2">Platforma ta agricolÄƒ</h2>
             <p className="text-[#74c69d] text-sm mb-5 max-w-xs">
-              Gestionează arendatorii, contractele și parcelele din un singur loc.
+              GestioneazÄƒ arendatorii, contractele È™i parcelele din un singur loc.
             </p>
             <button
               onClick={() => router.push('/arendatori/nou')}
               className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold rounded-xl transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              Adaugă arendator
+              AdaugÄƒ arendator
             </button>
           </div>
           {/* Tractor illustration */}
@@ -147,23 +147,23 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <StatCard label="Arendatori activi"           value={dash ?? s.lessorsTotal}         icon={Users}          iconBg="bg-green-100"   iconColor="text-green-600" />
         <StatCard label="Contracte active"            value={dash ?? s.contractsActive}       icon={FileText}       iconBg="bg-blue-100"    iconColor="text-blue-600" />
-        <StatCard label="Contracte ce expiră (30 zile)" value={dash ?? s.contractsExpiring}  icon={Clock}          iconBg="bg-amber-100"   iconColor="text-amber-600" />
-        <StatCard label="Parcele înregistrate"        value={dash ?? s.parcelsTotal}          icon={MapPin}         iconBg="bg-violet-100"  iconColor="text-violet-600"
-          sub={loading ? undefined : `Suprafață totală: ${s.surfaceTotal} ha`} />
-        <StatCard label="Plăți restante"              value={dash ?? s.paymentsOverdue}       icon={AlertTriangle}  iconBg="bg-red-100"     iconColor="text-red-500"
+        <StatCard label="Contracte ce expirÄƒ (30 zile)" value={dash ?? s.contractsExpiring}  icon={Clock}          iconBg="bg-amber-100"   iconColor="text-amber-600" />
+        <StatCard label="Parcele Ã®nregistrate"        value={dash ?? s.parcelsTotal}          icon={MapPin}         iconBg="bg-violet-100"  iconColor="text-violet-600"
+          sub={loading ? undefined : `SuprafaÈ›Äƒ totalÄƒ: ${s.surfaceTotal} ha`} />
+        <StatCard label="PlÄƒÈ›i restante"              value={dash ?? s.paymentsOverdue}       icon={AlertTriangle}  iconBg="bg-red-100"     iconColor="text-red-500"
           sub={loading ? undefined : `${s.paymentsOverdueAmount} RON`} />
-        <StatCard label="Total restanțe (RON)"        value={dash ?? s.paymentsOverdueAmount} icon={CreditCard}     iconBg="bg-sky-100"     iconColor="text-sky-600" />
+        <StatCard label="Total restanÈ›e (RON)"        value={dash ?? s.paymentsOverdueAmount} icon={CreditCard}     iconBg="bg-sky-100"     iconColor="text-sky-600" />
       </div>
 
       {/* Quick actions */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <div className="text-sm font-semibold text-gray-700 mb-3">Acțiuni rapide</div>
+        <div className="text-sm font-semibold text-gray-700 mb-3">AcÈ›iuni rapide</div>
         <div className="flex flex-wrap gap-2">
           {[
             { label: 'Arendator nou', href: '/arendatori/nou', icon: Users },
             { label: 'Contract nou', href: '/contracte/nou', icon: FileText },
-            { label: 'Parcelă nouă', href: '/parcele/nou', icon: MapPin },
-            { label: 'Plăți restante', href: '/plati', icon: AlertTriangle },
+            { label: 'ParcelÄƒ nouÄƒ', href: '/parcele/nou', icon: MapPin },
+            { label: 'PlÄƒÈ›i restante', href: '/plati', icon: AlertTriangle },
             { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3 },
           ].map(({ label, href, icon: Icon }) => (
             <button
@@ -173,107 +173,6 @@ export default function DashboardPage() {
             >
               <Icon className="w-3 h-3" />
               {label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-
-interface Stats {
-  lessorsTotal: number
-  contractsActive: number
-  contractsExpiring: number
-  parcelsTotal: number
-  surfaceTotal: string
-  paymentsOverdue: number
-  paymentsOverdueAmount: string
-}
-
-const EMPTY: Stats = {
-  lessorsTotal: 0, contractsActive: 0, contractsExpiring: 0,
-  parcelsTotal: 0, surfaceTotal: '0.00', paymentsOverdue: 0, paymentsOverdueAmount: '0.00',
-}
-
-function StatCard({ label, value, icon: Icon, sub, variant = 'default' }: {
-  label: string; value: string | number; icon: React.ElementType; sub?: string; variant?: 'default' | 'warning' | 'danger'
-}) {
-  const v = { default: 'border-gray-200 bg-white', warning: 'border-yellow-200 bg-yellow-50', danger: 'border-red-200 bg-red-50' }
-  const iv = { default: 'bg-brand-100 text-brand-600', warning: 'bg-yellow-100 text-yellow-600', danger: 'bg-red-100 text-red-600' }
-  return (
-    <div className={`rounded-xl border p-5 flex items-start gap-4 ${v[variant]}`}>
-      <div className={`p-2.5 rounded-xl ${iv[variant]}`}><Icon className="w-5 h-5" /></div>
-      <div>
-        <div className="text-2xl font-bold text-gray-900">{value}</div>
-        <div className="text-sm text-gray-600 mt-0.5">{label}</div>
-        {sub && <div className="text-xs text-gray-400 mt-0.5">{sub}</div>}
-      </div>
-    </div>
-  )
-}
-
-export default function DashboardPage() {
-  const router = useRouter()
-  const [s, setS] = useState<Stats>(EMPTY)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function load() {
-      const db = createClient()
-      const now = new Date()
-      const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      const today = now.toISOString().split('T')[0]
-      const [
-        { count: lessorsTotal },
-        { count: contractsActive },
-        { count: contractsExpiring },
-        { data: parcelsData },
-        { data: paymentsData },
-      ] = await Promise.all([
-        db.from('lessors').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
-        db.from('contracts').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
-        db.from('contracts').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE').lte('end_date', in30).gte('end_date', today),
-        db.from('parcels').select('surface'),
-        db.from('payments').select('amount, status').in('status', ['OVERDUE', 'PENDING']),
-      ])
-      const surfaceTotal = ((parcelsData ?? []) as any[]).reduce((s, p) => s + Number(p.surface ?? 0), 0).toFixed(2)
-      const paymentsOverdue = (paymentsData ?? []).length
-      const paymentsOverdueAmount = ((paymentsData ?? []) as any[]).reduce((s, p) => s + Number(p.amount ?? 0), 0).toFixed(2)
-      setS({ lessorsTotal: lessorsTotal ?? 0, contractsActive: contractsActive ?? 0, contractsExpiring: contractsExpiring ?? 0, parcelsTotal: (parcelsData ?? []).length, surfaceTotal, paymentsOverdue, paymentsOverdueAmount })
-      setLoading(false)
-    }
-    load()
-  }, [])
-
-  const links = [
-    { label: 'Arendator nou', href: '/arendatori/nou' },
-    { label: 'Contract nou', href: '/contracte/nou' },
-    { label: 'Parcela noua', href: '/parcele/nou' },
-    { label: 'Plati', href: '/plati' },
-    { label: 'Rapoarte', href: '/rapoarte' },
-  ]
-
-  const dash = loading ? '—' : undefined
-
-  return (
-    <div>
-      <PageHeader title="Dashboard" subtitle="Vizualizare generala platforma" />
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <StatCard label="Arendatori activi" value={dash ?? s.lessorsTotal} icon={Users} />
-        <StatCard label="Contracte active" value={dash ?? s.contractsActive} icon={FileText} />
-        <StatCard label="Contracte ce expira (30 zile)" value={dash ?? s.contractsExpiring} icon={TrendingUp} variant={s.contractsExpiring > 0 ? 'warning' : 'default'} />
-        <StatCard label="Parcele inregistrate" value={dash ?? s.parcelsTotal} icon={MapPin} sub={loading ? '' : `Suprafata totala: ${s.surfaceTotal} ha`} />
-        <StatCard label="Plati neachitate" value={dash ?? s.paymentsOverdue} icon={AlertTriangle} sub={loading ? '' : `${s.paymentsOverdueAmount} RON`} variant={s.paymentsOverdue > 0 ? 'danger' : 'default'} />
-        <StatCard label="Total restante (RON)" value={dash ?? s.paymentsOverdueAmount} icon={CreditCard} variant={parseFloat(s.paymentsOverdueAmount) > 0 ? 'danger' : 'default'} />
-      </div>
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="text-sm font-semibold text-gray-700 mb-3">Actiuni rapide</div>
-        <div className="flex flex-wrap gap-2">
-          {links.map(link => (
-            <button key={link.href} onClick={() => router.push(link.href)} className="px-3 py-1.5 text-xs rounded-lg border border-brand-300 text-brand-600 hover:bg-brand-50 transition-colors font-medium">
-              {link.label}
             </button>
           ))}
         </div>
