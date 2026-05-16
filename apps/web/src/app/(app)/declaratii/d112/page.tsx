@@ -1,10 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { AlertTriangle, FileSpreadsheet, Download, Check } from 'lucide-react'
+import { AlertTriangle, FileSpreadsheet, Download, Check, FileCode, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+
+interface PayerInfo {
+  cif: string
+  den: string
+  caen: string
+  casaAng: string
+  numeDeclar: string
+  prenumeDeclar: string
+  functieDeclar: string
+}
+
+const DEFAULT_PAYER: PayerInfo = {
+  cif: '', den: '', caen: '0111', casaAng: 'IS',
+  numeDeclar: '', prenumeDeclar: '', functieDeclar: 'Administrator',
+}
+
+const CASA_ANG_OPTIONS = [
+  '_B','_A','_T','AB','AR','AG','BC','BH','BN','BT','BV','BR','BZ','CS','CJ','CT','CV',
+  'CL','DB','DJ','GL','GR','GJ','HR','HD','IL','IS','IF','MM','MH','MS','NT','OT','PH',
+  'SM','SJ','SB','SV','TR','TM','TL','VS','VL','VN',
+]
 
 const MONTHS = [
   'Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie',
@@ -44,11 +65,31 @@ interface D112Dataset {
   requiresAccountantReview: true
 }
 
+function daysInMonth(y: number, m: number) { return new Date(y, m, 0).getDate() }
+
+function pad2(n: number) { return String(n).padStart(2, '0') }
+
+function escXml(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 export default function D112Page() {
   const [year, setYear] = useState(currentYear)
-  const [month, setMonth] = useState(currentMonth === 1 ? 12 : currentMonth - 1)  // previous month default
+  const [month, setMonth] = useState(currentMonth === 1 ? 12 : currentMonth - 1)
   const [loading, setLoading] = useState(false)
   const [dataset, setDataset] = useState<D112Dataset | null>(null)
+  const [payer, setPayer] = useState<PayerInfo>(() => {
+    if (typeof window !== 'undefined') {
+      try { return { ...DEFAULT_PAYER, ...JSON.parse(localStorage.getItem('d112_payer') ?? '{}') } } catch { /**/ }
+    }
+    return DEFAULT_PAYER
+  })
+  const [showPayerForm, setShowPayerForm] = useState(false)
+
+  function savePayer(updated: PayerInfo) {
+    setPayer(updated)
+    localStorage.setItem('d112_payer', JSON.stringify(updated))
+  }
 
   async function generate() {
     setLoading(true)
@@ -94,6 +135,119 @@ export default function D112Page() {
     URL.revokeObjectURL(url)
   }
 
+  function downloadXml() {
+    if (!dataset) return
+    const NZC = daysInMonth(dataset.periodYear, dataset.periodMonth)
+    const firstDay = `1.${pad2(dataset.periodMonth)}.${dataset.periodYear}`
+    const lastDay = `${NZC}.${pad2(dataset.periodMonth)}.${dataset.periodYear}`
+
+    // Aggregate per CNP (multiple payments → sum)
+    const byLessor = new Map<string, { last: string; first: string; brut: number; netTax: number; impozit: number }>()
+    for (const r of dataset.rows) {
+      const key = r.lessorCnp || `NECNP_${r.lessorLastName}`
+      const ex = byLessor.get(key)
+      if (ex) {
+        ex.brut += r.grossAmountRon
+        ex.netTax += r.netTaxableRon
+        ex.impozit += r.withholdingTaxRon
+      } else {
+        byLessor.set(key, { last: r.lessorLastName, first: r.lessorFirstName, brut: r.grossAmountRon, netTax: r.netTaxableRon, impozit: r.withholdingTaxRon })
+      }
+    }
+
+    const totalImpozit = Math.round(dataset.totalWithholdingTaxRon)
+    const totalBrut = Math.round(dataset.totalGrossRon)
+    const totalCASS = Math.round(totalBrut * 0.10) // 10% CASS arendă (C_1=26)
+    const totalPlata = totalImpozit + totalCASS
+
+    const [numeDeclar, ...restNume] = (payer.numeDeclar || 'NEDEFINIT').split(' ')
+    const prenumeDeclar = payer.prenumeDeclar || restNume.join(' ') || 'NEDEFINIT'
+
+    let idCounter = 1
+    const asigurati = [...byLessor.entries()].map(([cnp, d]) => {
+      const brut = Math.round(d.brut)
+      const netTax = Math.round(d.netTax)
+      const impozit = Math.round(d.impozit)
+      const cass = Math.round(brut * 0.10)
+      const idAsig = String(idCounter++).padStart(6, '0')
+      return `  <asigurat
+    idAsig="${idAsig}"
+    cnpAsig="${escXml(cnp)}"
+    numeAsig="${escXml(d.last.toUpperCase())}"
+    prenAsig="${escXml(d.first.toUpperCase())}"
+    dataAng="${firstDay}"
+    dataSf="${lastDay}"
+    casaSn="${escXml(payer.casaAng)}"
+    asigCI="2"
+    asigSO="2"
+    Timp_E3="${impozit}">
+    <asiguratC
+      C_1="26"
+      C_2="${NZC}"
+      C_19="${brut}"
+      C_8="${brut}"
+      C_9="${cass}"/>
+    <asiguratE3
+      E3_1="C"
+      E3_2="26"
+      E3_3="3"
+      E3_4="P"
+      E3_8="${brut}"
+      E3_9="0"
+      E3_14="${netTax}"
+      E3_15="${impozit}"
+      E3_16="${brut}"/>
+  </asigurat>`
+    }).join('\n')
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<declaratieUnica
+  xmlns="mfp:anaf:dgti:declaratie_unica:declaratie:v6"
+  luna_r="${dataset.periodMonth}"
+  an_r="${dataset.periodYear}"
+  d_rec="0"
+  nume_declar="${escXml(payer.numeDeclar || 'NEDEFINIT')}"
+  prenume_declar="${escXml(prenumeDeclar)}"
+  functie_declar="${escXml(payer.functieDeclar || 'Administrator')}">
+  <angajator
+    cif="${escXml(payer.cif)}"
+    caen="${escXml(payer.caen)}"
+    den="${escXml(payer.den)}"
+    casaAng="${escXml(payer.casaAng)}"
+    datCAM="0"
+    bifa_CAM="0"
+    totalPlata_A="${totalPlata}">
+    <angajatorA
+      A_codBugetar="5503XXXXXX"
+      A_codOblig="619"
+      A_datorat="${totalImpozit}"
+      A_scutit="0"
+      A_plata="${totalImpozit}"/>
+    <angajatorA
+      A_codBugetar="5503XXXXXX"
+      A_codOblig="469"
+      A_datorat="${totalCASS}"
+      A_scutit="0"
+      A_plata="${totalCASS}"/>
+    <angajatorB
+      B_cnp="0"
+      B_sanatate="0"
+      B_pensie="0"
+      B_brutSalarii="0"
+      B_sal="0"/>
+  </angajator>
+${asigurati}
+</declaratieUnica>`
+
+    const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `D112_${dataset.periodYear}_${String(dataset.periodMonth).padStart(2, '0')}_DRAFT.xml`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const inputCls = 'px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500'
 
   return (
@@ -109,6 +263,52 @@ export default function D112Page() {
           <strong>DRAFT</strong> — Sistemul generează un set de date orientativ. Folosiți software-ul oficial
           ANAF D112 pentru transmitere. Nu trimiteți date la ANAF direct din acest sistem.
         </span>
+      </div>
+
+      {/* Payer info form */}
+      <div className="mb-4 border border-gray-200 rounded-lg bg-white overflow-hidden">
+        <button
+          onClick={() => setShowPayerForm(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          <span className="flex items-center gap-2">
+            <FileCode className="w-4 h-4 text-gray-400" />
+            Date plătitor pentru export XML
+            {(!payer.cif || !payer.den) && <span className="text-xs text-amber-600 font-normal">(completați pentru XML valid)</span>}
+          </span>
+          {showPayerForm ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+        {showPayerForm && (
+          <div className="px-4 pb-4 pt-2 grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-gray-100">
+            {([
+              { key: 'cif', label: 'CIF Plătitor', placeholder: 'ex. 12345678' },
+              { key: 'den', label: 'Denumire plătitor', placeholder: 'ex. SC AGRO SRL' },
+              { key: 'numeDeclar', label: 'Nume declarant', placeholder: 'ex. POPESCU' },
+              { key: 'prenumeDeclar', label: 'Prenume declarant', placeholder: 'ex. ION' },
+              { key: 'functieDeclar', label: 'Funcție declarant', placeholder: 'ex. Administrator' },
+            ] as const).map(f => (
+              <div key={f.key}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+                <input
+                  value={payer[f.key]}
+                  onChange={e => savePayer({ ...payer, [f.key]: e.target.value })}
+                  placeholder={f.placeholder}
+                  className={inputCls + ' w-full'}
+                />
+              </div>
+            ))}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Cod CAEN</label>
+              <input value={payer.caen} onChange={e => savePayer({ ...payer, caen: e.target.value })} className={inputCls + ' w-full'} placeholder="0111" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Casă asig. sănătate</label>
+              <select value={payer.casaAng} onChange={e => savePayer({ ...payer, casaAng: e.target.value })} className={inputCls + ' w-full'}>
+                {CASA_ANG_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Period selector */}
@@ -138,15 +338,25 @@ export default function D112Page() {
           {loading ? 'Generez...' : 'Generează set de date'}
         </button>
         {dataset && (
-          <button
-            onClick={downloadCsv}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 hover:bg-gray-50 rounded font-medium"
-          >
-            <Download className="w-4 h-4" />
-            Export CSV (DRAFT)
-          </button>
+          <>
+            <button
+              onClick={downloadCsv}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 hover:bg-gray-50 rounded font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
+            <button
+              onClick={downloadXml}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-blue-400 text-blue-700 hover:bg-blue-50 rounded font-medium"
+            >
+              <FileCode className="w-4 h-4" />
+              Export XML (ANAF D112)
+            </button>
+          </>
         )}
       </div>
+
 
       {/* Results */}
       {dataset && (
