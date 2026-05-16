@@ -44,49 +44,40 @@ export default function LoginPage() {
         <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-10">
           {/* Tractor SVG illustration */}
           <svg viewBox="0 0 320 200" className="w-72 mb-8 drop-shadow-2xl" xmlns="http://www.w3.org/2000/svg">
-            {/* Body */}
-            <rect x="80" y="80" width="130" height="70" rx="8" fill="#2d6a4f"/>
-            <rect x="80" y="80" width="130" height="70" rx="8" fill="url(#tractorBody)"/>
-            {/* Cabin */}
+            <rect x="80" y="82" width="130" height="68" rx="8" fill="#2d6a4f"/>
             <rect x="155" y="50" width="75" height="50" rx="6" fill="#1b4332"/>
-            <rect x="163" y="58" width="55" height="30" rx="3" fill="#74c69d" opacity="0.5"/>
-            {/* Hood */}
-            <rect x="80" y="90" width="80" height="40" rx="4" fill="#1b4332"/>
-            {/* Exhaust */}
-            <rect x="130" y="40" width="8" height="20" rx="4" fill="#1b4332"/>
-            <ellipse cx="134" cy="38" rx="6" ry="4" fill="#333" opacity="0.6"/>
-            {/* Big rear wheel */}
-            <circle cx="115" cy="155" r="42" fill="#1a1a1a"/>
-            <circle cx="115" cy="155" r="34" fill="#2d2d2d"/>
-            <circle cx="115" cy="155" r="24" fill="#1a1a1a"/>
-            <circle cx="115" cy="155" r="10" fill="#555"/>
-            {/* Wheel spokes */}
-            {[0,45,90,135,180,225,270,315].map((a,i) => (
-              <line key={i} x1="115" y1="155"
-                x2={115 + 28*Math.cos(a*Math.PI/180)}
-                y2={155 + 28*Math.sin(a*Math.PI/180)}
-                stroke="#555" strokeWidth="3"/>
+            <rect x="163" y="58" width="55" height="30" rx="3" fill="#52b788" opacity="0.45"/>
+            <rect x="80" y="92" width="80" height="38" rx="4" fill="#1b4332"/>
+            <rect x="128" y="36" width="9" height="26" rx="4" fill="#333"/>
+            <circle cx="132" cy="33" r="6" fill="#555" opacity="0.55"/>
+            <circle cx="137" cy="27" r="4" fill="#555" opacity="0.35"/>
+            <circle cx="115" cy="158" r="42" fill="#b45309"/>
+            <circle cx="115" cy="158" r="33" fill="#f59e0b"/>
+            <circle cx="115" cy="158" r="22" fill="#b45309"/>
+            <circle cx="115" cy="158" r="9" fill="#fbbf24"/>
+            {[0,60,120,180,240,300].map((a,i) => (
+              <line key={i} x1="115" y1="158"
+                x2={115 + 27*Math.cos(a*Math.PI/180)}
+                y2={158 + 27*Math.sin(a*Math.PI/180)}
+                stroke="#92400e" strokeWidth="4"/>
             ))}
-            {/* Small front wheel */}
-            <circle cx="225" cy="163" r="24" fill="#1a1a1a"/>
-            <circle cx="225" cy="163" r="18" fill="#2d2d2d"/>
-            <circle cx="225" cy="163" r="12" fill="#1a1a1a"/>
-            <circle cx="225" cy="163" r="5" fill="#555"/>
-            {/* Ground line */}
+            <circle cx="230" cy="166" r="25" fill="#b45309"/>
+            <circle cx="230" cy="166" r="19" fill="#f59e0b"/>
+            <circle cx="230" cy="166" r="12" fill="#b45309"/>
+            <circle cx="230" cy="166" r="5" fill="#fbbf24"/>
+            {[0,90,180,270].map((a,i) => (
+              <line key={i} x1="230" y1="166"
+                x2={230 + 15*Math.cos(a*Math.PI/180)}
+                y2={166 + 15*Math.sin(a*Math.PI/180)}
+                stroke="#92400e" strokeWidth="3"/>
+            ))}
             <line x1="50" y1="197" x2="290" y2="197" stroke="#2d6a4f" strokeWidth="2" opacity="0.6"/>
-            {/* Wheat / crop decorations */}
             {[40,55,270,285].map((x,i) => (
               <g key={i}>
                 <line x1={x} y1="197" x2={x} y2="170" stroke="#52b788" strokeWidth="2"/>
                 <ellipse cx={x} cy="166" rx="5" ry="9" fill="#52b788" opacity="0.8"/>
               </g>
             ))}
-            <defs>
-              <linearGradient id="tractorBody" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#fff" stopOpacity="0.05"/>
-                <stop offset="100%" stopColor="#000" stopOpacity="0.1"/>
-              </linearGradient>
-            </defs>
           </svg>
 
           <h2 className="text-3xl font-bold text-white text-center mb-3 leading-tight">

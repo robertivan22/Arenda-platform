@@ -79,61 +79,68 @@ export default function DashboardPage() {
     load()
   }, [])
 
-  const dash = loading ? 'â€”' : undefined
+  const dash = loading ? '—' : undefined
 
   return (
     <div>
       {/* Page title */}
       <div className="mb-5">
         <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Vizualizare generalÄƒ platformÄƒ</p>
+        <p className="text-sm text-gray-500 mt-0.5">Vizualizare generală platformă</p>
       </div>
 
       {/* Hero banner */}
       <div className="rounded-2xl mb-6 overflow-hidden relative" style={{ background: 'linear-gradient(135deg, #1e3a22 0%, #2d6a4f 100%)' }}>
         <div className="px-8 py-7 flex items-center justify-between">
           <div className="relative z-10">
-            <p className="text-amber-400 text-xs font-semibold uppercase tracking-wider mb-2">Bun venit Ã®napoi</p>
-            <h2 className="text-2xl font-bold text-white mb-2">Platforma ta agricolÄƒ</h2>
+            <p className="text-amber-400 text-xs font-semibold uppercase tracking-wider mb-2">Bun venit înapoi</p>
+            <h2 className="text-2xl font-bold text-white mb-2">Platforma ta agricolă</h2>
             <p className="text-[#74c69d] text-sm mb-5 max-w-xs">
-              GestioneazÄƒ arendatorii, contractele È™i parcelele din un singur loc.
+              Gestionează arendatorii, contractele și parcelele din un singur loc.
             </p>
             <button
               onClick={() => router.push('/arendatori/nou')}
               className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold rounded-xl transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              AdaugÄƒ arendator
+              Adaugă arendator
             </button>
           </div>
           {/* Tractor illustration */}
           <div className="hidden sm:block flex-shrink-0 mr-4 opacity-90">
             <svg viewBox="0 0 260 160" className="w-56 h-auto" xmlns="http://www.w3.org/2000/svg">
-              <rect x="60" y="65" width="110" height="58" rx="6" fill="#2d6a4f"/>
-              <rect x="125" y="38" width="62" height="42" rx="5" fill="#1b4332"/>
-              <rect x="132" y="45" width="45" height="26" rx="3" fill="#74c69d" opacity="0.35"/>
-              <rect x="60" y="74" width="68" height="34" rx="3" fill="#1b4332"/>
-              <rect x="108" y="28" width="7" height="18" rx="3.5" fill="#1b4332"/>
-              <ellipse cx="111" cy="27" rx="5" ry="3.5" fill="#333" opacity="0.5"/>
-              <circle cx="90" cy="128" r="35" fill="#1a1a1a"/>
-              <circle cx="90" cy="128" r="28" fill="#2d2d2d"/>
-              <circle cx="90" cy="128" r="19" fill="#1a1a1a"/>
-              <circle cx="90" cy="128" r="8" fill="#555"/>
-              {[0,45,90,135,180,225,270,315].map((a,i) => (
-                <line key={i} x1="90" y1="128"
-                  x2={90 + 23*Math.cos(a*Math.PI/180)}
-                  y2={128 + 23*Math.sin(a*Math.PI/180)}
-                  stroke="#555" strokeWidth="2.5"/>
+              <rect x="60" y="68" width="110" height="55" rx="7" fill="#2d6a4f"/>
+              <rect x="128" y="42" width="62" height="46" rx="6" fill="#1b4332"/>
+              <rect x="135" y="50" width="46" height="28" rx="3" fill="#52b788" opacity="0.45"/>
+              <rect x="60" y="76" width="72" height="32" rx="4" fill="#1b4332"/>
+              <rect x="106" y="28" width="8" height="22" rx="4" fill="#333"/>
+              <circle cx="110" cy="25" r="5" fill="#555" opacity="0.55"/>
+              <circle cx="114" cy="20" r="3.5" fill="#555" opacity="0.35"/>
+              <circle cx="92" cy="128" r="33" fill="#b45309"/>
+              <circle cx="92" cy="128" r="26" fill="#f59e0b"/>
+              <circle cx="92" cy="128" r="17" fill="#b45309"/>
+              <circle cx="92" cy="128" r="7" fill="#fbbf24"/>
+              {[0,60,120,180,240,300].map((a,i) => (
+                <line key={i} x1="92" y1="128"
+                  x2={92 + 21*Math.cos(a*Math.PI/180)}
+                  y2={128 + 21*Math.sin(a*Math.PI/180)}
+                  stroke="#92400e" strokeWidth="3"/>
               ))}
-              <circle cx="188" cy="135" r="20" fill="#1a1a1a"/>
-              <circle cx="188" cy="135" r="15" fill="#2d2d2d"/>
-              <circle cx="188" cy="135" r="9" fill="#1a1a1a"/>
-              <circle cx="188" cy="135" r="4" fill="#555"/>
-              <line x1="30" y1="163" x2="240" y2="163" stroke="#2d6a4f" strokeWidth="2" opacity="0.5"/>
-              {[22,35,215,228].map((x,i) => (
+              <circle cx="190" cy="135" r="19" fill="#b45309"/>
+              <circle cx="190" cy="135" r="14" fill="#f59e0b"/>
+              <circle cx="190" cy="135" r="8" fill="#b45309"/>
+              <circle cx="190" cy="135" r="4" fill="#fbbf24"/>
+              {[0,90,180,270].map((a,i) => (
+                <line key={i} x1="190" y1="135"
+                  x2={190 + 10*Math.cos(a*Math.PI/180)}
+                  y2={135 + 10*Math.sin(a*Math.PI/180)}
+                  stroke="#92400e" strokeWidth="2"/>
+              ))}
+              <line x1="20" y1="161" x2="240" y2="161" stroke="#2d6a4f" strokeWidth="2" opacity="0.5"/>
+              {[20,33,215,228].map((x,i) => (
                 <g key={i}>
-                  <line x1={x} y1="163" x2={x} y2="140" stroke="#52b788" strokeWidth="1.5"/>
-                  <ellipse cx={x} cy="137" rx="4" ry="7" fill="#52b788" opacity="0.7"/>
+                  <line x1={x} y1="161" x2={x} y2="142" stroke="#52b788" strokeWidth="1.5"/>
+                  <ellipse cx={x} cy="138" rx="4" ry="7" fill="#52b788" opacity="0.75"/>
                 </g>
               ))}
             </svg>
@@ -147,23 +154,23 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <StatCard label="Arendatori activi"           value={dash ?? s.lessorsTotal}         icon={Users}          iconBg="bg-green-100"   iconColor="text-green-600" />
         <StatCard label="Contracte active"            value={dash ?? s.contractsActive}       icon={FileText}       iconBg="bg-blue-100"    iconColor="text-blue-600" />
-        <StatCard label="Contracte ce expirÄƒ (30 zile)" value={dash ?? s.contractsExpiring}  icon={Clock}          iconBg="bg-amber-100"   iconColor="text-amber-600" />
-        <StatCard label="Parcele Ã®nregistrate"        value={dash ?? s.parcelsTotal}          icon={MapPin}         iconBg="bg-violet-100"  iconColor="text-violet-600"
-          sub={loading ? undefined : `SuprafaÈ›Äƒ totalÄƒ: ${s.surfaceTotal} ha`} />
-        <StatCard label="PlÄƒÈ›i restante"              value={dash ?? s.paymentsOverdue}       icon={AlertTriangle}  iconBg="bg-red-100"     iconColor="text-red-500"
+        <StatCard label="Contracte ce expiră (30 zile)" value={dash ?? s.contractsExpiring}  icon={Clock}          iconBg="bg-amber-100"   iconColor="text-amber-600" />
+        <StatCard label="Parcele înregistrate"        value={dash ?? s.parcelsTotal}          icon={MapPin}         iconBg="bg-violet-100"  iconColor="text-violet-600"
+          sub={loading ? undefined : `Suprafață totală: ${s.surfaceTotal} ha`} />
+        <StatCard label="Plăți restante"              value={dash ?? s.paymentsOverdue}       icon={AlertTriangle}  iconBg="bg-red-100"     iconColor="text-red-500"
           sub={loading ? undefined : `${s.paymentsOverdueAmount} RON`} />
-        <StatCard label="Total restanÈ›e (RON)"        value={dash ?? s.paymentsOverdueAmount} icon={CreditCard}     iconBg="bg-sky-100"     iconColor="text-sky-600" />
+        <StatCard label="Total restanțe (RON)"        value={dash ?? s.paymentsOverdueAmount} icon={CreditCard}     iconBg="bg-sky-100"     iconColor="text-sky-600" />
       </div>
 
       {/* Quick actions */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <div className="text-sm font-semibold text-gray-700 mb-3">AcÈ›iuni rapide</div>
+        <div className="text-sm font-semibold text-gray-700 mb-3">Acțiuni rapide</div>
         <div className="flex flex-wrap gap-2">
           {[
             { label: 'Arendator nou', href: '/arendatori/nou', icon: Users },
             { label: 'Contract nou', href: '/contracte/nou', icon: FileText },
-            { label: 'ParcelÄƒ nouÄƒ', href: '/parcele/nou', icon: MapPin },
-            { label: 'PlÄƒÈ›i restante', href: '/plati', icon: AlertTriangle },
+            { label: 'Parcelă nouă', href: '/parcele/nou', icon: MapPin },
+            { label: 'Plăți restante', href: '/plati', icon: AlertTriangle },
             { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3 },
           ].map(({ label, href, icon: Icon }) => (
             <button
