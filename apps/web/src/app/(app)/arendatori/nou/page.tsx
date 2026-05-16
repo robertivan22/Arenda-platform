@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { lessors } from '@/lib/mockStore'
+import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
 import { ArrowLeft } from 'lucide-react'
@@ -27,12 +27,32 @@ export default function NewLessorPage() {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const item = lessors.create({ type, ...form })
-    toast.success('Arendatorul a fost creat cu succes.')
-    router.push(`/arendatori/${item.id}/sumar`)
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) { toast.error('Neautentificat.'); setSaving(false); return }
+    const { count } = await db.from('lessors').select('id', { count: 'exact', head: true })
+    const code = `AR${String((count ?? 0) + 1).padStart(4, '0')}`
+    const { data, error } = await db.from('lessors').insert({
+      user_id: user.id, code, type,
+      first_name: form.firstName,
+      last_name: form.lastName,
+      company_name: form.companyName || null,
+      cnp: form.cnpCui,
+      gender: form.gender || null,
+      county: form.county, locality: form.locality,
+      address: form.address || null,
+      phone: form.phone || null, mobile: form.mobile || null,
+      email: form.email || null, iban: form.iban || null,
+      bank_name: form.bankName || null,
+      notes: form.notes || null, status: 'ACTIVE',
+    }).select('id').single()
+    setSaving(false)
+    if (error) { toast.error('Eroare: ' + error.message); return }
+    toast.success('Arendatorul a fost creat.')
+    router.push(`/arendatori/${data.id}/sumar`)
   }
 
   const inputCls = 'w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500'
@@ -42,24 +62,22 @@ export default function NewLessorPage() {
     <div className="max-w-4xl">
       <div className="mb-4">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-2">
-          <ArrowLeft className="w-3.5 h-3.5" /> Înapoi
+          <ArrowLeft className="w-3.5 h-3.5" /> Inapoi
         </button>
-        <PageHeader title="Arendator nou" subtitle="Completați datele arendatorului" />
+        <PageHeader title="Arendator nou" subtitle="Completati datele arendatorului" />
       </div>
-
       <form onSubmit={handleSubmit}>
         <div className="form-section">
-          <div className="form-section-title">Tip persoană</div>
+          <div className="form-section-title">Tip persoana</div>
           <div className="flex gap-3">
             {(['NATURAL', 'LEGAL', 'PFA'] as LessorType[]).map(t => (
               <label key={t} className="flex items-center gap-2 cursor-pointer text-sm">
                 <input type="radio" name="type" value={t} checked={type === t} onChange={() => setType(t)} className="accent-brand-500" />
-                {t === 'NATURAL' ? 'Persoană fizică' : t === 'LEGAL' ? 'Persoană juridică' : 'PFA'}
+                {t === 'NATURAL' ? 'Persoana fizica' : t === 'LEGAL' ? 'Persoana juridica' : 'PFA'}
               </label>
             ))}
           </div>
         </div>
-
         <div className="form-section">
           <div className="form-section-title">Date identitate</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -69,14 +87,14 @@ export default function NewLessorPage() {
                 <div><label className={labelCls}>Prenume *</label><input className={inputCls} value={form.firstName} onChange={e => set('firstName', e.target.value)} required /></div>
               </>
             ) : (
-              <div className="col-span-2"><label className={labelCls}>Denumire firmă *</label><input className={inputCls} value={form.companyName} onChange={e => set('companyName', e.target.value)} required /></div>
+              <div className="col-span-2"><label className={labelCls}>Denumire firma *</label><input className={inputCls} value={form.companyName} onChange={e => set('companyName', e.target.value)} required /></div>
             )}
             <div><label className={labelCls}>{type === 'LEGAL' ? 'CUI' : 'CNP'} *</label><input className={inputCls} value={form.cnpCui} onChange={e => set('cnpCui', e.target.value)} required /></div>
             {type === 'NATURAL' && (
               <div>
                 <label className={labelCls}>Gen</label>
                 <select className={inputCls} value={form.gender} onChange={e => set('gender', e.target.value)}>
-                  <option value="">—</option>
+                  <option value="">-</option>
                   <option value="MALE">Masculin</option>
                   <option value="FEMALE">Feminin</option>
                 </select>
@@ -84,16 +102,14 @@ export default function NewLessorPage() {
             )}
           </div>
         </div>
-
         <div className="form-section">
-          <div className="form-section-title">Adresă</div>
+          <div className="form-section-title">Adresa</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div><label className={labelCls}>Județ *</label><input className={inputCls} value={form.county} onChange={e => set('county', e.target.value)} placeholder="ex: Cluj" required /></div>
-            <div><label className={labelCls}>Localitate *</label><input className={inputCls} value={form.locality} onChange={e => set('locality', e.target.value)} placeholder="ex: Cluj-Napoca" required /></div>
-            <div><label className={labelCls}>Adresă stradă</label><input className={inputCls} value={form.address} onChange={e => set('address', e.target.value)} /></div>
+            <div><label className={labelCls}>Judet *</label><input className={inputCls} value={form.county} onChange={e => set('county', e.target.value)} required /></div>
+            <div><label className={labelCls}>Localitate *</label><input className={inputCls} value={form.locality} onChange={e => set('locality', e.target.value)} required /></div>
+            <div><label className={labelCls}>Strada</label><input className={inputCls} value={form.address} onChange={e => set('address', e.target.value)} /></div>
           </div>
         </div>
-
         <div className="form-section">
           <div className="form-section-title">Date contact</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -102,26 +118,23 @@ export default function NewLessorPage() {
             <div><label className={labelCls}>Email</label><input className={inputCls} type="email" value={form.email} onChange={e => set('email', e.target.value)} /></div>
           </div>
         </div>
-
         <div className="form-section">
           <div className="form-section-title">Date bancare</div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className={labelCls}>IBAN</label><input className={inputCls} value={form.iban} onChange={e => set('iban', e.target.value.replace(/\s/g, '').toUpperCase())} placeholder="RO49AAAA1B31007593840000" /></div>
-            <div><label className={labelCls}>Bancă</label><input className={inputCls} value={form.bankName} onChange={e => set('bankName', e.target.value)} /></div>
+            <div><label className={labelCls}>Banca</label><input className={inputCls} value={form.bankName} onChange={e => set('bankName', e.target.value)} /></div>
           </div>
         </div>
-
         <div className="form-section">
-          <div className="form-section-title">Observații</div>
+          <div className="form-section-title">Observatii</div>
           <textarea className={inputCls} rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} />
         </div>
-
         <div className="flex gap-3 mt-6">
           <button type="submit" disabled={saving} className="px-5 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50">
-            Salvează arendator
+            {saving ? 'Se salveaza...' : 'Salveaza arendator'}
           </button>
           <button type="button" onClick={() => router.back()} className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">
-            Anulează
+            Anuleaza
           </button>
         </div>
       </form>

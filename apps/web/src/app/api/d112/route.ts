@@ -5,7 +5,7 @@ export const runtime = 'edge'
 
 const FLAT_DEDUCTION_PCT = 0.40
 const WITHHOLDING_RATE   = 0.10
-const LEGAL_BASIS = 'art.84 CF - cedarea folosintei bunurilor, deducere forfetar 40%, cota 10%'
+const LEGAL_BASIS = 'art.84 CF - cedarea folosintei bunurilor, deducere forfetara 40%, cota 10%'
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('Authorization')
@@ -35,33 +35,19 @@ export async function POST(req: NextRequest) {
   const lastDay = new Date(year, month, 0).getDate()
   const periodTo = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
 
-  // Try fetching with user_id filter first
-  const { data: paymentsWithUser, error: err1 } = await supabase
+  // RLS ensures only current user's payments are returned
+  const { data: allPayments, error: paymentsError } = await supabase
     .from('payments')
-    .select('id, amount, status, paid_date, due_date, contract_id, lessor_id, user_id')
+    .select('id, amount, status, paid_date, due_date, contract_id, lessor_id')
     .eq('user_id', user.id)
 
-  // Also try without user_id filter to detect if column exists / RLS handles it
-  const { data: paymentsAll, error: err2 } = await supabase
-    .from('payments')
-    .select('id, amount, status, paid_date, due_date, contract_id, lessor_id, user_id')
-    .limit(5)
-
-  // Use whichever returned data
-  const payments = (paymentsWithUser && paymentsWithUser.length > 0)
-    ? paymentsWithUser
-    : (paymentsAll ?? [])
-
-  const paymentsError = err1 && err2 ? err1 : null
-
   if (paymentsError) {
-    return NextResponse.json({
-      error: 'Eroare interogare plati: ' + paymentsError.message,
-      _debug: { err1, err2, userId: user.id }
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Eroare interogare plati: ' + paymentsError.message }, { status: 500 })
   }
 
-  // Fetch lessors separately by ID
+  const payments = allPayments ?? []
+
+  // Fetch lessors for this user
   const lessorIds = [...new Set(payments.map((p: any) => p.lessor_id).filter(Boolean))]
   const lessorMap = new Map<string, { cnp: string; first_name: string; last_name: string }>()
   if (lessorIds.length > 0) {
@@ -72,21 +58,11 @@ export async function POST(req: NextRequest) {
     for (const l of lessors ?? []) lessorMap.set(l.id, l)
   }
 
-  // Status check - normalize to handle Platit/PAID/platit/achitat etc.
   function isPaid(status: string | null): boolean {
     if (!status) return false
     const s = status.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    return s === 'paid' || s === 'platit' || s === 'platita' || s === 'achitat' ||
-      s.includes('platit') || s.includes('paid')
+    return s === 'paid' || s.includes('platit') || s.includes('paid') || s === 'achitat'
   }
-
-  const paymentsInPeriod = payments.filter((p: any) => {
-    if (!isPaid(p.status)) return false
-    const dateStr: string | null = p.paid_date ?? p.due_date ?? null
-    if (!dateStr) return false
-    const d = dateStr.slice(0, 10)
-    return d >= periodFrom && d <= periodTo
-  })
 
   const applicabilityNotes = [
     `Perioada: ${String(month).padStart(2, '0')}/${year}`,
@@ -97,52 +73,35 @@ export async function POST(req: NextRequest) {
   if (payments.length === 0) {
     return NextResponse.json({
       dataset: {
-        periodYear: year, periodMonth: month,
-        rows: [], totalGrossRon: 0, totalWithholdingTaxRon: 0,
+        periodYear: year, periodMonth: month, rows: [],
+        totalGrossRon: 0, totalWithholdingTaxRon: 0,
         rowsWithWarnings: 0, rowsIncomplete: 0,
-        applicabilityNotes: [...applicabilityNotes, 'Nu exista plati inregistrate.'],
-        warnings: [], generatedAt: new Date().toISOString(),
-        status: 'DRAFT', requiresAccountantReview: true,
+        applicabilityNotes: [...applicabilityNotes, 'Nu exista plati inregistrate pentru acest utilizator.'],
+        warnings: [], generatedAt: new Date().toISOString(), status: 'DRAFT', requiresAccountantReview: true,
       },
-      _debug: {
-        msg: 'Zero payments found in DB',
-        userId: user.id,
-        err1: err1?.message,
-        err2: err2?.message,
-        paymentsWithUserCount: paymentsWithUser?.length ?? 'error',
-        paymentsAllCount: paymentsAll?.length ?? 'error',
-        periodFrom, periodTo,
-      }
     })
   }
 
+  const paymentsInPeriod = payments.filter((p: any) => {
+    if (!isPaid(p.status)) return false
+    const dateStr: string | null = p.paid_date ?? p.due_date ?? null
+    if (!dateStr) return false
+    const d = dateStr.slice(0, 10)
+    return d >= periodFrom && d <= periodTo
+  })
+
   if (paymentsInPeriod.length === 0) {
+    const statuses = [...new Set(payments.map((p: any) => p.status))]
     return NextResponse.json({
       dataset: {
-        periodYear: year, periodMonth: month,
-        rows: [], totalGrossRon: 0, totalWithholdingTaxRon: 0,
+        periodYear: year, periodMonth: month, rows: [],
+        totalGrossRon: 0, totalWithholdingTaxRon: 0,
         rowsWithWarnings: 0, rowsIncomplete: 0,
         applicabilityNotes: [...applicabilityNotes,
-          `Nu exista plati in ${String(month).padStart(2, '0')}/${year}. Exista ${payments.length} plati - verificati statusul si data.`
+          `Nu exista plati platite in ${String(month).padStart(2, '0')}/${year}. Total plati in cont: ${payments.length}. Statusuri: ${statuses.join(', ')}. Verificati statusul si data platii.`
         ],
-        warnings: [], generatedAt: new Date().toISOString(),
-        status: 'DRAFT', requiresAccountantReview: true,
+        warnings: [], generatedAt: new Date().toISOString(), status: 'DRAFT', requiresAccountantReview: true,
       },
-      _debug: {
-        totalInDB: payments.length,
-        userId: user.id,
-        statuses: [...new Set(payments.map((p: any) => p.status))],
-        sample: payments.slice(0, 5).map((p: any) => ({
-          id: p.id,
-          status: p.status,
-          paid_date: p.paid_date,
-          due_date: p.due_date,
-          lessor_id: p.lessor_id,
-          user_id: p.user_id,
-          amount: p.amount,
-        })),
-        periodFrom, periodTo,
-      }
     })
   }
 
@@ -158,19 +117,10 @@ export async function POST(req: NextRequest) {
     const netTaxable    = Math.round((gross - flatDeduction) * 100) / 100
     const withheld      = Math.round(netTaxable * WITHHOLDING_RATE * 100) / 100
     return {
-      lessorCnp:         cnp,
-      lessorLastName:    lessor?.last_name  ?? '-',
-      lessorFirstName:   lessor?.first_name ?? '-',
-      contractId:        p.contract_id ?? '',
-      paymentIds:        [p.id],
-      paymentType:       'CASH' as const,
-      grossAmountRon:    gross,
-      flatDeductionRon:  flatDeduction,
-      netTaxableRon:     netTaxable,
-      withholdingTaxRon: withheld,
-      warnings,
-      isComplete: cnp.length === 13 && gross > 0 && !!lessor,
-      legalBasis: LEGAL_BASIS,
+      lessorCnp: cnp, lessorLastName: lessor?.last_name ?? '-', lessorFirstName: lessor?.first_name ?? '-',
+      contractId: p.contract_id ?? '', paymentIds: [p.id], paymentType: 'CASH' as const,
+      grossAmountRon: gross, flatDeductionRon: flatDeduction, netTaxableRon: netTaxable, withholdingTaxRon: withheld,
+      warnings, isComplete: cnp.length === 13 && gross > 0 && !!lessor, legalBasis: LEGAL_BASIS,
     }
   })
 
@@ -182,10 +132,9 @@ export async function POST(req: NextRequest) {
       periodYear: year, periodMonth: month, rows,
       totalGrossRon:          Math.round(totalGross    * 100) / 100,
       totalWithholdingTaxRon: Math.round(totalWithheld * 100) / 100,
-      rowsWithWarnings:       rows.filter((r: any) => r.warnings.length > 0).length,
-      rowsIncomplete:         rows.filter((r: any) => !r.isComplete).length,
-      applicabilityNotes, warnings: [],
-      generatedAt: new Date().toISOString(),
+      rowsWithWarnings:  rows.filter((r: any) => r.warnings.length > 0).length,
+      rowsIncomplete:    rows.filter((r: any) => !r.isComplete).length,
+      applicabilityNotes, warnings: [], generatedAt: new Date().toISOString(),
       status: 'DRAFT', requiresAccountantReview: true,
     },
   })
