@@ -2,7 +2,6 @@ import {
   Controller, Post, Body, Req, Res, HttpCode, HttpStatus, Get, UseGuards
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
-import { Request, Response } from 'express'
 import { AuthService } from './auth.service'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
 import { LoginSchema, ForgotPasswordSchema, ResetPasswordSchema } from '@arenda/shared'
@@ -26,7 +25,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Autentificare utilizator' })
-  async login(@Body() body: LoginDto, @Req() req: Request) {
+  async login(@Body() body: LoginDto, @Req() req: any) {
     // Validate with Zod
     const parsed = LoginSchema.safeParse(body)
     if (!parsed.success) {
@@ -53,7 +52,7 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async logout(@Req() req: Request & { user: AuthenticatedUser }) {
+  async logout(@Req() req: any) {
     await this.authService.logout(req.user.sub, req.user.tenantId, req.ip)
   }
 
@@ -67,7 +66,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Date utilizator curent' })
-  async me(@Req() req: Request & { user: AuthenticatedUser }) {
+  async me(@Req() req: any) {
     return { data: req.user }
   }
 }

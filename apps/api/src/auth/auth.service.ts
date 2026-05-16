@@ -63,11 +63,11 @@ export class AuthService {
   ) {
     const { user, tenant } = await this.validateUser(tenantSlug, email, password)
 
-    const roles = user.userRoles.map(ur => ur.role.code)
+    const roles = user.userRoles.map((ur: any) => ur.role.code)
     const permissions = [
       ...new Set(
-        user.userRoles.flatMap(ur =>
-          ur.role.rolePermissions.map(rp => rp.permission.code),
+        user.userRoles.flatMap((ur: any) =>
+          ur.role.rolePermissions.map((rp: any) => rp.permission.code),
         ),
       ),
     ]
@@ -165,11 +165,11 @@ export class AuthService {
         throw new UnauthorizedException('Utilizator invalid')
       }
 
-      const roles = user.userRoles.map(ur => ur.role.code)
+      const roles = user.userRoles.map((ur: any) => ur.role.code)
       const permissions = [
         ...new Set(
-          user.userRoles.flatMap(ur =>
-            ur.role.rolePermissions.map(rp => rp.permission.code),
+          user.userRoles.flatMap((ur: any) =>
+            ur.role.rolePermissions.map((rp: any) => rp.permission.code),
           ),
         ),
       ]

@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
-import * as bcrypt from 'bcrypt'
-import { ROLE_PERMISSIONS, PERMISSIONS } from '../../../packages/shared/src/constants/permissions'
+import * as bcrypt from 'bcryptjs'
+import { ROLE_PERMISSIONS, PERMISSIONS } from '@arenda/shared'
 
 const prisma = new PrismaClient()
 
@@ -9,7 +9,7 @@ async function main() {
 
   // ── 1. Permissions ──────────────────────────────────────
   console.log('  → Seeding permissions...')
-  for (const code of Object.values(PERMISSIONS)) {
+  for (const code of Object.values(PERMISSIONS) as string[]) {
     const [resource, ...actionParts] = code.split(':')
     await prisma.permission.upsert({
       where: { code },
@@ -44,7 +44,7 @@ async function main() {
   for (const [roleCode, permCodes] of Object.entries(ROLE_PERMISSIONS)) {
     const role = await prisma.role.findUnique({ where: { code: roleCode } })
     if (!role) continue
-    for (const permCode of permCodes) {
+    for (const permCode of permCodes as string[]) {
       const perm = await prisma.permission.findUnique({ where: { code: permCode } })
       if (!perm) continue
       await prisma.rolePermission.upsert({
