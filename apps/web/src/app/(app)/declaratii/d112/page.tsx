@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { AlertTriangle, FileSpreadsheet, Download, Check } from 'lucide-react'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 
 const MONTHS = [
   'Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie',
@@ -53,9 +54,11 @@ export default function D112Page() {
     setLoading(true)
     setDataset(null)
     try {
+      const { data: { session } } = await createClient().auth.getSession()
+      const token = session?.access_token ?? ''
       const res = await fetch('/api/d112', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ year, month }),
       })
       const json = await res.json()

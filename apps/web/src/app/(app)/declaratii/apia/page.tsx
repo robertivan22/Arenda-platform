@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { AlertTriangle, Tractor, Download, Check } from 'lucide-react'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 
 interface ApiaRow {
   lessorCnp: string
@@ -41,9 +42,11 @@ export default function ApiaPage() {
     setLoading(true)
     setDataset(null)
     try {
+      const { data: { session } } = await createClient().auth.getSession()
+      const token = session?.access_token ?? ''
       const res = await fetch('/api/apia', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ campaignYear: year }),
       })
       const json = await res.json()

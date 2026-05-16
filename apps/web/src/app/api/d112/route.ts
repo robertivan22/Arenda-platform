@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
+
+export const runtime = 'edge'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 // Legislație în vigoare: OUG 156/2024 (01-06-2026) + OUG 89/2025 (07-12-2026)
@@ -43,20 +44,18 @@ export interface D112Dataset {
 
 // ─── Route Handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  const cookieStore = await cookies()
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
+  }
+  const token = authHeader.slice(7)
 
-  const supabase = createServerClient(
+  const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (cs) => cs.forEach(({ name, value, options }) => cookieStore.set(name, value, options)),
-      },
-    },
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } },
   )
 
-  // Auth check
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) {
     return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
