@@ -1,7 +1,5 @@
 'use client'
 
-export const runtime = 'edge'
-
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -59,27 +57,16 @@ export default function RunDetailPage() {
 
   useEffect(() => {
     if (!runId) return
-    api.get(`/declarations/runs/${runId}`)
-      .then(r => setRun(r.data))
-      .catch(() => toast.error('Nu s-a putut încărca setul.'))
-      .finally(() => setLoading(false))
-  }, [runId])
+    // Run history not available in this version — redirect
+    router.replace('/declaratii/d112')
+  }, [runId, router])
 
   async function approve() {
-    setApproving(true)
-    try {
-      const res = await api.post(`/declarations/runs/${runId}/approve`, { notes: approveNotes })
-      setRun(prev => prev ? { ...prev, status: res.data.status, approvedAt: res.data.approvedAt, reviewNotes: res.data.reviewNotes } : prev)
-      toast.success('Set aprobat.')
-    } catch (e: any) {
-      toast.error(e.response?.data?.message ?? e.message)
-    } finally {
-      setApproving(false)
-    }
+    toast.info('Funcționalitate indisponibilă în această versiune.')
   }
 
-  if (loading) return <div className="p-8 text-center text-sm text-gray-500">Se încarcă...</div>
-  if (!run) return <div className="p-8 text-center text-sm text-red-500">Setul nu a fost găsit. <Link href="/declaratii/istoric" className="underline">Înapoi</Link></div>
+  if (loading) return <div className="p-8 text-center text-sm text-gray-500">Se redirecționează...</div>
+  if (!run) return <div className="p-8 text-center text-sm text-red-500">Setul nu a fost găsit. <Link href="/declaratii/d112" className="underline">Înapoi la D112</Link></div>
 
   const isDraft = run.status === 'DRAFT'
   const needsReviewItems = run.items.filter(i => i.status === 'NEEDS_REVIEW')

@@ -1,13 +1,9 @@
 'use client'
 
-export const runtime = 'edge'
-
 import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { AlertTriangle, FileSpreadsheet, Download, Check, ChevronDown } from 'lucide-react'
+import { AlertTriangle, FileSpreadsheet, Download, Check } from 'lucide-react'
 import { toast } from 'sonner'
-import Link from 'next/link'
-import { api } from '@/lib/api-client'
 
 const MONTHS = [
   'Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie',
@@ -57,11 +53,17 @@ export default function D112Page() {
     setLoading(true)
     setDataset(null)
     try {
-      const res = await api.post('/declarations/d112/generate', { year, month })
-      setDataset(res.data.dataset)
-      toast.success(`D112 generat — ${res.data.dataset.rows.length} înregistrări.`)
+      const res = await fetch('/api/d112', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year, month }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Eroare la generare D112.')
+      setDataset(json.dataset)
+      toast.success(`D112 generat — ${json.dataset.rows.length} înregistrări.`)
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? e.message ?? 'Eroare la generare D112.')
+      toast.error(e.message ?? 'Eroare la generare D112.')
     } finally {
       setLoading(false)
     }
@@ -230,9 +232,7 @@ export default function D112Page() {
       )}
 
       <div className="mt-6 text-center">
-        <Link href="/declaratii/istoric" className="text-sm text-brand-600 hover:underline">
-          Vizualizați istoricul seturilor salvate →
-        </Link>
+        <span className="text-xs text-gray-400">Setul generat este DRAFT — validați cu contabilul înainte de depunere la ANAF.</span>
       </div>
     </div>
   )

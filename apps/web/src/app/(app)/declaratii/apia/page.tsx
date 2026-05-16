@@ -1,12 +1,9 @@
 'use client'
 
-export const runtime = 'edge'
-
 import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { AlertTriangle, Tractor, Download, Check } from 'lucide-react'
 import { toast } from 'sonner'
-import { api } from '@/lib/api-client'
 
 interface ApiaRow {
   lessorCnp: string
@@ -44,11 +41,17 @@ export default function ApiaPage() {
     setLoading(true)
     setDataset(null)
     try {
-      const res = await api.post('/declarations/apia/generate', { campaignYear: year })
-      setDataset(res.data.dataset)
-      toast.success(`Export APIA generat — ${res.data.dataset.rows.length} parcele.`)
+      const res = await fetch('/api/apia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignYear: year }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Eroare la generare export APIA.')
+      setDataset(json.dataset)
+      toast.success(`Export APIA generat — ${json.dataset.rows.length} parcele.`)
     } catch (e: any) {
-      toast.error(e.response?.data?.message ?? e.message ?? 'Eroare la generare export APIA.')
+      toast.error(e.message ?? 'Eroare la generare export APIA.')
     } finally {
       setLoading(false)
     }
