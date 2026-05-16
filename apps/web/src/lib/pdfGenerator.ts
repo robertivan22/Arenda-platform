@@ -87,7 +87,7 @@ export async function generateLessorPDF(lessorId: string) {
 
 <div class="header">
   <h1>CONTRACT DE ARENDĂ</h1>
-  <p>Nr. ${lessorContracts[0]?.contractNumber || '___________'} / ${today}</p>
+  <p>Nr. ${lessorContracts[0]?.contract_number || '___________'} / ${today}</p>
   <p style="margin-top:6px;font-size:9pt;color:#888">Generat automat de ArendaPro Platform</p>
 </div>
 
@@ -114,8 +114,8 @@ export async function generateLessorPDF(lessorId: string) {
 <div class="section">
   <div class="section-title">III. DURATA CONTRACTULUI</div>
   ${lessorContracts.length > 0 ? `
-  <p class="clause">Contractul se încheie pe o perioadă de <strong>${Math.ceil((new Date(lessorContracts[0].endDate).getTime() - new Date(lessorContracts[0].startDate).getTime()) / (365.25*24*60*60*1000))} ani</strong>, 
-  de la data de <strong>${lessorContracts[0].startDate}</strong> până la data de <strong>${lessorContracts[0].endDate}</strong>, 
+  <p class="clause">Contractul se încheie pe o perioadă de <strong>${Math.ceil((new Date(lessorContracts[0].end_date).getTime() - new Date(lessorContracts[0].start_date).getTime()) / (365.25*24*60*60*1000))} ani</strong>, 
+  de la data de <strong>${lessorContracts[0].start_date}</strong> până la data de <strong>${lessorContracts[0].end_date}</strong>, 
   cu posibilitate de prelungire prin acordul ambelor părți.</p>
   ` : '<p class="clause">Durata contractului se va stabili prin act adițional.</p>'}
 </div>
