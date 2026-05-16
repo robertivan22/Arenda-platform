@@ -1,10 +1,10 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, Building2, X, FileSpreadsheet,
+  BarChart3, ChevronDown, Building2, X, FileSpreadsheet, UserCircle,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState } from 'react'
@@ -29,7 +29,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Users,
     children: [
       { label: 'Lista arendatori', href: '/arendatori' },
-      { label: 'Adaugă arendator', href: '/arendatori/nou' },
+      { label: 'AdaugÄƒ arendator', href: '/arendatori/nou' },
     ],
   },
   {
@@ -45,11 +45,11 @@ const NAV_ITEMS: NavItem[] = [
     icon: MapPin,
     children: [
       { label: 'Lista parcele', href: '/parcele' },
-      { label: 'Parcelă nouă', href: '/parcele/nou' },
+      { label: 'ParcelÄƒ nouÄƒ', href: '/parcele/nou' },
     ],
   },
   {
-    label: 'Plăți',
+    label: 'PlÄƒÈ›i',
     href: '/plati',
     icon: CreditCard,
   },
@@ -59,13 +59,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: BarChart3,
   },
   {
-    label: 'Declarații',
+    label: 'DeclaraÈ›ii',
     icon: FileSpreadsheet,
     children: [
       { label: 'Dashboard fiscal', href: '/declaratii' },
-      { label: 'D112 — Impozit arendă', href: '/declaratii/d112' },
+      { label: 'D112 â€” Impozit arendÄƒ', href: '/declaratii/d112' },
       { label: 'Export APIA', href: '/declaratii/apia' },
-      { label: 'Istoric declarații', href: '/declaratii/istoric' },
+      { label: 'Istoric declaraÈ›ii', href: '/declaratii/istoric' },
     ],
   },
 ]
@@ -99,7 +99,7 @@ export function AppSidebar() {
             Arenda<span className="text-brand-400">Pro</span>
           </span>
         </div>
-        {/* Close button — mobile only */}
+        {/* Close button â€” mobile only */}
         <button
           onClick={close}
           className="md:hidden p-1 rounded text-sidebar-muted hover:text-sidebar-text hover:bg-sidebar-hover transition-colors"
@@ -188,9 +188,25 @@ export function AppSidebar() {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-sidebar-hover text-2xs text-sidebar-muted">
-        v0.1.0 — Arenda Platform
+      <div className="border-t border-sidebar-hover">
+        <Link
+          href="/profil"
+          onClick={close}
+          className={clsx(
+            'flex items-center gap-2.5 px-4 py-2 text-sm transition-colors',
+            pathname.startsWith('/profil')
+              ? 'bg-sidebar-active text-white'
+              : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white',
+          )}
+        >
+          <UserCircle className="w-4 h-4 flex-shrink-0" />
+          <span>Profil</span>
+        </Link>
+      </div>
+      <div className="px-4 py-2 border-t border-sidebar-hover text-2xs text-sidebar-muted">
+        v0.1.0 - Arenda Platform
       </div>
     </nav>
   )
 }
+
