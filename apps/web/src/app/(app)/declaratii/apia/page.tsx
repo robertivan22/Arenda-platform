@@ -43,21 +43,11 @@ export default function ApiaPage() {
     setLoading(true)
     setDataset(null)
     try {
-      const res = await fetch('/api/declarations/apia/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaignYear: year }),
-        credentials: 'include',
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.message ?? `Eroare server: ${res.status}`)
-      }
-      const data = await res.json()
-      setDataset(data.dataset)
-      toast.success(`Export APIA generat — ${data.dataset.rows.length} parcele.`)
+      const res = await api.post('/declarations/apia/generate', { campaignYear: year })
+      setDataset(res.data.dataset)
+      toast.success(`Export APIA generat — ${res.data.dataset.rows.length} parcele.`)
     } catch (e: any) {
-      toast.error(e.message ?? 'Eroare la generare export APIA.')
+      toast.error(e.response?.data?.message ?? e.message ?? 'Eroare la generare export APIA.')
     } finally {
       setLoading(false)
     }

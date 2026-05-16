@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { AlertTriangle, FileSpreadsheet, Download, Check, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { api } from '@/lib/api-client'
 
 const MONTHS = [
   'Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie',
@@ -56,21 +57,11 @@ export default function D112Page() {
     setLoading(true)
     setDataset(null)
     try {
-      const res = await fetch('/api/declarations/d112/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ year, month }),
-        credentials: 'include',
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.message ?? `Eroare server: ${res.status}`)
-      }
-      const data = await res.json()
-      setDataset(data.dataset)
-      toast.success(`D112 generat — ${data.dataset.rows.length} înregistrări.`)
+      const res = await api.post('/declarations/d112/generate', { year, month })
+      setDataset(res.data.dataset)
+      toast.success(`D112 generat — ${res.data.dataset.rows.length} înregistrări.`)
     } catch (e: any) {
-      toast.error(e.message ?? 'Eroare la generare D112.')
+      toast.error(e.response?.data?.message ?? e.message ?? 'Eroare la generare D112.')
     } finally {
       setLoading(false)
     }

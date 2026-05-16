@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { AlertTriangle, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { api } from '@/lib/api-client'
 
 interface RunItem {
   id: string
@@ -58,9 +59,8 @@ export default function RunDetailPage() {
 
   useEffect(() => {
     if (!runId) return
-    fetch(`/api/declarations/runs/${runId}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(setRun)
+    api.get(`/declarations/runs/${runId}`)
+      .then(r => setRun(r.data))
       .catch(() => toast.error('Nu s-a putut încărca setul.'))
       .finally(() => setLoading(false))
   }, [runId])
@@ -68,21 +68,11 @@ export default function RunDetailPage() {
   async function approve() {
     setApproving(true)
     try {
-      const res = await fetch(`/api/declarations/runs/${runId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: approveNotes }),
-        credentials: 'include',
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.message ?? 'Eroare la aprobare.')
-      }
-      const updated = await res.json()
-      setRun(prev => prev ? { ...prev, status: updated.status, approvedAt: updated.approvedAt, reviewNotes: updated.reviewNotes } : prev)
+      const res = await api.post(`/declarations/runs/${runId}/approve`, { notes: approveNotes })
+      setRun(prev => prev ? { ...prev, status: res.data.status, approvedAt: res.data.approvedAt, reviewNotes: res.data.reviewNotes } : prev)
       toast.success('Set aprobat.')
     } catch (e: any) {
-      toast.error(e.message)
+      toast.error(e.response?.data?.message ?? e.message)
     } finally {
       setApproving(false)
     }
