@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Pencil } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/data-display/StatusBadge'
 
@@ -62,15 +62,15 @@ export default function ContractesListPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              {['Nr. contract','Arendator','Tip','Zona','Data semn.','De la','Pana la','Arenda/an','Status'].map(h => (
+              {['Nr. contract','Arendator','Tip','Zona','Data semn.','De la','Pana la','Arenda/an','Status',''].map(h => (
                 <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-400">Nicio inregistrare</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={10} className="px-3 py-8 text-center text-gray-400">Nicio inregistrare</td></tr>}
             {filtered.map(row => (
-              <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/contracte/${row.id}`)}>
+              <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="px-3 py-2 font-medium">{row.contract_number}</td>
                 <td className="px-3 py-2 font-medium text-gray-900">{row.lessor_name}</td>
                 <td className="px-3 py-2">{row.contract_type}</td>
@@ -80,6 +80,15 @@ export default function ContractesListPage() {
                 <td className="px-3 py-2">{row.end_date}</td>
                 <td className="px-3 py-2">{Number(row.annual_rent).toFixed(2)} RON</td>
                 <td className="px-3 py-2"><StatusBadge status={row.status} /></td>
+                <td className="px-3 py-2">
+                  <button
+                    onClick={() => router.push(`/contracte/${row.id}`)}
+                    className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                    title="Editeaza"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

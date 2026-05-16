@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil } from 'lucide-react'
 import { StatusBadge } from '@/components/data-display/StatusBadge'
 
 type PaymentStatus = 'PENDING' | 'PAID' | 'OVERDUE'
@@ -32,6 +32,9 @@ export default function PlatiPage() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ lessorId: '', contractId: '', amount: '', dueDate: '', notes: '' })
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ lessorId: '', contractId: '', amount: '', dueDate: '', notes: '', status: 'PENDING' })
+  const [editSaving, setEditSaving] = useState(false)
 
   const reload = useCallback(async () => {
     const db = createClient()
@@ -88,6 +91,41 @@ export default function PlatiPage() {
     toast.success('Plata adaugata.')
     setShowForm(false)
     setForm({ lessorId: '', contractId: '', amount: '', dueDate: '', notes: '' })
+    reload()
+  }
+
+  function startEdit(row: Payment) {
+    setEditId(row.id)
+    setEditForm({
+      lessorId: row.lessor_id,
+      contractId: row.contract_id ?? '',
+      amount: String(row.amount),
+      dueDate: row.due_date,
+      notes: row.notes ?? '',
+      status: row.status,
+    })
+    setShowForm(false)
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editId) return
+    setEditSaving(true)
+    const contract = contracts.find(c => c.id === editForm.contractId)
+    const { error } = await createClient().from('payments').update({
+      lessor_id: editForm.lessorId,
+      contract_id: editForm.contractId || null,
+      contract_number: contract?.contract_number || null,
+      amount: parseFloat(editForm.amount),
+      due_date: editForm.dueDate,
+      notes: editForm.notes || null,
+      status: editForm.status as PaymentStatus,
+      paid_date: editForm.status === 'PAID' ? new Date().toISOString().split('T')[0] : null,
+    }).eq('id', editId)
+    setEditSaving(false)
+    if (error) { toast.error('Eroare: ' + error.message); return }
+    toast.success('Plata actualizata.')
+    setEditId(null)
     reload()
   }
 
@@ -175,17 +213,80 @@ export default function PlatiPage() {
                 <td className="px-3 py-2">{row.paid_date ?? 'neplatita'}</td>
                 <td className="px-3 py-2"><StatusBadge status={row.status} /></td>
                 <td className="px-3 py-2">
-                  {row.status !== 'PAID' && (
-                    <button onClick={() => markPaid(row.id)} className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 border border-green-300">
-                      Marcheaza platit
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => startEdit(row)}
+                      className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                      title="Editeaza"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                    {row.status !== 'PAID' && (
+                      <button onClick={() => markPaid(row.id)} className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 border border-green-300">
+                        Platit
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Inline edit panel */}
+      {editId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Editeaza plata</h3>
+            <form onSubmit={saveEdit}>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Arendator *</label>
+                  <select className={inputCls} value={editForm.lessorId} onChange={e => setEditForm(p => ({ ...p, lessorId: e.target.value }))} required>
+                    <option value="">Selectati</option>
+                    {lessors.map(l => <option key={l.id} value={l.id}>{l.display_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Contract</label>
+                  <select className={inputCls} value={editForm.contractId} onChange={e => setEditForm(p => ({ ...p, contractId: e.target.value }))}>
+                    <option value="">Selectati</option>
+                    {contracts.filter(c => !editForm.lessorId || c.lessor_id === editForm.lessorId)
+                      .map(c => <option key={c.id} value={c.id}>{c.contract_number}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Suma (RON) *</label>
+                  <input className={inputCls} type="number" min="0.01" step="0.01" value={editForm.amount} onChange={e => setEditForm(p => ({ ...p, amount: e.target.value }))} required />
+                </div>
+                <div>
+                  <label className={labelCls}>Scadenta *</label>
+                  <input className={inputCls} type="date" value={editForm.dueDate} onChange={e => setEditForm(p => ({ ...p, dueDate: e.target.value }))} required />
+                </div>
+                <div>
+                  <label className={labelCls}>Status</label>
+                  <select className={inputCls} value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}>
+                    <option value="PENDING">In asteptare</option>
+                    <option value="PAID">Platit</option>
+                    <option value="OVERDUE">Restanta</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Observatii</label>
+                  <input className={inputCls} value={editForm.notes} onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))} />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button type="submit" disabled={editSaving} className="px-4 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50">
+                  {editSaving ? 'Se salveaza...' : 'Salveaza'}
+                </button>
+                <button type="button" onClick={() => setEditId(null)} className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">Anuleaza</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

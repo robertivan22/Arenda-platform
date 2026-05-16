@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Pencil } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 
 interface Parcel {
@@ -62,13 +62,13 @@ export default function ParceleListPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              {['Cod parcela','Tarla','Nr. parcela','Judet','Localitate','Suprafata (ha)','Arendator','Status'].map(h => (
+              {['Cod parcela','Tarla','Nr. parcela','Judet','Localitate','Suprafata (ha)','Arendator','Status',''].map(h => (
                 <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-gray-400">Nicio parcela inregistrata</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-400">Nicio parcela inregistrata</td></tr>}
             {filtered.map(row => (
               <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="px-3 py-2 font-mono text-xs">{row.parcel_code ?? '-'}</td>
@@ -79,6 +79,15 @@ export default function ParceleListPage() {
                 <td className="px-3 py-2 font-medium">{Number(row.surface).toFixed(4)}</td>
                 <td className="px-3 py-2">{row.lessor_name}</td>
                 <td className="px-3 py-2"><span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">{row.status}</span></td>
+                <td className="px-3 py-2">
+                  <button
+                    onClick={() => router.push(`/parcele/${row.id}`)}
+                    className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                    title="Editeaza"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
