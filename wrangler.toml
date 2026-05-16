@@ -2,3 +2,7 @@ name = "arenda"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "apps/web/.vercel/output/static"
+
+[vars]
+NEXT_PUBLIC_SUPABASE_URL = "https://hsaomcgssyyxroezhgcp.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzYW9tY2dzc3l5eHJvZXpoZ2NwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5MzgwMDQsImV4cCI6MjA5NDUxNDAwNH0.23-2t8nWvJ1gG2WNWU4U_pTttGPYMqaoeQEaxsjWxd0"

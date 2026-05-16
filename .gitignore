@@ -5,3 +5,6 @@ dist
 .turbo
 *.log
 uploads/
+
+.env.local
+.env*.local
