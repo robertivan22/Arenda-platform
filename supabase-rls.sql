@@ -3,7 +3,7 @@
 -- Run this in the Supabase SQL Editor (Dashboard > SQL Editor > New query)
 -- =============================================================================
 
--- ─── TABLES ──────────────────────────────────────────────────────────────────
+-- ─── TABLES (create if not exist) ────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS lessors (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -74,6 +74,72 @@ CREATE TABLE IF NOT EXISTS payments (
   notes           text,
   created_at      timestamptz NOT NULL DEFAULT now()
 );
+
+-- ─── MIGRATE EXISTING TABLES (add missing snake_case columns) ─────────────────
+-- Safe to run multiple times – ADD COLUMN IF NOT EXISTS is idempotent.
+-- Needed when tables were created by the old NestJS backend with camelCase columns.
+
+ALTER TABLE lessors
+  ADD COLUMN IF NOT EXISTS user_id      uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS code         text,
+  ADD COLUMN IF NOT EXISTS type         text,
+  ADD COLUMN IF NOT EXISTS first_name   text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS last_name    text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS company_name text,
+  ADD COLUMN IF NOT EXISTS cnp          text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS gender       text,
+  ADD COLUMN IF NOT EXISTS county       text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS locality     text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS address      text,
+  ADD COLUMN IF NOT EXISTS phone        text,
+  ADD COLUMN IF NOT EXISTS mobile       text,
+  ADD COLUMN IF NOT EXISTS email        text,
+  ADD COLUMN IF NOT EXISTS iban         text,
+  ADD COLUMN IF NOT EXISTS bank_name    text,
+  ADD COLUMN IF NOT EXISTS notes        text,
+  ADD COLUMN IF NOT EXISTS status       text NOT NULL DEFAULT 'ACTIVE',
+  ADD COLUMN IF NOT EXISTS created_at   timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE contracts
+  ADD COLUMN IF NOT EXISTS user_id         uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS lessor_id       uuid,
+  ADD COLUMN IF NOT EXISTS contract_number text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS contract_type   text NOT NULL DEFAULT 'ARENDA',
+  ADD COLUMN IF NOT EXISTS zone            text,
+  ADD COLUMN IF NOT EXISTS sign_date       date,
+  ADD COLUMN IF NOT EXISTS start_date      date,
+  ADD COLUMN IF NOT EXISTS end_date        date,
+  ADD COLUMN IF NOT EXISTS total_parcels   integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS annual_rent     numeric(14,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS status          text NOT NULL DEFAULT 'ACTIVE',
+  ADD COLUMN IF NOT EXISTS created_at      timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE parcels
+  ADD COLUMN IF NOT EXISTS user_id            uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS parcel_code        text,
+  ADD COLUMN IF NOT EXISTS tarla_nr           text,
+  ADD COLUMN IF NOT EXISTS parcel_nr          text,
+  ADD COLUMN IF NOT EXISTS county             text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS locality           text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS land_use_category  text,
+  ADD COLUMN IF NOT EXISTS surface            numeric(10,4) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS surface_rented     numeric(10,4),
+  ADD COLUMN IF NOT EXISTS lessor_id          uuid,
+  ADD COLUMN IF NOT EXISTS contract_id        uuid,
+  ADD COLUMN IF NOT EXISTS status             text NOT NULL DEFAULT 'ACTIVE',
+  ADD COLUMN IF NOT EXISTS created_at         timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE payments
+  ADD COLUMN IF NOT EXISTS user_id         uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS lessor_id       uuid,
+  ADD COLUMN IF NOT EXISTS contract_id     uuid,
+  ADD COLUMN IF NOT EXISTS contract_number text,
+  ADD COLUMN IF NOT EXISTS amount          numeric(14,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS due_date        date,
+  ADD COLUMN IF NOT EXISTS paid_date       date,
+  ADD COLUMN IF NOT EXISTS status          text NOT NULL DEFAULT 'PENDING',
+  ADD COLUMN IF NOT EXISTS notes           text,
+  ADD COLUMN IF NOT EXISTS created_at      timestamptz NOT NULL DEFAULT now();
 
 -- ─── INDEXES ─────────────────────────────────────────────────────────────────
 

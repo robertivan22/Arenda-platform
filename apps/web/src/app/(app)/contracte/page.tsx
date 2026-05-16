@@ -2,22 +2,43 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Plus, Search } from 'lucide-react'
-import { contracts, type Contract } from '@/lib/mockStore'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/data-display/StatusBadge'
+
+interface Contract {
+  id: string; contract_number: string; contract_type: string
+  lessor_id: string | null; zone: string | null; sign_date: string | null
+  start_date: string; end_date: string; annual_rent: number; status: string
+  lessor_name: string
+}
 
 export default function ContractesListPage() {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<Contract[]>([])
 
-  useEffect(() => { setRows(contracts.list()) }, [])
+  useEffect(() => {
+    createClient()
+      .from('contracts')
+      .select('id, contract_number, contract_type, lessor_id, zone, sign_date, start_date, end_date, annual_rent, status, lessors(first_name, last_name, company_name, type)')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) setRows((data as any[]).map(c => ({
+          ...c,
+          lessor_name: c.lessors
+            ? (c.lessors.type === 'LEGAL' ? c.lessors.company_name : `${c.lessors.last_name} ${c.lessors.first_name}`.trim())
+            : 'fara arendator',
+        })))
+      })
+  }, [])
 
-  const filtered = rows.filter(r =>
-    !search || r.contractNumber.toLowerCase().includes(search.toLowerCase()) ||
-    r.lessorName.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = rows.filter(r => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return r.contract_number.toLowerCase().includes(q) || r.lessor_name.toLowerCase().includes(q)
+  })
 
   return (
     <div>
@@ -30,36 +51,34 @@ export default function ContractesListPage() {
           </button>
         }
       />
-
       <div className="bg-white rounded-lg border border-gray-200 p-3 mb-4">
         <div className="relative max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Caută după nr. contract, arendator..." value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder="Cauta dupa nr. contract, arendator..." value={search} onChange={e => setSearch(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
       </div>
-
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              {['Nr. contract','Arendator','Tip','Zonă','Data semn.','De la','Până la','Arendă/an','Status'].map(h => (
+              {['Nr. contract','Arendator','Tip','Zona','Data semn.','De la','Pana la','Arenda/an','Status'].map(h => (
                 <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-400">Nicio înregistrare</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-400">Nicio inregistrare</td></tr>}
             {filtered.map(row => (
               <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/contracte/${row.id}`)}>
-                <td className="px-3 py-2 font-medium">{row.contractNumber}</td>
-                <td className="px-3 py-2 font-medium text-gray-900">{row.lessorName}</td>
-                <td className="px-3 py-2">{row.contractType}</td>
-                <td className="px-3 py-2">{row.zone}</td>
-                <td className="px-3 py-2">{row.signDate}</td>
-                <td className="px-3 py-2">{row.startDate}</td>
-                <td className="px-3 py-2">{row.endDate}</td>
-                <td className="px-3 py-2">{row.annualRent} RON</td>
+                <td className="px-3 py-2 font-medium">{row.contract_number}</td>
+                <td className="px-3 py-2 font-medium text-gray-900">{row.lessor_name}</td>
+                <td className="px-3 py-2">{row.contract_type}</td>
+                <td className="px-3 py-2">{row.zone ?? '-'}</td>
+                <td className="px-3 py-2">{row.sign_date ?? '-'}</td>
+                <td className="px-3 py-2">{row.start_date}</td>
+                <td className="px-3 py-2">{row.end_date}</td>
+                <td className="px-3 py-2">{Number(row.annual_rent).toFixed(2)} RON</td>
                 <td className="px-3 py-2"><StatusBadge status={row.status} /></td>
               </tr>
             ))}
