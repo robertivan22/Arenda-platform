@@ -30,21 +30,7 @@ export async function POST(req: NextRequest) {
   // Fetch parcels with lessor and contract for this user
   const { data: parcels, error } = await supabase
     .from('parcels')
-    .select(`
-      id,
-      bloc_fizic,
-      tarla_nr,
-      parcel_nr,
-      surface,
-      surface_rented,
-      county,
-      locality,
-      land_use_category,
-      lessor_id,
-      contract_id,
-      lessors(cnp, first_name, last_name),
-      contracts(contract_number, start_date, end_date)
-    `)
+    .select('*, lessors(cnp, first_name, last_name), contracts(contract_number, start_date, end_date)')
     .eq('user_id', user.id)
 
   if (error) {

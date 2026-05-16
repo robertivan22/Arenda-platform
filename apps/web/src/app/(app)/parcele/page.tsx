@@ -20,7 +20,7 @@ export default function ParceleListPage() {
   useEffect(() => {
     createClient()
       .from('parcels')
-      .select('id, bloc_fizic, tarla_nr, parcel_nr, county, locality, surface, status, lessors(first_name, last_name, company_name, type)')
+      .select('*, lessors(first_name, last_name, company_name, type)')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         if (data) setRows((data as any[]).map(p => ({
