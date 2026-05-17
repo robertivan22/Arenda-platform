@@ -88,12 +88,12 @@ export default function PrintFacturaPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, gap: 8 }}>
           <div style={{ minWidth: 170, maxWidth: 200 }}>
             {company.logo_url
-              ? <img src={company.logo_url} alt="Logo" style={{ maxHeight: 70, maxWidth: 190, objectFit: 'contain', display: 'block' }} />
+              ? <img src={company.logo_url} alt="Logo" style={{ maxHeight: 100, maxWidth: 240, objectFit: 'contain', display: 'block' }} />
               : <div style={{ width: 170 }} />}
           </div>
           <div style={{ flex: 1, textAlign: 'center' }}>
             <h1 className="text-xl font-bold uppercase tracking-wide">
-              {isAviz ? 'AVIZ DE ÎNSOȞIRE A MĂRFII' : 'FACTURĂ FISCALĂ'}
+              {isAviz ? 'AVIZ DE ÎNSOȚIRE A MĂRFII' : 'FACTURĂ FISCALĂ'}
             </h1>
           </div>
           <div style={{ minWidth: 180 }}>

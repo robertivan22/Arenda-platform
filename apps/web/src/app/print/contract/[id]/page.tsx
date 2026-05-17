@@ -108,7 +108,7 @@ export default function ContractPrintPage() {
           padding: 20mm 22mm 20mm 28mm;
         }
         .doc-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 8pt; margin-bottom: 12pt; }
-        .company-logo { max-height: 80px; max-width: 200px; object-fit: contain; margin-bottom: 6pt; }
+        .company-logo { max-height: 110px; max-width: 260px; object-fit: contain; margin-bottom: 6pt; }
         .company-info { font-size: 9pt; line-height: 1.4; }
         .company-name { font-weight: bold; font-size: 11pt; }
         .doc-ref { text-align: right; font-size: 9pt; line-height: 1.6; }
