@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Search, Pencil } from 'lucide-react'
+import { Plus, Search, Pencil, Eye } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/data-display/StatusBadge'
 
@@ -81,13 +81,22 @@ export default function ContractesListPage() {
                 <td className="px-3 py-2">{Number(row.annual_rent).toFixed(2)} RON</td>
                 <td className="px-3 py-2"><StatusBadge status={row.status} /></td>
                 <td className="px-3 py-2">
-                  <button
-                    onClick={() => router.push(`/contracte/${row.id}`)}
-                    className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                    title="Editeaza"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => router.push(`/contracte/${row.id}`)}
+                      className="p-1.5 rounded hover:bg-brand-50 text-brand-500 hover:text-brand-700 transition-colors"
+                      title="Deschide dashboard"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => router.push(`/contracte/${row.id}/editeaza`)}
+                      className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                      title="Editeaza"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, UserCircle,
+  BarChart3, ChevronDown, X, FileSpreadsheet, UserCircle, Settings,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState } from 'react'
@@ -51,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Istoric declarații', href: '/declaratii/istoric' },
     ],
   },
+  { label: 'Setari', href: '/setari', icon: Settings },
 ]
 
 export function AppSidebar() {
