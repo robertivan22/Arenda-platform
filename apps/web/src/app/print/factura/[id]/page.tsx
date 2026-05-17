@@ -15,7 +15,7 @@ interface Invoice {
 interface Company {
   name: string; cif: string; reg_com: string; address: string
   county: string; locality: string; iban: string; bank_name: string
-  phone: string; email: string
+  phone: string; email: string; logo_url?: string
 }
 interface Lessor {
   first_name: string; last_name: string; company_name: string | null; type: string
@@ -84,24 +84,29 @@ export default function PrintFacturaPage() {
       </div>
 
       <div className="page">
-        {/* Title */}
-        <div className="text-center mb-6">
-          <h1 className="text-xl font-bold uppercase tracking-wide">
-            {isAviz ? 'AVIZ DE INSOTIRE A MARFII' : 'FACTURA FISCALA'}
-          </h1>
-        </div>
-
-        {/* Invoice meta */}
-        <div className="flex justify-end mb-6">
-          <table className="text-sm border border-gray-300">
-            <tbody>
-              <tr><td className="px-3 py-1 font-semibold bg-gray-50 border-b border-r border-gray-300">Nr.</td><td className="px-3 py-1 border-b border-gray-300">{invoice.invoice_number}</td></tr>
-              <tr><td className="px-3 py-1 font-semibold bg-gray-50 border-b border-r border-gray-300">Serie</td><td className="px-3 py-1 border-b border-gray-300">{invoice.invoice_series}</td></tr>
-              <tr><td className="px-3 py-1 font-semibold bg-gray-50 border-b border-r border-gray-300">Data</td><td className="px-3 py-1 border-b border-gray-300">{invoice.invoice_date}</td></tr>
-              {invoice.due_date && <tr><td className="px-3 py-1 font-semibold bg-gray-50 border-b border-r border-gray-300">Scadenta</td><td className="px-3 py-1 border-b border-gray-300">{invoice.due_date}</td></tr>}
-              <tr><td className="px-3 py-1 font-semibold bg-gray-50 border-r border-gray-300">Cota TVA</td><td className="px-3 py-1">{invoice.tva_rate}% Redus</td></tr>
-            </tbody>
-          </table>
+        {/* Header: Logo | Title | Meta table — 3-column layout */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, gap: 8 }}>
+          <div style={{ minWidth: 170, maxWidth: 200 }}>
+            {company.logo_url
+              ? <img src={company.logo_url} alt="Logo" style={{ maxHeight: 70, maxWidth: 190, objectFit: 'contain', display: 'block' }} />
+              : <div style={{ width: 170 }} />}
+          </div>
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <h1 className="text-xl font-bold uppercase tracking-wide">
+              {isAviz ? 'AVIZ DE ÎNSOȞIRE A MĂRFII' : 'FACTURĂ FISCALĂ'}
+            </h1>
+          </div>
+          <div style={{ minWidth: 180 }}>
+            <table className="text-sm border border-gray-300" style={{ marginLeft: 'auto' }}>
+              <tbody>
+                <tr><td className="px-3 py-1 font-semibold bg-gray-50 border-b border-r border-gray-300">Nr.</td><td className="px-3 py-1 border-b border-gray-300">{invoice.invoice_number}</td></tr>
+                <tr><td className="px-3 py-1 font-semibold bg-gray-50 border-b border-r border-gray-300">Serie</td><td className="px-3 py-1 border-b border-gray-300">{invoice.invoice_series}</td></tr>
+                <tr><td className="px-3 py-1 font-semibold bg-gray-50 border-b border-r border-gray-300">Data</td><td className="px-3 py-1 border-b border-gray-300">{invoice.invoice_date}</td></tr>
+                {invoice.due_date && <tr><td className="px-3 py-1 font-semibold bg-gray-50 border-b border-r border-gray-300">Scadenta</td><td className="px-3 py-1 border-b border-gray-300">{invoice.due_date}</td></tr>}
+                {!isAviz && <tr><td className="px-3 py-1 font-semibold bg-gray-50 border-r border-gray-300">Cota TVA</td><td className="px-3 py-1">{invoice.tva_rate}% Redus</td></tr>}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Furnizor / Client */}

@@ -142,6 +142,30 @@ export default function ContractDashboardPage() {
     router.push(`/print/factura/${inv.id}`)
   }
 
+  async function generateAviz() {
+    if (selectedTxns.size === 0) { toast.error('Selectati cel putin o tranzactie.'); return }
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) return
+    const { data: cs } = await db.from('company_settings').select('invoice_series, aviz_counter').eq('user_id', user.id).single()
+    const series = cs?.invoice_series ?? 'A'
+    const counter = (cs?.aviz_counter ?? 0) + 1
+    const avizNumber = `${series}AV-${counter}`
+    const txnsSelected = transactions.filter(t => selectedTxns.has(t.id))
+    const totalRon = txnsSelected.reduce((s, t) => s + t.ron_net, 0)
+    const { data: inv, error } = await db.from('invoices').insert({
+      user_id: user.id, lessor_id: contract?.lessor_id,
+      invoice_number: avizNumber, invoice_series: series,
+      invoice_date: new Date().toISOString().split('T')[0],
+      total_ron: totalRon, tva_amount: 0, tva_rate: 0, doc_type: 'AVIZ', status: 'DRAFT',
+    }).select('id').single()
+    if (error || !inv) { toast.error('Eroare la generare aviz.'); return }
+    await db.from('company_settings').update({ aviz_counter: counter }).eq('user_id', user.id)
+    await db.from('transactions').update({ invoice_id: inv.id }).in('id', [...selectedTxns])
+    toast.success(`Aviz ${avizNumber} generat.`)
+    router.push(`/print/factura/${inv.id}`)
+  }
+
   const inputCls = 'w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500'
   const labelCls = 'block text-xs font-medium text-gray-700 mb-1'
   const thCls = 'px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50'
@@ -245,7 +269,10 @@ export default function ContractDashboardPage() {
           <span className="font-semibold text-sm">Tranzactii</span>
           <div className="flex gap-2">
             {selectedTxns.size > 0 && (
-              <button onClick={generateInvoice} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded font-medium"><Printer className="w-3.5 h-3.5" /> Genereaza factura ({selectedTxns.size})</button>
+              <>
+                <button onClick={generateInvoice} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded font-medium"><Printer className="w-3.5 h-3.5" /> Factura ({selectedTxns.size})</button>
+                <button onClick={generateAviz} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded font-medium"><FileText className="w-3.5 h-3.5" /> Aviz ({selectedTxns.size})</button>
+              </>
             )}
             <button onClick={() => router.push(`/contracte/${id}/tranzactie`)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded font-medium"><Plus className="w-3.5 h-3.5" /> Adauga tranzactie</button>
           </div>
