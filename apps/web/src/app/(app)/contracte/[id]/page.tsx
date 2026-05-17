@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const runtime = 'edge'
 
@@ -57,7 +57,7 @@ export default function ContractDashboardPage() {
     ])
     if (c) {
       const lessor = Array.isArray((c as any).lessors) ? (c as any).lessors[0] : (c as any).lessors
-      setContract({ ...c as any, lessor_name: lessor ? (lessor.type === 'LEGAL' ? lessor.company_name : `${lessor.last_name} ${lessor.first_name}`.trim()) : '—' })
+      setContract({ ...c as any, lessor_name: lessor ? (lessor.type === 'LEGAL' ? lessor.company_name : `${lessor.last_name} ${lessor.first_name}`.trim()) : 'â€”' })
     }
     setRentLevels((levels ?? []) as RentLevel[])
     setParcels((ps ?? []) as Parcel[])
@@ -157,7 +157,7 @@ export default function ContractDashboardPage() {
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${contract.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{contract.status}</span>
             </div>
             <div className="text-sm text-gray-500 space-y-0.5">
-              <div><span className="font-medium text-gray-700">{contract.lessor_name}</span> · {contract.localities ?? contract.zone ?? '—'}</div>
+              <div><span className="font-medium text-gray-700">{contract.lessor_name}</span> Â· {contract.localities ?? contract.zone ?? 'â€”'}</div>
               <div>Plata impozit: <span className="font-medium">{TAX_LABELS[contract.tax_method] ?? contract.tax_method}</span></div>
             </div>
           </div>
@@ -173,7 +173,7 @@ export default function ContractDashboardPage() {
         </div>
         {/* Timeline */}
         <div className="mt-4 bg-[#1e3a22] rounded-lg p-3 text-white">
-          <div className="text-sm font-bold mb-1">{new Date(contract.start_date).getFullYear()} — {new Date(contract.end_date).getFullYear()}</div>
+          <div className="text-sm font-bold mb-1">{new Date(contract.start_date).getFullYear()} â€” {new Date(contract.end_date).getFullYear()}</div>
           <div className="text-sm font-semibold">{contract.lessor_name}</div>
           {rentLevels.map((r, i) => (
             <div key={i} className="text-xs text-green-300">{r.level_per_ha} {r.product_name}/ha {r.level_type}</div>
@@ -190,21 +190,21 @@ export default function ContractDashboardPage() {
           <tbody>
             <tr className="border-b border-gray-100">
               <td className={tdCls + ' font-mono font-bold'}>{contract.contract_number}</td>
-              <td className={tdCls}>{contract.sign_date ?? '—'}</td>
+              <td className={tdCls}>{contract.sign_date ?? 'â€”'}</td>
               <td className={tdCls}><span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">{contract.lessor_name}</span></td>
-              <td className={tdCls}>{new Date(contract.start_date).getFullYear()} – {new Date(contract.end_date).getFullYear()}</td>
+              <td className={tdCls}>{new Date(contract.start_date).getFullYear()} â€“ {new Date(contract.end_date).getFullYear()}</td>
               <td className={tdCls}>{rentLevels.map((r, i) => <div key={i} className="text-xs">{r.level_per_ha} {r.product_name}/ha {r.level_type}</div>)}</td>
-              <td className={tdCls}>{parcels.map(p => p.tarla_nr).filter(Boolean).join(', ') || '—'}</td>
-              <td className={tdCls}>{parcels.map(p => p.parcel_nr).filter(Boolean).join(', ') || '—'}</td>
+              <td className={tdCls}>{parcels.map(p => p.tarla_nr).filter(Boolean).join(', ') || 'â€”'}</td>
+              <td className={tdCls}>{parcels.map(p => p.parcel_nr).filter(Boolean).join(', ') || 'â€”'}</td>
               <td className={tdCls + ' font-semibold'}>{totalHa.toFixed(4)}</td>
               <td className={tdCls}></td>
             </tr>
             {amendments.map(a => (
               <tr key={a.id} className="border-b border-gray-100 bg-blue-50">
                 <td className={tdCls + ' font-mono text-blue-700'}>Act {a.number}</td>
-                <td className={tdCls}>{a.sign_date ?? '—'}</td>
+                <td className={tdCls}>{a.sign_date ?? 'â€”'}</td>
                 <td className={tdCls + ' text-blue-700 font-medium'}>{contract.lessor_name}</td>
-                <td className={tdCls} colSpan={5}>{a.description ?? '—'}</td>
+                <td className={tdCls} colSpan={5}>{a.description ?? 'â€”'}</td>
                 <td className={tdCls}><button onClick={async () => { await createClient().from('contract_amendments').delete().eq('id', a.id); setAmendments(p => p.filter(x => x.id !== a.id)) }} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
               </tr>
             ))}
@@ -254,7 +254,7 @@ export default function ContractDashboardPage() {
                       {years.map(y => {
                         const paid = matrix[prod]?.[y] ?? 0
                         const rem = duePerYear !== null ? duePerYear - paid : null
-                        return <td key={y} className={`px-3 py-2 text-right ${paid > 0 ? 'text-green-700 font-semibold' : ''} ${rem !== null && rem > 0 ? 'text-orange-500' : ''}`}>{rem !== null && rem > 0 ? rem.toFixed(0) : paid > 0 ? paid.toFixed(0) : '—'}</td>
+                        return <td key={y} className={`px-3 py-2 text-right ${paid > 0 ? 'text-green-700 font-semibold' : ''} ${rem !== null && rem > 0 ? 'text-orange-500' : ''}`}>{rem !== null && rem > 0 ? rem.toFixed(0) : paid > 0 ? paid.toFixed(0) : 'â€”'}</td>
                       })}
                     </tr>
                   )
@@ -303,10 +303,10 @@ export default function ContractDashboardPage() {
             {deeds.map((d, i) => (
               <tr key={d.id} className="border-b border-gray-100">
                 <td className={tdCls}>{i + 1}</td>
-                <td className={tdCls}>{d.deed_nr ?? '—'}</td>
-                <td className={tdCls}>{d.deed_date ?? '—'}</td>
+                <td className={tdCls}>{d.deed_nr ?? 'â€”'}</td>
+                <td className={tdCls}>{d.deed_date ?? 'â€”'}</td>
                 <td className={tdCls}>{d.deed_type}</td>
-                <td className={tdCls}>{d.file_url ? <a href={d.file_url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline text-xs">Deschide</a> : '—'}</td>
+                <td className={tdCls}>{d.file_url ? <a href={d.file_url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline text-xs">Deschide</a> : 'â€”'}</td>
                 <td className={tdCls}><button onClick={async () => { await createClient().from('property_deeds').delete().eq('id', d.id); setDeeds(p => p.filter(x => x.id !== d.id)) }} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
               </tr>
             ))}
@@ -329,135 +329,6 @@ export default function ContractDashboardPage() {
           </form>
         )}
       </div>
-    </div>
-  )
-}
-
-
-export default function EditContractPage() {
-  const router = useRouter()
-  const { id } = useParams<{ id: string }>()
-  const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [lessorsList, setLessorsList] = useState<LessorOption[]>([])
-  const [form, setForm] = useState({
-    contractNumber: '', contractType: 'ARENDA',
-    lessorId: '', zone: '', signDate: '', startDate: '', endDate: '',
-    totalParcels: '0', annualRent: '', status: 'ACTIVE',
-  })
-
-  useEffect(() => {
-    const db = createClient()
-    db.from('lessors').select('id, first_name, last_name, company_name, type').order('last_name')
-      .then(({ data }) => {
-        if (data) setLessorsList((data as any[]).map(l => ({
-          id: l.id,
-          display_name: l.type === 'LEGAL' ? l.company_name : `${l.last_name} ${l.first_name}`.trim(),
-        })))
-      })
-    db.from('contracts').select('*').eq('id', id).single()
-      .then(({ data, error }) => {
-        if (error || !data) { toast.error('Contractul nu a fost gasit.'); router.push('/contracte'); return }
-        setForm({
-          contractNumber: data.contract_number ?? '',
-          contractType: data.contract_type ?? 'ARENDA',
-          lessorId: data.lessor_id ?? '',
-          zone: data.zone ?? '',
-          signDate: data.sign_date ?? '',
-          startDate: data.start_date ?? '',
-          endDate: data.end_date ?? '',
-          totalParcels: String(data.total_parcels ?? 0),
-          annualRent: String(data.annual_rent ?? ''),
-          status: data.status ?? 'ACTIVE',
-        })
-        setLoading(false)
-      })
-  }, [id, router])
-
-  function set(field: string, value: string) { setForm(prev => ({ ...prev, [field]: value })) }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    const { error } = await createClient()
-      .from('contracts')
-      .update({
-        contract_number: form.contractNumber,
-        contract_type: form.contractType,
-        lessor_id: form.lessorId || null,
-        zone: form.zone || null,
-        sign_date: form.signDate || null,
-        start_date: form.startDate,
-        end_date: form.endDate,
-        total_parcels: parseInt(form.totalParcels) || 0,
-        annual_rent: parseFloat(form.annualRent) || 0,
-        status: form.status,
-      })
-      .eq('id', id)
-    setSaving(false)
-    if (error) { toast.error('Eroare: ' + error.message); return }
-    toast.success('Contractul a fost actualizat.')
-    router.push('/contracte')
-  }
-
-  const inputCls = 'w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500'
-  const labelCls = 'block text-xs font-medium text-gray-700 mb-1'
-
-  if (loading) return <div className="p-8 text-sm text-gray-400">Se incarca...</div>
-
-  return (
-    <div className="max-w-4xl">
-      <div className="mb-4">
-        <button onClick={() => router.back()} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-2">
-          <ArrowLeft className="w-3.5 h-3.5" /> Inapoi
-        </button>
-        <PageHeader title={`Contract ${form.contractNumber}`} subtitle="Modifica datele contractului" />
-      </div>
-      <form onSubmit={handleSubmit}>
-        <div className="form-section">
-          <div className="form-section-title">Date contract</div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div><label className={labelCls}>Nr. contract *</label><input className={inputCls} value={form.contractNumber} onChange={e => set('contractNumber', e.target.value)} required /></div>
-            <div>
-              <label className={labelCls}>Tip contract</label>
-              <select className={inputCls} value={form.contractType} onChange={e => set('contractType', e.target.value)}>
-                <option value="ARENDA">Arenda</option>
-                <option value="CONCESIUNE">Concesiune</option>
-                <option value="COMODAT">Comodat</option>
-                <option value="ASOCIERE">Asociere in participatiune</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Arendator *</label>
-              <select className={inputCls} value={form.lessorId} onChange={e => set('lessorId', e.target.value)} required>
-                <option value="">Selectati</option>
-                {lessorsList.map(l => <option key={l.id} value={l.id}>{l.display_name}</option>)}
-              </select>
-            </div>
-            <div><label className={labelCls}>Zona</label><input className={inputCls} value={form.zone} onChange={e => set('zone', e.target.value)} /></div>
-            <div><label className={labelCls}>Data semnare</label><input className={inputCls} type="date" value={form.signDate} onChange={e => set('signDate', e.target.value)} /></div>
-            <div><label className={labelCls}>De la *</label><input className={inputCls} type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} required /></div>
-            <div><label className={labelCls}>Pana la *</label><input className={inputCls} type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} required /></div>
-            <div><label className={labelCls}>Arenda anuala (RON)</label><input className={inputCls} type="number" min="0" step="0.01" value={form.annualRent} onChange={e => set('annualRent', e.target.value)} /></div>
-            <div><label className={labelCls}>Nr. parcele</label><input className={inputCls} type="number" min="0" value={form.totalParcels} onChange={e => set('totalParcels', e.target.value)} /></div>
-            <div>
-              <label className={labelCls}>Status</label>
-              <select className={inputCls} value={form.status} onChange={e => set('status', e.target.value)}>
-                <option value="ACTIVE">Activ</option>
-                <option value="EXPIRED">Expirat</option>
-                <option value="TERMINATED">Reziliat</option>
-                <option value="DRAFT">Draft</option>
-              </select>
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-3 mt-6">
-          <button type="submit" disabled={saving} className="px-5 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50">
-            {saving ? 'Se salveaza...' : 'Salveaza modificarile'}
-          </button>
-          <button type="button" onClick={() => router.back()} className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">Anuleaza</button>
-        </div>
-      </form>
     </div>
   )
 }
