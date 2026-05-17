@@ -188,7 +188,7 @@ export default function SetariPage() {
             <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Adauga produs nou</div>
             <div className="flex gap-2">
               <input
-                className={inputCls + ' flex-1'}
+                className="flex-1 min-w-0 px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500"
                 placeholder="Denumire produs (ex: Grau, Porumb, RON)"
                 value={newProduct.name}
                 onChange={e => setNewProduct(p => ({...p, name: e.target.value}))}

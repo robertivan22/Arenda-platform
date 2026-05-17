@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 export const runtime = 'edge'
 
@@ -24,6 +24,7 @@ interface Transaction {
 }
 interface Amendment { id: string; number: string; sign_date: string | null; description: string | null }
 interface Deed { id: string; deed_nr: string | null; deed_date: string | null; deed_type: string; file_url: string | null }
+interface LessorContract { id: string; contract_number: string; sign_date: string | null; start_date: string; end_date: string; status: string }
 
 const TAX_LABELS: Record<string, string> = {
   COTA_FORFETARA: 'Cota Forfetara', SISTEM_REAL: 'Sistem Real', SCUTIT: 'Scutit',
@@ -44,26 +45,29 @@ export default function ContractDashboardPage() {
   const [amendForm, setAmendForm] = useState({ number: '', sign_date: '', description: '' })
   const [showNewDeed, setShowNewDeed] = useState(false)
   const [deedForm, setDeedForm] = useState({ deed_nr: '', deed_date: '', deed_type: 'Titlu proprietate' })
+  const [lessorContracts, setLessorContracts] = useState<LessorContract[]>([])
 
   const load = useCallback(async () => {
     const db = createClient()
-    const [{ data: c }, { data: levels }, { data: ps }, { data: txns }, { data: amends }, { data: ds }] = await Promise.all([
-      db.from('contracts').select('*, lessors(first_name, last_name, company_name, type)').eq('id', id).single(),
+    const { data: c } = await db.from('contracts').select('*, lessors(first_name, last_name, company_name, type)').eq('id', id).single()
+    if (!c) { setLoading(false); return }
+    const lessor = Array.isArray((c as any).lessors) ? (c as any).lessors[0] : (c as any).lessors
+    const lessorName = lessor ? (lessor.type === 'LEGAL' ? lessor.company_name : `${lessor.last_name} ${lessor.first_name}`.trim()) : '—'
+    setContract({ ...c as any, lessor_name: lessorName })
+    const [{ data: levels }, { data: ps }, { data: txns }, { data: amends }, { data: ds }, { data: lc }] = await Promise.all([
       db.from('contract_rent_levels').select('*').eq('contract_id', id).order('sort_order'),
       db.from('parcels').select('id, tarla_nr, parcel_nr, surface').eq('contract_id', id),
       db.from('transactions').select('*').eq('contract_id', id).order('campaign_year').order('transaction_date'),
       db.from('contract_amendments').select('*').eq('contract_id', id).order('sign_date'),
       db.from('property_deeds').select('*').eq('contract_id', id).order('deed_date'),
+      db.from('contracts').select('id, contract_number, sign_date, start_date, end_date, status').eq('lessor_id', (c as any).lessor_id).order('start_date'),
     ])
-    if (c) {
-      const lessor = Array.isArray((c as any).lessors) ? (c as any).lessors[0] : (c as any).lessors
-      setContract({ ...c as any, lessor_name: lessor ? (lessor.type === 'LEGAL' ? lessor.company_name : `${lessor.last_name} ${lessor.first_name}`.trim()) : 'â€”' })
-    }
     setRentLevels((levels ?? []) as RentLevel[])
     setParcels((ps ?? []) as Parcel[])
     setTransactions((txns ?? []) as Transaction[])
     setAmendments((amends ?? []) as Amendment[])
     setDeeds((ds ?? []) as Deed[])
+    setLessorContracts((lc ?? []) as LessorContract[])
     setLoading(false)
   }, [id])
 
@@ -153,11 +157,11 @@ export default function ContractDashboardPage() {
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-lg font-bold text-gray-900">Contract {contract.contract_number}</h1>
+              <h1 className="text-xl font-bold text-gray-900">{contract.lessor_name}</h1>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${contract.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{contract.status}</span>
             </div>
             <div className="text-sm text-gray-500 space-y-0.5">
-              <div><span className="font-medium text-gray-700">{contract.lessor_name}</span> Â· {contract.localities ?? contract.zone ?? 'â€”'}</div>
+              <div className="font-mono text-gray-600">#{contract.contract_number} · {contract.localities ?? contract.zone ?? '—'}</div>
               <div>Plata impozit: <span className="font-medium">{TAX_LABELS[contract.tax_method] ?? contract.tax_method}</span></div>
             </div>
           </div>
@@ -173,7 +177,7 @@ export default function ContractDashboardPage() {
         </div>
         {/* Timeline */}
         <div className="mt-4 bg-[#1e3a22] rounded-lg p-3 text-white">
-          <div className="text-sm font-bold mb-1">{new Date(contract.start_date).getFullYear()} â€” {new Date(contract.end_date).getFullYear()}</div>
+          <div className="text-sm font-bold mb-1">{new Date(contract.start_date).getFullYear()} — {new Date(contract.end_date).getFullYear()}</div>
           <div className="text-sm font-semibold">{contract.lessor_name}</div>
           {rentLevels.map((r, i) => (
             <div key={i} className="text-xs text-green-300">{r.level_per_ha} {r.product_name}/ha {r.level_type}</div>
@@ -186,31 +190,34 @@ export default function ContractDashboardPage() {
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 font-semibold text-sm">Contract initial si acte aditionale</div>
         <table className="w-full text-sm">
-          <thead><tr>{['Nr.','Data','Arendator','Perioada','Nivel arenda','Tarla','Parcela','Ha',''].map(h => <th key={h} className={thCls}>{h}</th>)}</tr></thead>
+          <thead><tr>{['Nr.','Data','Arendator','Perioada','Nivel arenda','Tarla','Parcela','Ha','Status'].map(h => <th key={h} className={thCls}>{h}</th>)}</tr></thead>
           <tbody>
-            <tr className="border-b border-gray-100">
-              <td className={tdCls + ' font-mono font-bold'}>{contract.contract_number}</td>
-              <td className={tdCls}>{contract.sign_date ?? 'â€”'}</td>
-              <td className={tdCls}><span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">{contract.lessor_name}</span></td>
-              <td className={tdCls}>{new Date(contract.start_date).getFullYear()} â€“ {new Date(contract.end_date).getFullYear()}</td>
-              <td className={tdCls}>{rentLevels.map((r, i) => <div key={i} className="text-xs">{r.level_per_ha} {r.product_name}/ha {r.level_type}</div>)}</td>
-              <td className={tdCls}>{parcels.map(p => p.tarla_nr).filter(Boolean).join(', ') || 'â€”'}</td>
-              <td className={tdCls}>{parcels.map(p => p.parcel_nr).filter(Boolean).join(', ') || 'â€”'}</td>
-              <td className={tdCls + ' font-semibold'}>{totalHa.toFixed(4)}</td>
-              <td className={tdCls}></td>
-            </tr>
+            {lessorContracts.map(lc => (
+              <tr key={lc.id} className={`border-b border-gray-100 ${lc.id === id ? 'bg-green-50' : 'hover:bg-gray-50 cursor-pointer'}`} onClick={() => { if (lc.id !== id) router.push(`/contracte/${lc.id}`) }}>
+                <td className={tdCls + ' font-mono font-bold'}>{lc.contract_number}</td>
+                <td className={tdCls}>{lc.sign_date ?? '—'}</td>
+                <td className={tdCls}><span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">{contract.lessor_name}</span></td>
+                <td className={tdCls}>{new Date(lc.start_date).getFullYear()} — {new Date(lc.end_date).getFullYear()}</td>
+                <td className={tdCls}>{lc.id === id ? rentLevels.map((r, i) => <div key={i} className="text-xs">{r.level_per_ha} {r.product_name}/ha {r.level_type}</div>) : null}</td>
+                <td className={tdCls}>{lc.id === id ? (parcels.map(p => p.tarla_nr).filter(Boolean).join(', ') || '—') : '—'}</td>
+                <td className={tdCls}>{lc.id === id ? (parcels.map(p => p.parcel_nr).filter(Boolean).join(', ') || '—') : '—'}</td>
+                <td className={tdCls + ' font-semibold'}>{lc.id === id ? totalHa.toFixed(4) : ''}</td>
+                <td className={tdCls}><span className={`text-xs px-1.5 py-0.5 rounded ${lc.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{lc.status}</span></td>
+              </tr>
+            ))}
             {amendments.map(a => (
               <tr key={a.id} className="border-b border-gray-100 bg-blue-50">
                 <td className={tdCls + ' font-mono text-blue-700'}>Act {a.number}</td>
-                <td className={tdCls}>{a.sign_date ?? 'â€”'}</td>
+                <td className={tdCls}>{a.sign_date ?? '—'}</td>
                 <td className={tdCls + ' text-blue-700 font-medium'}>{contract.lessor_name}</td>
-                <td className={tdCls} colSpan={5}>{a.description ?? 'â€”'}</td>
+                <td className={tdCls} colSpan={5}>{a.description ?? '—'}</td>
                 <td className={tdCls}><button onClick={async () => { await createClient().from('contract_amendments').delete().eq('id', a.id); setAmendments(p => p.filter(x => x.id !== a.id)) }} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
               </tr>
             ))}
           </tbody>
         </table>
         <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
+          <button onClick={() => router.push('/contracte/nou')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded font-medium"><Plus className="w-3.5 h-3.5" /> Contract nou</button>
           <button onClick={() => setShowNewAmendment(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded font-medium"><Plus className="w-3.5 h-3.5" /> Adauga act aditional</button>
           <button onClick={async () => { if (!confirm('Inchizi contractul?')) return; await createClient().from('contracts').update({ status: 'TERMINATED' }).eq('id', id); load() }} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-500 hover:bg-red-600 text-white rounded font-medium"><X className="w-3.5 h-3.5" /> Inchide Contract</button>
         </div>
@@ -254,7 +261,7 @@ export default function ContractDashboardPage() {
                       {years.map(y => {
                         const paid = matrix[prod]?.[y] ?? 0
                         const rem = duePerYear !== null ? duePerYear - paid : null
-                        return <td key={y} className={`px-3 py-2 text-right ${paid > 0 ? 'text-green-700 font-semibold' : ''} ${rem !== null && rem > 0 ? 'text-orange-500' : ''}`}>{rem !== null && rem > 0 ? rem.toFixed(0) : paid > 0 ? paid.toFixed(0) : 'â€”'}</td>
+                        return <td key={y} className={`px-3 py-2 text-right ${paid > 0 ? 'text-green-700 font-semibold' : ''} ${rem !== null && rem > 0 ? 'text-orange-500' : ''}`}>{rem !== null && rem > 0 ? rem.toFixed(0) : paid > 0 ? paid.toFixed(0) : '—'}</td>
                       })}
                     </tr>
                   )
@@ -303,10 +310,10 @@ export default function ContractDashboardPage() {
             {deeds.map((d, i) => (
               <tr key={d.id} className="border-b border-gray-100">
                 <td className={tdCls}>{i + 1}</td>
-                <td className={tdCls}>{d.deed_nr ?? 'â€”'}</td>
-                <td className={tdCls}>{d.deed_date ?? 'â€”'}</td>
+                <td className={tdCls}>{d.deed_nr ?? '—'}</td>
+                <td className={tdCls}>{d.deed_date ?? '—'}</td>
                 <td className={tdCls}>{d.deed_type}</td>
-                <td className={tdCls}>{d.file_url ? <a href={d.file_url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline text-xs">Deschide</a> : 'â€”'}</td>
+                <td className={tdCls}>{d.file_url ? <a href={d.file_url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline text-xs">Deschide</a> : '—'}</td>
                 <td className={tdCls}><button onClick={async () => { await createClient().from('property_deeds').delete().eq('id', d.id); setDeeds(p => p.filter(x => x.id !== d.id)) }} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
               </tr>
             ))}
