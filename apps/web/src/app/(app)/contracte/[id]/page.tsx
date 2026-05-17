@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Pencil, Plus, Trash2, Printer, X } from 'lucide-react'
+import { Pencil, Plus, Trash2, Printer, X, FileText } from 'lucide-react'
 
 interface Contract {
   id: string; contract_number: string; contract_type: string
@@ -170,6 +170,9 @@ export default function ContractDashboardPage() {
               <div className="text-xs text-gray-400">Suprafata totala</div>
               <div className="text-xl font-bold text-brand-700">{totalHa.toFixed(4)} ha</div>
             </div>
+            <button onClick={() => window.open(`/print/contract/${id}`, '_blank')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-brand-300 text-brand-700 bg-brand-50 rounded hover:bg-brand-100">
+              <FileText className="w-3.5 h-3.5" /> Contract PDF
+            </button>
             <button onClick={() => router.push(`/contracte/${id}/editeaza`)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">
               <Pencil className="w-3.5 h-3.5" /> Editeaza
             </button>

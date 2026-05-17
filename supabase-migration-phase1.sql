@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS company_settings (
   invoice_series  text NOT NULL DEFAULT 'A',
   invoice_counter integer NOT NULL DEFAULT 0,
   aviz_counter    integer NOT NULL DEFAULT 0,
+  logo_url        text,
   created_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE(user_id)
 );
@@ -124,6 +125,10 @@ ALTER TABLE contracts
   ADD COLUMN IF NOT EXISTS primarie_date  date,
   ADD COLUMN IF NOT EXISTS tax_method     text NOT NULL DEFAULT 'COTA_FORFETARA',
   ADD COLUMN IF NOT EXISTS localities     text;
+
+-- Company settings: logo
+ALTER TABLE company_settings
+  ADD COLUMN IF NOT EXISTS logo_url text;
 
 -- Parcels: extended ISAGRI fields
 ALTER TABLE parcels

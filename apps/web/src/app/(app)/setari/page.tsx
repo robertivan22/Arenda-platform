@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Plus, Trash2, Building2, Package } from 'lucide-react'
+import { Plus, Trash2, Building2, Package, Upload, X } from 'lucide-react'
 
 interface CompanySettings {
   name: string; cif: string; reg_com: string
   address: string; county: string; locality: string
   iban: string; bank_name: string; phone: string; email: string
-  invoice_series: string
+  invoice_series: string; logo_url?: string
 }
 
 interface Product {
@@ -19,7 +19,7 @@ interface Product {
 
 const EMPTY_COMPANY: CompanySettings = {
   name: '', cif: '', reg_com: '', address: '', county: '', locality: '',
-  iban: '', bank_name: '', phone: '', email: '', invoice_series: 'A',
+  iban: '', bank_name: '', phone: '', email: '', invoice_series: 'A', logo_url: '',
 }
 
 export default function SetariPage() {
@@ -153,6 +153,31 @@ export default function SetariPage() {
                 <label className={labelCls}>Serie factura</label>
                 <input className={inputCls} value={company.invoice_series} onChange={e => setCompany(p => ({...p, invoice_series: e.target.value.toUpperCase()}))} maxLength={5} />
               </div>
+              <div className="col-span-2">
+                <label className={labelCls}>Logo firmă (apare pe facturi, avize, contracte)</label>
+                <div className="flex items-center gap-3 mt-1">
+                  {company.logo_url && (
+                    <img src={company.logo_url} alt="Logo" className="h-12 border border-gray-200 rounded p-1 bg-white object-contain" />
+                  )}
+                  <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded cursor-pointer hover:bg-gray-50">
+                    <Upload className="w-3.5 h-3.5" /> Încarcă logo
+                    <input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" className="hidden" onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      if (file.size > 150 * 1024) { toast.error('Fișierul este prea mare (max 150KB)'); return }
+                      const reader = new FileReader()
+                      reader.onload = ev => setCompany(p => ({...p, logo_url: ev.target?.result as string ?? ''}))
+                      reader.readAsDataURL(file)
+                    }} />
+                  </label>
+                  {company.logo_url && (
+                    <button type="button" onClick={() => setCompany(p => ({...p, logo_url: ''}))} className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700">
+                      <X className="w-3 h-3" /> Șterge logo
+                    </button>
+                  )}
+                  <span className="text-xs text-gray-400">PNG, JPG, SVG — max 150KB</span>
+                </div>
+              </div>
             </div>
             <button type="submit" disabled={savingCompany} className="px-5 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50">
               {savingCompany ? 'Se salveaza...' : 'Salveaza setarile'}
@@ -194,7 +219,7 @@ export default function SetariPage() {
                 onChange={e => setNewProduct(p => ({...p, name: e.target.value}))}
               />
               <select
-                className={inputCls + ' w-28'}
+                className="w-24 shrink-0 px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500"
                 value={newProduct.unit}
                 onChange={e => setNewProduct(p => ({...p, unit: e.target.value}))}
               >
