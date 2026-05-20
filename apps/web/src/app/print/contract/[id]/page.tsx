@@ -133,6 +133,8 @@ export default function ContractPrintPage() {
         .sig-title { font-weight: bold; font-size: 11pt; margin-bottom: 4pt; }
         .sig-line { border-bottom: 1px solid #000; margin-top: 28pt; }
         .sig-label { font-size: 9pt; color: #555; margin-top: 2pt; }
+        .watermark-banner { text-align: center; font-size: 9pt; color: #92400e; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 3pt; padding: 3pt 12pt; margin: 0 auto 10pt; display: inline-block; max-width: 100%; }
+        .watermark-wrap { text-align: center; margin: 0 0 10pt; }
         .no-print { position: fixed; top: 16px; right: 16px; z-index: 9999; }
         @media print {
           body { background: #fff; }
@@ -180,6 +182,14 @@ export default function ContractPrintPage() {
         <div className="subtitle">
           Nr. {contract.contract_number} / {contract.sign_date ?? '___________'}
         </div>
+
+        {(cfg.watermark_show ?? 'true') !== 'false' && (cfg.watermark_text ?? 'Generat cu ArendaPro') && (
+          <div className="watermark-wrap">
+            <span className="watermark-banner">
+              {cfg.watermark_text ?? 'Generat cu ArendaPro'}
+            </span>
+          </div>
+        )}
 
         <h2>I. Părțile Contractante</h2>
         <p>

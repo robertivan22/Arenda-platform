@@ -5,6 +5,7 @@ export interface ConfigField {
   label: string
   defaultValue: string
   multiline?: boolean
+  type?: 'text' | 'checkbox'
 }
 
 export const CONFIG_FIELDS: Record<DocType, ConfigField[]> = {
@@ -53,6 +54,8 @@ export const CONFIG_FIELDS: Record<DocType, ConfigField[]> = {
     { key: 'sig_arrendator', label: 'Titlu semnătură stânga',   defaultValue: 'ARENDATOR' },
     { key: 'sig_arrendas',   label: 'Titlu semnătură dreapta',  defaultValue: 'ARENDAȘ' },
     { key: 'sig_footnote',   label: 'Text sub semnătură',       defaultValue: 'Semnătura și ștampila' },
+    { key: 'watermark_text', label: 'Text filigran (sub titlu)', defaultValue: 'Generat cu ArendaPro' },
+    { key: 'watermark_show', label: 'Afișează filigranul',       defaultValue: 'true', type: 'checkbox' },
   ],
 }
 
