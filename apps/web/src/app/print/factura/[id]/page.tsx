@@ -107,6 +107,9 @@ export default function PrintFacturaPage() {
       tva_rate: String(invoice.tva_rate),
       tva_amount: invoice.tva_amount.toLocaleString('ro-RO', { minimumFractionDigits: 2 }),
       total_cu_tva: total.toLocaleString('ro-RO', { minimumFractionDigits: 2 }),
+      company_logo: company.logo_url
+        ? `<img src="${company.logo_url}" alt="Logo" style="max-height:100px;max-width:240px;object-fit:contain;display:block">`
+        : '',
     })
     return (
       <>

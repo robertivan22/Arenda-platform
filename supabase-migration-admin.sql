@@ -15,6 +15,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure columns exist even if table was pre-existing
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email        TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS display_name TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_admin     BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at   TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at   TIMESTAMPTZ DEFAULT NOW();
+
 -- Back-fill existing users
 INSERT INTO public.profiles (id, email)
 SELECT id, email FROM auth.users

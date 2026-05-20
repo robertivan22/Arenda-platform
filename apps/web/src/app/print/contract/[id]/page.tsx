@@ -101,12 +101,44 @@ export default function ContractPrintPage() {
 
   // ── Custom template rendering ──────────────────────────────────────────────
   if (customHtml) {
-    const parcelRows = parcels.map((p, i) =>
-      `<tr><td>${i + 1}</td><td>${p.tarla_nr ?? '-'}</td><td>${p.parcel_nr ?? '-'}</td>${hasCadastral ? `<td>${(p as any).cadastral_nr ?? '-'}</td>` : ''}<td>${Number(p.surface).toFixed(4)} ha</td>${hasPopularName ? `<td>${(p as any).popular_name ?? '-'}</td>` : ''}</tr>`
-    ).join('')
-    const rentRows = rentLevels.map(r =>
-      `<tr><td>${r.product_name}</td><td>${r.level_per_ha} ${r.level_type === 'BANI' ? 'lei/ha' : 'kg/ha'}</td><td>${r.tax_rate}%</td></tr>`
-    ).join('')
+    const tdS = 'border:1px solid #333;padding:3pt 6pt'
+    const thS = 'border:1px solid #333;padding:4pt 6pt;background:#f0f0f0;font-weight:bold;text-align:center;font-size:9pt'
+    const parcelsTable = parcels.length > 0
+      ? `<table style="width:100%;border-collapse:collapse;margin:6pt 0;font-size:10pt"><thead><tr>
+          <th style="${thS}">Nr.</th><th style="${thS}">Tarla</th><th style="${thS}">Parcel\u0103</th>
+          <th style="${thS}">Nr. cadastral</th><th style="${thS}" class="right">Suprafa\u021b\u0103 (ha)</th>
+          <th style="${thS}">Denumire popular\u0103</th></tr></thead><tbody>
+          ${parcels.map((p, i) => `<tr>
+            <td style="${tdS};text-align:center">${i + 1}</td>
+            <td style="${tdS}">${p.tarla_nr ?? '\u2014'}</td>
+            <td style="${tdS}">${p.parcel_nr ?? '\u2014'}</td>
+            <td style="${tdS}">${(p as any).cadastral_nr ?? '\u2014'}</td>
+            <td style="${tdS};text-align:right">${Number(p.surface).toFixed(4)}</td>
+            <td style="${tdS}">${(p as any).popular_name ?? '\u2014'}</td>
+          </tr>`).join('')}
+          <tr><td style="${tdS};font-weight:bold;background:#f9f9f9;text-align:center" colspan="4">TOTAL</td>
+            <td style="${tdS};font-weight:bold;background:#f9f9f9;text-align:right">${totalHa.toFixed(4)}</td>
+            <td style="${tdS};background:#f9f9f9"></td></tr>
+        </tbody></table>`
+      : '<p>Parcelele arendate vor fi specificate prin act adi\u021bional.</p>'
+
+    const rentTable = rentLevels.length > 0
+      ? `<table style="width:100%;border-collapse:collapse;margin:6pt 0;font-size:10pt"><thead><tr>
+          <th style="${thS}">Produs / Moned\u0103</th>
+          <th style="${thS};text-align:right">Cantitate / ha</th>
+          <th style="${thS}">Tip calcul</th>
+          <th style="${thS};text-align:right">Total / an (${totalHa.toFixed(4)} ha)</th>
+          <th style="${thS}">Cot\u0103 impozit</th></tr></thead><tbody>
+          ${rentLevels.map(r => `<tr>
+            <td style="${tdS}">${r.product_name}</td>
+            <td style="${tdS};text-align:right">${Number(r.level_per_ha).toFixed(4)}</td>
+            <td style="${tdS};text-align:center">${r.level_type}</td>
+            <td style="${tdS};text-align:right"><strong>${(r.level_per_ha * totalHa).toFixed(2)} ${r.product_name}</strong></td>
+            <td style="${tdS};text-align:center">${r.tax_rate}%</td>
+          </tr>`).join('')}
+        </tbody></table>`
+      : '<p>Arenda se stabilete prin negociere direct\u0103.</p>'
+
     const filled = renderTemplate(customHtml, {
       contract_number: contract.contract_number,
       contract_type: CONTRACT_TYPE_LABELS[contract.contract_type] ?? contract.contract_type,
@@ -139,8 +171,11 @@ export default function ContractPrintPage() {
       lessor_bank: lessor?.bank_name ?? '',
       total_ha: totalHa.toFixed(4),
       parcel_count: String(parcels.length),
-      parcels_table: parcelRows,
-      rent_table: rentRows,
+      parcels_table: parcelsTable,
+      rent_table: rentTable,
+      company_logo: company.logo_url
+        ? `<img src="${company.logo_url}" alt="Logo" class="company-logo" style="max-height:110px;max-width:260px;object-fit:contain;display:block">`
+        : '',
     })
     return (
       <>
