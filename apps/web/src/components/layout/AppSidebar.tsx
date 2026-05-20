@@ -7,57 +7,80 @@ import {
   BarChart3, ChevronDown, X, FileSpreadsheet, UserCircle, Settings,
 } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSidebarStore } from '@/store/sidebar.store'
+import { createClient } from '@/lib/supabase/client'
 
 interface NavItem {
   label: string
   href?: string
   icon: React.ElementType
+  permKey?: string // maps to user_permissions column
   children?: { label: string; href: string }[]
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Dashboard',   href: '/dashboard',  icon: LayoutDashboard, permKey: 'can_dashboard' },
   {
-    label: 'Arendatori', icon: Users,
+    label: 'Arendatori', icon: Users, permKey: 'can_arendasi',
     children: [
       { label: 'Lista arendatori', href: '/arendatori' },
       { label: 'Adaugă arendator', href: '/arendatori/nou' },
     ],
   },
   {
-    label: 'Contracte', icon: FileText,
+    label: 'Contracte', icon: FileText, permKey: 'can_contracte',
     children: [
       { label: 'Lista contracte', href: '/contracte' },
       { label: 'Contract nou', href: '/contracte/nou' },
     ],
   },
   {
-    label: 'Parcele', icon: MapPin,
+    label: 'Parcele', icon: MapPin, permKey: 'can_parcele',
     children: [
       { label: 'Lista parcele', href: '/parcele' },
       { label: 'Parcelă nouă', href: '/parcele/nou' },
     ],
   },
-  { label: 'Plăți', href: '/plati', icon: CreditCard },
-  { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3 },
+  { label: 'Plăți',    href: '/plati',    icon: CreditCard,    permKey: 'can_facturi' },
+  { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3,      permKey: 'can_rapoarte' },
   {
-    label: 'Declarații', icon: FileSpreadsheet,
+    label: 'Declarații', icon: FileSpreadsheet, permKey: 'can_declaratii',
     children: [
-      { label: 'Dashboard fiscal', href: '/declaratii' },
+      { label: 'Dashboard fiscal',    href: '/declaratii' },
       { label: 'D112 - Impozit arendă', href: '/declaratii/d112' },
-      { label: 'Export APIA', href: '/declaratii/apia' },
-      { label: 'Istoric declarații', href: '/declaratii/istoric' },
+      { label: 'Export APIA',         href: '/declaratii/apia' },
+      { label: 'Istoric declarații',  href: '/declaratii/istoric' },
     ],
   },
-  { label: 'Setari', href: '/setari', icon: Settings },
+  { label: 'Setari', href: '/setari', icon: Settings, permKey: 'can_setari' },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
   const { open, close } = useSidebarStore()
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  // Fetched from user_permissions; empty = all allowed (no row = all true)
+  const [perms, setPerms] = useState<Record<string, boolean> | null>(null)
+
+  useEffect(() => {
+    const db = createClient()
+    db.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data } = await db
+        .from('user_permissions')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (data) setPerms(data as Record<string, boolean>)
+    })
+  }, [])
+
+  // Returns true if the nav item should be visible
+  function canShow(item: NavItem): boolean {
+    if (!item.permKey || perms === null) return true // no row = all allowed
+    return perms[item.permKey] !== false
+  }
 
   function toggleGroup(label: string) {
     setCollapsed(prev => ({ ...prev, [label]: !prev[label] }))
@@ -96,7 +119,7 @@ export function AppSidebar() {
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-2">
-        {NAV_ITEMS.map(item => {
+        {NAV_ITEMS.filter(canShow).map(item => {
           if (!item.children) {
             const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
             return (

@@ -5,6 +5,7 @@ export const runtime = 'edge'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { fetchTemplate, renderTemplate } from '@/lib/templates'
 
 interface Invoice {
   id: string; invoice_number: string; invoice_series: string
@@ -34,6 +35,7 @@ export default function PrintFacturaPage() {
   const [company, setCompany] = useState<Company | null>(null)
   const [lessor, setLessor] = useState<Lessor | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [customHtml, setCustomHtml] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export default function PrintFacturaPage() {
     db.from('invoices').select('*').eq('id', id).single().then(async ({ data: inv }) => {
       if (!inv) return
       setInvoice(inv as Invoice)
+      const { data: { user } } = await db.auth.getUser()
       const [{ data: cs }, { data: les }, { data: txns }] = await Promise.all([
         db.from('company_settings').select('*').single(),
         db.from('lessors').select('*').eq('id', inv.lessor_id).single(),
@@ -49,6 +52,12 @@ export default function PrintFacturaPage() {
       if (cs) setCompany(cs as Company)
       if (les) setLessor(les as Lessor)
       setTransactions((txns ?? []) as Transaction[])
+      // Check for user-specific template
+      if (user) {
+        const docType = inv.doc_type === 'AVIZ' ? 'AVIZ' : 'FACTURA'
+        const tmpl = await fetchTemplate(db, user.id, docType)
+        if (tmpl) setCustomHtml(tmpl.html_content)
+      }
       setLoading(false)
     })
   }, [id])
@@ -60,6 +69,60 @@ export default function PrintFacturaPage() {
   const lessorName = lessor.type === 'LEGAL' ? lessor.company_name ?? '' : `${lessor.last_name} ${lessor.first_name}`.trim()
   const totalFaraTva = invoice.total_ron
   const total = totalFaraTva + invoice.tva_amount
+
+  // ── Custom template rendering ─────────────────────────────────────────────
+  if (customHtml) {
+    const productsRows = transactions.map((t, i) =>
+      `<tr><td>${i + 1}</td><td>${t.product_name} (conform contractului de arendare nr. ${(t.contracts as any)?.contract_number ?? ''})</td><td>Kg.</td><td>${t.kg_net.toLocaleString('ro-RO')}</td>${!isAviz ? `<td>${t.price_per_unit}</td><td>${t.ron_net.toLocaleString('ro-RO', { minimumFractionDigits: 2 })}</td>` : ''}</tr>`
+    ).join('')
+    const productsTable = `<table style="width:100%;border-collapse:collapse;margin:12px 0"><thead><tr style="background:#f5f5f5"><th style="border:1px solid #ccc;padding:6px 10px">Nr.</th><th style="border:1px solid #ccc;padding:6px 10px">Denumire</th><th style="border:1px solid #ccc;padding:6px 10px">U.M.</th><th style="border:1px solid #ccc;padding:6px 10px">Cant.</th>${!isAviz ? '<th style="border:1px solid #ccc;padding:6px 10px">Preț/kg</th><th style="border:1px solid #ccc;padding:6px 10px">Valoare RON</th>' : ''}</tr></thead><tbody>${productsRows}</tbody></table>`
+
+    const filled = renderTemplate(customHtml, {
+      invoice_number: invoice.invoice_number,
+      invoice_series: invoice.invoice_series,
+      aviz_number: invoice.invoice_number,
+      aviz_series: invoice.invoice_series,
+      invoice_date: invoice.invoice_date,
+      aviz_date: invoice.invoice_date,
+      due_date: invoice.due_date ?? '',
+      company_name: company.name,
+      company_cif: company.cif ?? '',
+      company_reg_com: company.reg_com ?? '',
+      company_address: [company.address, company.locality, company.county].filter(Boolean).join(', '),
+      company_iban: company.iban ?? '',
+      company_bank: company.bank_name ?? '',
+      company_phone: company.phone ?? '',
+      company_email: company.email ?? '',
+      client_name: lessorName,
+      client_cnp: lessor.cnp ?? '',
+      client_address: lessor.address ?? '',
+      client_iban: lessor.iban ?? '',
+      client_bank: lessor.bank_name ?? '',
+      client_phone: lessor.phone ?? lessor.mobile ?? '',
+      client_email: lessor.email ?? '',
+      products_table: productsTable,
+      total_kg: transactions.reduce((s, t) => s + t.kg_net, 0).toLocaleString('ro-RO'),
+      total_ron: totalFaraTva.toLocaleString('ro-RO', { minimumFractionDigits: 2 }),
+      total_fara_tva: totalFaraTva.toLocaleString('ro-RO', { minimumFractionDigits: 2 }),
+      tva_rate: String(invoice.tva_rate),
+      tva_amount: invoice.tva_amount.toLocaleString('ro-RO', { minimumFractionDigits: 2 }),
+      total_cu_tva: total.toLocaleString('ro-RO', { minimumFractionDigits: 2 }),
+    })
+    return (
+      <>
+        <div className="no-print fixed top-4 right-4 flex gap-2 z-50" style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999, display: 'flex', gap: 8 }}>
+          <button onClick={() => window.print()} style={{ padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>
+            🖨️ Printează / PDF
+          </button>
+          <button onClick={() => window.close()} style={{ padding: '8px 16px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>
+            ✕ Închide
+          </button>
+        </div>
+        {/* dangerouslySetInnerHTML is safe: HTML comes from admin-only template editor */}
+        <div dangerouslySetInnerHTML={{ __html: filled }} />
+      </>
+    )
+  }
 
   return (
     <>

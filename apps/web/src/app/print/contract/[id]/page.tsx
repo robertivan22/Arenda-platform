@@ -5,6 +5,7 @@ export const runtime = 'edge'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { fetchTemplate, renderTemplate } from '@/lib/templates'
 
 interface CompanySettings {
   name: string; cif: string; reg_com: string; address: string
@@ -52,6 +53,7 @@ export default function ContractPrintPage() {
   const [company, setCompany] = useState<CompanySettings | null>(null)
   const [rentLevels, setRentLevels] = useState<RentLevel[]>([])
   const [parcels, setParcels] = useState<Parcel[]>([])
+  const [customHtml, setCustomHtml] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function ContractPrintPage() {
       db.from('company_settings').select('*').single(),
       db.from('contract_rent_levels').select('*').eq('contract_id', id).order('sort_order'),
       db.from('parcels').select('*').eq('contract_id', id),
-    ]).then(([{ data: c }, { data: cs }, { data: levels }, { data: ps }]) => {
+    ]).then(async ([{ data: c }, { data: cs }, { data: levels }, { data: ps }]) => {
       if (c) {
         const l = Array.isArray((c as any).lessors) ? (c as any).lessors[0] : (c as any).lessors
         setContract(c as any)
@@ -70,6 +72,12 @@ export default function ContractPrintPage() {
       if (cs) setCompany(cs as any)
       setRentLevels((levels ?? []) as RentLevel[])
       setParcels((ps ?? []) as Parcel[])
+      // Check for user-specific CONTRACT template
+      const { data: { user } } = await db.auth.getUser()
+      if (user) {
+        const tmpl = await fetchTemplate(db, user.id, 'CONTRACT')
+        if (tmpl) setCustomHtml(tmpl.html_content)
+      }
       setLoading(false)
     })
   }, [id])
@@ -90,6 +98,65 @@ export default function ContractPrintPage() {
   const lessorId = lessor?.cnp || '___________'
   const hasCadastral = parcels.some(p => (p as any).cadastral_nr)
   const hasPopularName = parcels.some(p => (p as any).popular_name)
+
+  // ── Custom template rendering ──────────────────────────────────────────────
+  if (customHtml) {
+    const parcelRows = parcels.map((p, i) =>
+      `<tr><td>${i + 1}</td><td>${p.tarla_nr ?? '-'}</td><td>${p.parcel_nr ?? '-'}</td>${hasCadastral ? `<td>${(p as any).cadastral_nr ?? '-'}</td>` : ''}<td>${Number(p.surface).toFixed(4)} ha</td>${hasPopularName ? `<td>${(p as any).popular_name ?? '-'}</td>` : ''}</tr>`
+    ).join('')
+    const rentRows = rentLevels.map(r =>
+      `<tr><td>${r.product_name}</td><td>${r.level_per_ha} ${r.level_type === 'BANI' ? 'lei/ha' : 'kg/ha'}</td><td>${r.tax_rate}%</td></tr>`
+    ).join('')
+    const filled = renderTemplate(customHtml, {
+      contract_number: contract.contract_number,
+      contract_type: CONTRACT_TYPE_LABELS[contract.contract_type] ?? contract.contract_type,
+      sign_date: contract.sign_date ?? '',
+      start_date: contract.start_date,
+      end_date: contract.end_date,
+      contract_years: String(contractYears),
+      tax_method: TAX_MAP[contract.tax_method] ?? contract.tax_method,
+      primarie_nr: contract.primarie_nr ?? '',
+      primarie_date: contract.primarie_date ?? '',
+      localities: contract.localities ?? '',
+      zone: contract.zone ?? '',
+      company_name: company.name,
+      company_cif: company.cif,
+      company_reg_com: company.reg_com,
+      company_address: [company.address, company.locality, company.county].filter(Boolean).join(', '),
+      company_iban: company.iban,
+      company_bank: company.bank_name,
+      company_phone: company.phone,
+      company_email: company.email,
+      lessor_name: lessorName,
+      lessor_cnp: lessorId,
+      lessor_id_label: lessorIdLabel,
+      lessor_address: lessor?.address ?? '',
+      lessor_county: lessor?.county ?? '',
+      lessor_locality: lessor?.locality ?? '',
+      lessor_phone: lessor?.phone ?? lessor?.mobile ?? '',
+      lessor_email: lessor?.email ?? '',
+      lessor_iban: lessor?.iban ?? '',
+      lessor_bank: lessor?.bank_name ?? '',
+      total_ha: totalHa.toFixed(4),
+      parcel_count: String(parcels.length),
+      parcels_table: parcelRows,
+      rent_table: rentRows,
+    })
+    return (
+      <>
+        <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999, display: 'flex', gap: 8 }} className="no-print">
+          <button onClick={() => window.print()} style={{ padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>
+            🖨️ Printează / PDF
+          </button>
+          <button onClick={() => window.close()} style={{ padding: '8px 16px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>
+            ✕ Închide
+          </button>
+        </div>
+        {/* dangerouslySetInnerHTML is safe: HTML comes from admin-only template editor */}
+        <div dangerouslySetInnerHTML={{ __html: filled }} />
+      </>
+    )
+  }
 
   return (
     <>
