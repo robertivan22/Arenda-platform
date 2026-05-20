@@ -5,7 +5,8 @@ export const runtime = 'edge'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { fetchTemplate, renderTemplate } from '@/lib/templates'
+import { fetchTextConfig } from '@/lib/templates'
+import { getDefaults } from '@/lib/doc-config-fields'
 
 interface CompanySettings {
   name: string; cif: string; reg_com: string; address: string
@@ -53,7 +54,7 @@ export default function ContractPrintPage() {
   const [company, setCompany] = useState<CompanySettings | null>(null)
   const [rentLevels, setRentLevels] = useState<RentLevel[]>([])
   const [parcels, setParcels] = useState<Parcel[]>([])
-  const [customHtml, setCustomHtml] = useState<string | null>(null)
+  const [cfg, setCfg] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -72,12 +73,10 @@ export default function ContractPrintPage() {
       if (cs) setCompany(cs as any)
       setRentLevels((levels ?? []) as RentLevel[])
       setParcels((ps ?? []) as Parcel[])
-      // Check for user-specific CONTRACT template
+      // Load text config
       const { data: { user } } = await db.auth.getUser()
-      if (user) {
-        const tmpl = await fetchTemplate(db, user.id, 'CONTRACT')
-        if (tmpl) setCustomHtml(tmpl.html_content)
-      }
+      const textCfg = await fetchTextConfig(db, user?.id ?? '', 'CONTRACT')
+      setCfg(textCfg ?? getDefaults('CONTRACT'))
       setLoading(false)
     })
   }, [id])
@@ -98,101 +97,6 @@ export default function ContractPrintPage() {
   const lessorId = lessor?.cnp || '___________'
   const hasCadastral = parcels.some(p => (p as any).cadastral_nr)
   const hasPopularName = parcels.some(p => (p as any).popular_name)
-
-  // ── Custom template rendering ──────────────────────────────────────────────
-  if (customHtml) {
-    const tdS = 'border:1px solid #333;padding:3pt 6pt'
-    const thS = 'border:1px solid #333;padding:4pt 6pt;background:#f0f0f0;font-weight:bold;text-align:center;font-size:9pt'
-    const parcelsTable = parcels.length > 0
-      ? `<table style="width:100%;border-collapse:collapse;margin:6pt 0;font-size:10pt"><thead><tr>
-          <th style="${thS}">Nr.</th><th style="${thS}">Tarla</th><th style="${thS}">Parcel\u0103</th>
-          <th style="${thS}">Nr. cadastral</th><th style="${thS}" class="right">Suprafa\u021b\u0103 (ha)</th>
-          <th style="${thS}">Denumire popular\u0103</th></tr></thead><tbody>
-          ${parcels.map((p, i) => `<tr>
-            <td style="${tdS};text-align:center">${i + 1}</td>
-            <td style="${tdS}">${p.tarla_nr ?? '\u2014'}</td>
-            <td style="${tdS}">${p.parcel_nr ?? '\u2014'}</td>
-            <td style="${tdS}">${(p as any).cadastral_nr ?? '\u2014'}</td>
-            <td style="${tdS};text-align:right">${Number(p.surface).toFixed(4)}</td>
-            <td style="${tdS}">${(p as any).popular_name ?? '\u2014'}</td>
-          </tr>`).join('')}
-          <tr><td style="${tdS};font-weight:bold;background:#f9f9f9;text-align:center" colspan="4">TOTAL</td>
-            <td style="${tdS};font-weight:bold;background:#f9f9f9;text-align:right">${totalHa.toFixed(4)}</td>
-            <td style="${tdS};background:#f9f9f9"></td></tr>
-        </tbody></table>`
-      : '<p>Parcelele arendate vor fi specificate prin act adi\u021bional.</p>'
-
-    const rentTable = rentLevels.length > 0
-      ? `<table style="width:100%;border-collapse:collapse;margin:6pt 0;font-size:10pt"><thead><tr>
-          <th style="${thS}">Produs / Moned\u0103</th>
-          <th style="${thS};text-align:right">Cantitate / ha</th>
-          <th style="${thS}">Tip calcul</th>
-          <th style="${thS};text-align:right">Total / an (${totalHa.toFixed(4)} ha)</th>
-          <th style="${thS}">Cot\u0103 impozit</th></tr></thead><tbody>
-          ${rentLevels.map(r => `<tr>
-            <td style="${tdS}">${r.product_name}</td>
-            <td style="${tdS};text-align:right">${Number(r.level_per_ha).toFixed(4)}</td>
-            <td style="${tdS};text-align:center">${r.level_type}</td>
-            <td style="${tdS};text-align:right"><strong>${(r.level_per_ha * totalHa).toFixed(2)} ${r.product_name}</strong></td>
-            <td style="${tdS};text-align:center">${r.tax_rate}%</td>
-          </tr>`).join('')}
-        </tbody></table>`
-      : '<p>Arenda se stabilete prin negociere direct\u0103.</p>'
-
-    const filled = renderTemplate(customHtml, {
-      contract_number: contract.contract_number,
-      contract_type: CONTRACT_TYPE_LABELS[contract.contract_type] ?? contract.contract_type,
-      sign_date: contract.sign_date ?? '',
-      start_date: contract.start_date,
-      end_date: contract.end_date,
-      contract_years: String(contractYears),
-      tax_method: TAX_MAP[contract.tax_method] ?? contract.tax_method,
-      primarie_nr: contract.primarie_nr ?? '',
-      primarie_date: contract.primarie_date ?? '',
-      localities: contract.localities ?? '',
-      zone: contract.zone ?? '',
-      company_name: company.name,
-      company_cif: company.cif,
-      company_reg_com: company.reg_com,
-      company_address: [company.address, company.locality, company.county].filter(Boolean).join(', '),
-      company_iban: company.iban,
-      company_bank: company.bank_name,
-      company_phone: company.phone,
-      company_email: company.email,
-      lessor_name: lessorName,
-      lessor_cnp: lessorId,
-      lessor_id_label: lessorIdLabel,
-      lessor_address: lessor?.address ?? '',
-      lessor_county: lessor?.county ?? '',
-      lessor_locality: lessor?.locality ?? '',
-      lessor_phone: lessor?.phone ?? lessor?.mobile ?? '',
-      lessor_email: lessor?.email ?? '',
-      lessor_iban: lessor?.iban ?? '',
-      lessor_bank: lessor?.bank_name ?? '',
-      total_ha: totalHa.toFixed(4),
-      parcel_count: String(parcels.length),
-      parcels_table: parcelsTable,
-      rent_table: rentTable,
-      company_logo: company.logo_url
-        ? `<img src="${company.logo_url}" alt="Logo" class="company-logo" style="max-height:110px;max-width:260px;object-fit:contain;display:block">`
-        : '',
-    })
-    return (
-      <>
-        <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 9999, display: 'flex', gap: 8 }} className="no-print">
-          <button onClick={() => window.print()} style={{ padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>
-            🖨️ Printează / PDF
-          </button>
-          <button onClick={() => window.close()} style={{ padding: '8px 16px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>
-            ✕ Închide
-          </button>
-        </div>
-        {/* dangerouslySetInnerHTML is safe: HTML comes from admin-only template editor */}
-        <div dangerouslySetInnerHTML={{ __html: filled }} />
-      </>
-    )
-  }
-
   return (
     <>
       <style>{`
@@ -296,9 +200,7 @@ export default function ContractPrintPage() {
           denumit(ă) în continuare <strong>Arendaș</strong>.
         </p>
         <p>
-          Ambele părți au convenit să încheie prezentul contract de arendare, în temeiul
-          Legii arendării nr. 16/1994, republicată, cu modificările și completările ulterioare,
-          și ale Codului civil, în următoarele condiții:
+          {cfg.intro_clause ?? 'Ambele părți au convenit să încheie prezentul contract de arendare, în temeiul Legii arendării nr. 16/1994, republicată, cu modificările şi completările ulterioare, şi ale Codului civil, în următoarele condiții:'}
         </p>
 
         <h2>II. Obiectul Contractului</h2>
@@ -318,8 +220,7 @@ export default function ContractPrintPage() {
           <strong>{contract.end_date}</strong>.
         </p>
         <p>
-          La expirarea termenului, contractul poate fi reînnoit prin acordul scris al ambelor părți,
-          cu cel puțin 30 de zile înainte de data expirării.
+          {cfg.s3_renewal ?? 'La expirarea termenului, contractul poate fi reînnoit prin acordul scris al ambelor părți, cu cel puțin 30 de zile înainte de data expirării.'}
         </p>
 
         <h2>IV. Arenda (Chiria)</h2>
@@ -352,8 +253,8 @@ export default function ContractPrintPage() {
               </tbody>
             </table>
             <p>
-              Arenda se plătește anual, prin acordul direct al părților.
-              Metoda de plată a impozitului: <strong>{TAX_MAP[contract.tax_method] ?? contract.tax_method}</strong>.
+              {cfg.s4_payment ?? 'Arenda se plăteşte anual, prin acordul direct al părților.'}
+              {' Metoda de plată a impozitului: '}<strong>{TAX_MAP[contract.tax_method] ?? contract.tax_method}</strong>.
             </p>
           </>
         ) : (
@@ -401,28 +302,24 @@ export default function ContractPrintPage() {
 
         <h2>VI. Obligațiile Părților</h2>
         <p><strong>6.1. Arendatorul se obligă:</strong></p>
-        <p>a) să predea terenul arendat în stare corespunzătoare destinației agricole;</p>
-        <p>b) să garanteze liniștita posesie și folosință a terenului pe toată durata contractului;</p>
-        <p>c) să achite toate taxele și impozitele legale aferente proprietății, cu excepțiile prevăzute de lege.</p>
-        <p style={{ marginTop: 6 }}><strong>6.2. Arendașul se obligă:</strong></p>
-        <p>a) să folosească terenul arendat ca un bun proprietar și potrivit destinației sale agricole;</p>
-        <p>b) să mențină potențialul productiv al terenului și să execute lucrările de îmbunătățiri funciare;</p>
-        <p>c) să plătească arenda la termenele și în condițiile stabilite prin prezentul contract;</p>
-        <p>d) să nu subînchirieze terenul fără acordul scris al arendatorului;</p>
-        <p>e) să restituie terenul la expirarea contractului în starea în care l-a primit.</p>
+        <p>a) {cfg.s6_1_a ?? 'să predea terenul arendat în stare corespunzătoare destinației agricole;'}</p>
+        <p>b) {cfg.s6_1_b ?? 'să garanteze liniştita posesie şi folosință a terenului pe toată durata contractului;'}</p>
+        <p>c) {cfg.s6_1_c ?? 'să achite toate taxele şi impozitele legale aferente proprietății, cu excepțiile prevăzute de lege.'}</p>
+        <p style={{ marginTop: 6 }}><strong>6.2. Arendaşul se obligă:</strong></p>
+        <p>a) {cfg.s6_2_a ?? 'să folosească terenul arendat ca un bun proprietar şi potrivit destinației sale agricole;'}</p>
+        <p>b) {cfg.s6_2_b ?? 'să mențină potențialul productiv al terenului şi să execute lucrările de îmbunătățiri funciare;'}</p>
+        <p>c) {cfg.s6_2_c ?? 'să plătească arenda la termenele şi în condițiile stabilite prin prezentul contract;'}</p>
+        <p>d) {cfg.s6_2_d ?? 'să nu subînchirieze terenul fără acordul scris al arendatorului;'}</p>
+        <p>e) {cfg.s6_2_e ?? 'să restituie terenul la expirarea contractului în starea în care l-a primit.'}</p>
 
         <h2>VII. Forța Majoră și Cazul Fortuit</h2>
         <p>
-          Niciuna din părți nu va fi răspunzătoare pentru neexecutarea obligațiilor sale contractuale,
-          dacă aceasta se datorează unui caz de forță majoră. Partea care invocă forța majoră este
-          obligată să notifice celeilalte părți, în termen de 5 zile, producerea evenimentului.
+          {cfg.s7_body ?? 'Niciuna din părți nu va fi răspunzătoare pentru neexecutarea obligațiilor sale contractuale, dacă aceasta se datorează unui caz de forță majoră. Partea care invocă forța majoră este obligată să notifice celeilalte părți, în termen de 5 zile, producerea evenimentului.'}
         </p>
 
         <h2>VIII. Clauze Finale</h2>
         <p>
-          Prezentul contract a fost încheiat cu respectarea dispozițiilor Legii nr. 16/1994 a arendării
-          și ale Codului civil, în <strong>3 (trei) exemplare originale</strong>, câte unul pentru
-          fiecare parte contractantă și unul pentru înregistrarea la primăria comunei/orașului
+          {cfg.s8_body ?? 'Prezentul contract a fost încheiat cu respectarea dispozițiilor Legii nr. 16/1994 a arendării şi ale Codului civil, în 3 (trei) exemplare originale, câte unul pentru fiecare parte contractantă şi unul pentru înregistrarea la primăria comunei/oraşului'}
           {contract.localities ? ` ${contract.localities}` : ''}.
         </p>
         {contract.primarie_nr && (
@@ -434,18 +331,18 @@ export default function ContractPrintPage() {
 
         <div className="signatures">
           <div className="sig-block">
-            <div className="sig-title">ARENDATOR</div>
+            <div className="sig-title">{cfg.sig_arrendator ?? 'ARENDATOR'}</div>
             <p>{lessorName}</p>
             {lessor?.address && <p style={{ fontSize: '9pt', color: '#555' }}>{lessor.address}, {lessor.locality}, {lessor.county}</p>}
             <div className="sig-line"></div>
-            <div className="sig-label">Semnătura și ștampila</div>
+            <div className="sig-label">{cfg.sig_footnote ?? 'Semnătura şi ştampila'}</div>
           </div>
           <div className="sig-block" style={{ textAlign: 'right' }}>
-            <div className="sig-title">ARENDAȘ</div>
+            <div className="sig-title">{cfg.sig_arrendas ?? 'ARENDAȘ'}</div>
             <p>{company.name}</p>
             {company.cif && <p style={{ fontSize: '9pt', color: '#555' }}>CIF: {company.cif}</p>}
             <div className="sig-line"></div>
-            <div className="sig-label">Semnătura și ștampila</div>
+            <div className="sig-label">{cfg.sig_footnote ?? 'Semnătura şi ştampila'}</div>
           </div>
         </div>
       </div>

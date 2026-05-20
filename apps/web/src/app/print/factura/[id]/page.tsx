@@ -5,7 +5,8 @@ export const runtime = 'edge'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { fetchTemplate, renderTemplate } from '@/lib/templates'
+import { fetchTextConfig } from '@/lib/templates'
+import { getDefaults } from '@/lib/doc-config-fields'
 
 interface Invoice {
   id: string; invoice_number: string; invoice_series: string
@@ -35,7 +36,7 @@ export default function PrintFacturaPage() {
   const [company, setCompany] = useState<Company | null>(null)
   const [lessor, setLessor] = useState<Lessor | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [customHtml, setCustomHtml] = useState<string | null>(null)
+  const [cfg, setCfg] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -52,11 +53,14 @@ export default function PrintFacturaPage() {
       if (cs) setCompany(cs as Company)
       if (les) setLessor(les as Lessor)
       setTransactions((txns ?? []) as Transaction[])
-      // Check for user-specific template
+      // Load text config
       if (user) {
         const docType = inv.doc_type === 'AVIZ' ? 'AVIZ' : 'FACTURA'
-        const tmpl = await fetchTemplate(db, user.id, docType)
-        if (tmpl) setCustomHtml(tmpl.html_content)
+        const textCfg = await fetchTextConfig(db, user.id, docType)
+        setCfg(textCfg ?? getDefaults(docType))
+      } else {
+        const docType = inv.doc_type === 'AVIZ' ? 'AVIZ' : 'FACTURA'
+        setCfg(getDefaults(docType))
       }
       setLoading(false)
     })
@@ -159,7 +163,7 @@ export default function PrintFacturaPage() {
           </div>
           <div style={{ flex: 1, textAlign: 'center' }}>
             <h1 className="text-xl font-bold uppercase tracking-wide">
-              {isAviz ? 'AVIZ DE ÎNSOȚIRE A MĂRFII' : 'FACTURĂ FISCALĂ'}
+              {cfg.doc_title ?? (isAviz ? 'AVIZ DE ÎNSOȚIRE A MĂRFII' : 'FACTURĂ FISCALĂ')}
             </h1>
           </div>
           <div style={{ minWidth: 180 }}>
@@ -178,7 +182,7 @@ export default function PrintFacturaPage() {
         {/* Furnizor / Client */}
         <div className="grid grid-cols-2 gap-6 mb-6 text-sm">
           <div>
-            <p className="font-bold text-gray-500 uppercase text-xs mb-2">Furnizor:</p>
+            <p className="font-bold text-gray-500 uppercase text-xs mb-2">{cfg.label_furnizor ?? 'Furnizor:'}</p>
             <p className="font-bold text-blue-700 text-base">{company.name}</p>
             {company.cif && <p>CIF: {company.cif}</p>}
             {company.reg_com && <p>Reg. com.: {company.reg_com}</p>}
@@ -189,7 +193,7 @@ export default function PrintFacturaPage() {
             {company.email && <p>Email: {company.email}</p>}
           </div>
           <div>
-            <p className="font-bold text-gray-500 uppercase text-xs mb-2">Client:</p>
+            <p className="font-bold text-gray-500 uppercase text-xs mb-2">{cfg.label_client ?? 'Client:'}</p>
             <p className="font-bold text-blue-700 text-base">{lessorName}</p>
             {lessor.cnp && <p>CNP: {lessor.cnp}</p>}
             {lessor.address && <p>Adresa: {lessor.address}</p>}
@@ -253,7 +257,7 @@ export default function PrintFacturaPage() {
           </div>
         )}
 
-        <p className="text-xs text-gray-400 mt-6 text-center">TVA la incasare</p>
+        <p className="text-xs text-gray-400 mt-6 text-center">{cfg.footer_note ?? 'TVA la încasare'}</p>
       </div>
     </>
   )

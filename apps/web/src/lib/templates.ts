@@ -22,10 +22,41 @@ export interface TemplateRow {
 }
 
 /**
- * Fetch user-specific template from Supabase.
- * Falls back to system default (user_id IS NULL) if no user template exists.
- * Returns null if even the system default is the placeholder comment.
+ * Fetch JSON text-config for a user+docType from document_templates.
+ * Falls back to system default (user_id IS NULL).
+ * Returns null if no saved config exists → caller uses built-in defaults.
  */
+export async function fetchTextConfig(
+  db: ReturnType<typeof import('@/lib/supabase/client').createClient>,
+  userId: string,
+  docType: DocType,
+): Promise<Record<string, string> | null> {
+  const tryParse = (s: string | null | undefined) => {
+    if (!s) return null
+    try { const p = JSON.parse(s); if (typeof p === 'object') return p as Record<string, string> } catch {}
+    return null
+  }
+
+  const { data: userRow } = await db
+    .from('document_templates')
+    .select('html_content')
+    .eq('user_id', userId)
+    .eq('doc_type', docType)
+    .eq('is_active', true)
+    .maybeSingle()
+  const userCfg = tryParse(userRow?.html_content)
+  if (userCfg) return userCfg
+
+  const { data: sysRow } = await db
+    .from('document_templates')
+    .select('html_content')
+    .is('user_id', null)
+    .eq('doc_type', docType)
+    .eq('is_active', true)
+    .maybeSingle()
+  return tryParse(sysRow?.html_content)
+}
+
 export async function fetchTemplate(
   db: ReturnType<typeof import('@/lib/supabase/client').createClient>,
   userId: string,

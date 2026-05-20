@@ -5,7 +5,8 @@ export const runtime = 'edge'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Save, ChevronDown, ChevronRight, Shield, FileText, Users, X } from 'lucide-react'
+import { Save, ChevronDown, ChevronRight, Shield, FileText, Users } from 'lucide-react'
+import { CONFIG_FIELDS, getDefaults, DocConfig } from '@/lib/doc-config-fields'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Profile {
@@ -58,7 +59,8 @@ const DEFAULT_PERMS: Omit<Permissions, 'user_id'> = {
   can_rapoarte: true, can_declaratii: true, can_setari: true,
 }
 
-// ─── Placeholder reference per doc type ──────────────────────────────────────
+// (PLACEHOLDERS and STARTER_HTML removed — templates now use form-based JSON config)
+// ─── Config stub ─────────────────────────────────────────────────────────────
 const PLACEHOLDERS: Record<DocType, string[]> = {
   FACTURA: [
     '{{company_logo}}',
@@ -318,11 +320,8 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<string>('') // '' = system default
   const [docType, setDocType] = useState<DocType>('FACTURA')
   const [templates, setTemplates] = useState<Record<string, Record<DocType, Template | null>>>({})
-  const [editingHtml, setEditingHtml] = useState('')
-  const [editingName, setEditingName] = useState('')
-  const [showPlaceholders, setShowPlaceholders] = useState(false)
+  const [editingConfig, setEditingConfig] = useState<DocConfig>({})
   const [savingTemplate, setSavingTemplate] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
 
   // ── Auth check ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -362,11 +361,16 @@ export default function AdminPage() {
     setTemplates(tmplMap)
   }, [])
 
-  // ── Load template into editor when user/docType changes ────────────────────
+  // ── Load config into editor when user/docType changes ──────────────────────────
   useEffect(() => {
     const tmpl = templates[selectedUser]?.[docType]
-    setEditingHtml(tmpl?.html_content ?? STARTER_HTML[docType])
-    setEditingName(tmpl?.name ?? (selectedUser === '' ? `Default ${docType}` : `Template ${docType}`))
+    if (tmpl?.html_content) {
+      try {
+        const parsed = JSON.parse(tmpl.html_content)
+        if (parsed && typeof parsed === 'object') { setEditingConfig(parsed); return }
+      } catch {}
+    }
+    setEditingConfig(getDefaults(docType))
   }, [selectedUser, docType, templates])
 
   // ── Save permissions ────────────────────────────────────────────────────────
@@ -398,15 +402,14 @@ export default function AdminPage() {
 
   // ── Save template ───────────────────────────────────────────────────────────
   async function saveTemplate() {
-    if (!editingHtml.trim()) { toast.error('Template-ul este gol.'); return }
     setSavingTemplate(true)
     const db = createClient()
     const existing = templates[selectedUser]?.[docType]
     const payload = {
       user_id: selectedUser || null,
       doc_type: docType,
-      name: editingName || `${docType} Template`,
-      html_content: editingHtml,
+      name: `${docType} Config`,
+      html_content: JSON.stringify(editingConfig),
       is_active: true,
       updated_at: new Date().toISOString(),
     }
@@ -418,7 +421,7 @@ export default function AdminPage() {
     }
     setSavingTemplate(false)
     if (error) { toast.error(error.message); return }
-    toast.success('Template salvat.')
+    toast.success('Configurație salvată.')
     // Reload templates
     const { data: tmpls } = await db.from('document_templates').select('*')
     const tmplMap: Record<string, Record<DocType, Template | null>> = { '': { CONTRACT: null, FACTURA: null, AVIZ: null } }
@@ -441,10 +444,9 @@ export default function AdminPage() {
         if (n[selectedUser]) n[selectedUser][docType] = null
         return n
       })
-      toast.success('Template șters — se va folosi cel implicit.')
+      toast.success('Configurație ştearsă — se vor folosi valorile implicite.')
     }
-    setEditingHtml(STARTER_HTML[docType])
-    setEditingName(`Default ${docType}`)
+    setEditingConfig(getDefaults(docType))
   }
 
   // ── Guards ──────────────────────────────────────────────────────────────────
@@ -670,38 +672,17 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Template editor */}
+            {/* Config field editor */}
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    value={editingName}
-                    onChange={e => setEditingName(e.target.value)}
-                    placeholder="Nume template"
-                    className="text-sm font-medium border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                  />
-                  <button
-                    onClick={() => setShowPlaceholders(v => !v)}
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    {showPlaceholders ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                    Placeholder-uri disponibile
-                  </button>
-                </div>
+                <span className="text-sm font-medium text-gray-700">Texte editabile — {docType}</span>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowPreview(true)}
-                    className="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-100 font-medium"
-                  >
-                    Previzualizare
-                  </button>
                   {selectedUser && templates[selectedUser]?.[docType] && (
                     <button
                       onClick={resetTemplate}
                       className="px-3 py-1.5 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 font-medium"
                     >
-                      Șterge (revin la implicit)
+                      Resetează la implicit
                     </button>
                   )}
                   <button
@@ -710,75 +691,44 @@ export default function AdminPage() {
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#1e3a22] hover:bg-[#2d6a4f] text-white rounded font-medium disabled:opacity-60"
                   >
                     <Save className="w-3 h-3" />
-                    {savingTemplate ? 'Se salvează...' : 'Salvează template'}
+                    {savingTemplate ? 'Se salvează...' : 'Salvează configurație'}
                   </button>
                 </div>
               </div>
 
-              {/* Placeholders reference */}
-              {showPlaceholders && (
-                <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
-                  <p className="text-xs font-semibold text-blue-700 mb-2">Placeholder-uri pentru {docType}:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {PLACEHOLDERS[docType].map(ph => (
-                      <button
-                        key={ph}
-                        onClick={() => setEditingHtml(h => h + ph)}
-                        className="px-2 py-0.5 bg-white border border-blue-200 text-blue-700 text-xs rounded font-mono hover:bg-blue-100 transition-colors"
-                        title="Click pentru a insera"
-                      >
-                        {ph}
-                      </button>
-                    ))}
+              <div className="p-4 grid gap-4">
+                {CONFIG_FIELDS[docType].map(field => (
+                  <div key={field.key}>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{field.label}</label>
+                    {field.multiline ? (
+                      <textarea
+                        value={editingConfig[field.key] ?? field.defaultValue}
+                        onChange={e => setEditingConfig(c => ({ ...c, [field.key]: e.target.value }))}
+                        rows={3}
+                        className="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400 resize-y"
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value={editingConfig[field.key] ?? field.defaultValue}
+                        onChange={e => setEditingConfig(c => ({ ...c, [field.key]: e.target.value }))}
+                        className="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
+                      />
+                    )}
                   </div>
-                  <p className="text-xs text-blue-500 mt-2">Click pe un placeholder pentru a-l insera la sfârșitul templateului.</p>
-                </div>
-              )}
-
-              {/* HTML textarea */}
-              <textarea
-                value={editingHtml}
-                onChange={e => setEditingHtml(e.target.value)}
-                rows={28}
-                spellCheck={false}
-                className="w-full p-4 text-xs font-mono text-gray-800 border-0 focus:outline-none resize-y"
-                placeholder="Scrie HTML-ul template-ului aici..."
-              />
+                ))}
+              </div>
             </div>
 
             {/* Info box */}
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-xs text-amber-800">
-              <strong>Cum funcționează:</strong> Dacă un utilizator are un template personalizat setat pentru un tip de document,
-              acel template va fi folosit la generarea documentului (cu placeholder-urile înlocuite cu datele reale).
-              Dacă nu are template, se va folosi template-ul implicit (codul JSX din aplicație).
-              Template-ul de sistem poate fi înlocuit prin selectarea „Template implicit (sistem)" și salvarea unui HTML personalizat.
+              <strong>Cum funcționează:</strong> Textele editate aici vor fi afișate în documentele generate pentru utilizatorul selectat.
+              Dacă nu există o configurație salvată, se folosesc valorile implicite din aplicație.
+              Selectați „Template implicit (sistem)" pentru a schimba valorile pentru toți utilizatorii care nu au configurație proprie.
             </div>
           </div>
         )}
       </div>
-
-      {/* Preview modal */}
-      {showPreview && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-              <span className="font-semibold text-sm">Previzualizare template — {docType}</span>
-              <button onClick={() => setShowPreview(false)} className="p-1 rounded hover:bg-gray-100">
-                <X className="w-4 h-4 text-gray-500" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto p-4">
-              {/* dangerouslySetInnerHTML is safe here — only the admin can edit and view this */}
-              <iframe
-                srcDoc={editingHtml}
-                className="w-full h-full border-0 min-h-[600px]"
-                title="Template Preview"
-                sandbox="allow-same-origin"
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
