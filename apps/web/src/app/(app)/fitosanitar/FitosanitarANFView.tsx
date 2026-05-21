@@ -13,137 +13,157 @@ import { FitosanitarModal } from './FitosanitarModal'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
+// ─── Helper: strip Romanian diacritics so jsPDF's built-in fonts render correctly
+// (Helvetica/Times/Courier only support Latin-1; ă ș ț î â are outside that range)
+function ro(str: string | null | undefined): string {
+  if (!str) return ''
+  return str
+    .replace(/ă/g, 'a').replace(/Ă/g, 'A')
+    .replace(/â/g, 'a').replace(/Â/g, 'A')
+    .replace(/î/g, 'i').replace(/Î/g, 'I')
+    .replace(/ș/g, 's').replace(/Ș/g, 'S')
+    .replace(/ş/g, 's').replace(/Ş/g, 'S')
+    .replace(/ț/g, 't').replace(/Ț/g, 'T')
+    .replace(/ţ/g, 't').replace(/Ţ/g, 'T')
+}
+
 // ─── PDF export ───────────────────────────────────────────────────────────────
 function generateANFPdf(
   entries: RegistruFitosanitar[],
   user: { name: string; address: string },
 ) {
+  // Landscape A4: 297 × 210 mm
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-  const pageW = doc.internal.pageSize.getWidth()
-  const pageH = doc.internal.pageSize.getHeight()
-  const margin = 10
+  const pageW = doc.internal.pageSize.getWidth()   // 297 mm
+  const pageH = doc.internal.pageSize.getHeight()  // 210 mm
+  const margin = 10                                 // left & right margin
 
   const now = new Date()
   const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
 
   // ── Title ──────────────────────────────────────────────────────────────────
-  doc.setFontSize(13)
   doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
   doc.setTextColor(0, 0, 0)
-  doc.text(
-    'Registrul de evidență a tratamentelor cu produse de protecție a plantelor',
-    pageW / 2, margin + 5, { align: 'center' },
+  const titleLines = doc.splitTextToSize(
+    ro('Registrul de evidenta a tratamentelor cu produse de protectie a plantelor'),
+    pageW - 2 * margin,
   )
+  doc.text(titleLines, pageW / 2, margin + 6, { align: 'center' })
 
-  // ── Info block (simple table format) ────────────────────────────────────────
-  const labelColW = 80
-  const valueColW = pageW - 2 * margin - labelColW
-  let infoY = margin + 12
+  // ── Info block ─────────────────────────────────────────────────────────────
+  // Split label / value side by side; each row 5.5 mm tall
+  const ROW_H    = 5.5
+  const LABEL_W  = 90
+  const VALUE_W  = pageW - 2 * margin - LABEL_W
+  let infoY = margin + 6 + titleLines.length * 5 + 3
 
-  const infoRows = [
-    ['Nume si prenume persoana juridică/PFA/II/IF/PF', user.name || ''],
-    ['Domiciliu persoana juridică/PFA/II/IF/PF', user.address || ''],
-    ['Denumire spațiu/suprafață', ''],
-    ['Data generare', dateStr],
+  const infoRows: [string, string][] = [
+    [ro('Nume si prenume persoana juridica/PFA/II/IF/PF'), ro(user.name)],
+    [ro('Domiciliu persoana juridica/PFA/II/IF/PF'),      ro(user.address)],
+    [ro('Denumire spatiu/suprafata'),                      ''],
+    ['Data generare',                                     dateStr],
   ]
 
-  doc.setFontSize(7)
-  doc.setFont('helvetica', 'normal')
-
   for (const [label, value] of infoRows) {
-    // Label cell
+    // Label cell — light grey background, red bold text
     doc.setFillColor(240, 240, 240)
-    doc.rect(margin, infoY, labelColW, 4, 'F')
+    doc.setDrawColor(200, 200, 200)
+    doc.rect(margin, infoY, LABEL_W, ROW_H, 'FD')
     doc.setTextColor(180, 30, 30)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.text(label, margin + 1, infoY + 2.5, { maxWidth: labelColW - 2 })
+    doc.setFontSize(7.5)
+    doc.text(label, margin + 1.5, infoY + ROW_H / 2 + 1, { baseline: 'middle' })
 
-    // Value cell
+    // Value cell — white background, black normal text
     doc.setFillColor(255, 255, 255)
-    doc.rect(margin + labelColW, infoY, valueColW, 4, 'F')
+    doc.rect(margin + LABEL_W, infoY, VALUE_W, ROW_H, 'FD')
     doc.setTextColor(0, 0, 0)
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.text(value, margin + labelColW + 1, infoY + 2.5, { maxWidth: valueColW - 2 })
+    doc.setFontSize(7.5)
+    doc.text(value, margin + LABEL_W + 1.5, infoY + ROW_H / 2 + 1, { baseline: 'middle', maxWidth: VALUE_W - 3 })
 
-    infoY += 4
+    infoY += ROW_H
   }
 
   // ── Table ──────────────────────────────────────────────────────────────────
+  // Total usable width = 297 - 2×10 = 277 mm → column widths must sum to 277
   autoTable(doc, {
-    startY: infoY + 2,
-    head: [
-      [
-        'Tipul utilizării',
-        'Denumire',
-        'Substanță activă',
-        'Doză de aplicare',
-        'Cultura / Locul terenului',
-        'Organism dăunător',
-        'Cantitate utilizată',
-        'Momentul utilizării',
-        'Suprafață (ha)',
-        'Localizare',
-        'Observații',
-        'Dată',
-      ],
-    ],
+    startY: infoY + 3,
+    head: [[
+      ro('Tipul utilizarii'),
+      'Denumire',
+      ro('Substanta activa'),
+      ro('Doza de aplicare'),
+      ro('Cultura / Locul terenului'),
+      ro('Organism daunat or'),
+      ro('Cantitate utilizata'),
+      ro('Momentul utilizarii'),
+      ro('Suprafata (ha)'),
+      'Localizare',
+      ro('Observatii'),
+      ro('Data'),
+    ]],
     body: entries.map(row => [
-      row.tip_utilizare ?? '-',
-      row.denumire_produs,
-      row.substanta_activa,
+      ro(row.tip_utilizare) || '-',
+      ro(row.denumire_produs),
+      ro(row.substanta_activa),
       `${row.doza_folosita} ${row.unitate_doza}`,
-      row.cultura + (row.locul_terenului ? ` / ${row.locul_terenului}` : ''),
-      row.agent_daunare,
-      `${row.cantitate_utilizata}${row.unitate_cantitate === 'litri' ? 'L' : 'kg'}`,
+      ro(row.cultura) + (row.locul_terenului ? ` / ${ro(row.locul_terenului)}` : ''),
+      ro(row.agent_daunare),
+      `${row.cantitate_utilizata} ${row.unitate_cantitate === 'litri' ? 'L' : 'kg'}`,
       formatDateRO(row.data_tratament) + (row.ora_tratament ? ` ${row.ora_tratament}` : ''),
       row.suprafata_tratata.toString(),
-      row.locul_terenului ?? '',
-      row.observatii ?? '',
+      ro(row.locul_terenului),
+      ro(row.observatii),
       formatDateRO(row.data_tratament),
     ]),
     styles: {
-      fontSize: 6,
-      cellPadding: 1,
+      font: 'helvetica',
+      fontSize: 6.5,
+      cellPadding: 1.2,
       overflow: 'linebreak',
       halign: 'left',
       valign: 'top',
+      textColor: [30, 30, 30],
     },
     headStyles: {
       fillColor: [30, 95, 164],
-      textColor: 255,
+      textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 6,
+      fontSize: 6.5,
       halign: 'center',
       valign: 'middle',
       cellPadding: 1.5,
+      minCellHeight: 8,
     },
     alternateRowStyles: { fillColor: [245, 248, 252] },
+    // Column widths: must sum to 277 mm (= 297 - 2×10 margins)
     columnStyles: {
-      0: { cellWidth: 28 },
-      1: { cellWidth: 22 },
-      2: { cellWidth: 18 },
-      3: { cellWidth: 15 },
-      4: { cellWidth: 28 },
-      5: { cellWidth: 20 },
-      6: { cellWidth: 16 },
-      7: { cellWidth: 20 },
-      8: { cellWidth: 12 },
-      9: { cellWidth: 20 },
-      10: { cellWidth: 16 },
-      11: { cellWidth: 15 },
+      0:  { cellWidth: 38 },   // Tipul utilizarii  (can be long)
+      1:  { cellWidth: 26 },   // Denumire
+      2:  { cellWidth: 23 },   // Substanta activa
+      3:  { cellWidth: 15 },   // Doza
+      4:  { cellWidth: 32 },   // Cultura / Locul
+      5:  { cellWidth: 22 },   // Organism
+      6:  { cellWidth: 18 },   // Cantitate
+      7:  { cellWidth: 22 },   // Momentul
+      8:  { cellWidth: 12 },   // Suprafata
+      9:  { cellWidth: 22 },   // Localizare
+      10: { cellWidth: 30 },   // Observatii (wider for notes)
+      11: { cellWidth: 17 },   // Data
     },
-    margin: { left: margin, right: margin, top: 5, bottom: 5 },
-    didDrawPage: (data) => {
-      // Footer
-      const pageCount = doc.internal.pages.length - 1
+    margin: { left: margin, right: margin, top: margin + 5, bottom: 12 },
+    didDrawPage: () => {
+      const totalPages = (doc as unknown as { internal: { getNumberOfPages(): number } }).internal.getNumberOfPages()
+      const currentPage = doc.getCurrentPageInfo().pageNumber
+      doc.setFont('helvetica', 'normal')
       doc.setFontSize(6)
-      doc.setTextColor(100, 100, 100)
+      doc.setTextColor(130, 130, 130)
       doc.text(
-        `Pagina 1 din 1 | Generat de ArendaPro | ${dateStr}`,
+        `Pagina ${currentPage} din ${totalPages}  |  Generat de ArendaPro  |  ${dateStr}`,
         pageW / 2,
-        pageH - 5,
+        pageH - 4,
         { align: 'center' },
       )
     },
