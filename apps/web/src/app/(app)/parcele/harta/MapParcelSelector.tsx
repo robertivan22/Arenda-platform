@@ -36,77 +36,52 @@ function fixLeafletIcons() {
   })
 }
 
-// ─── esri-leaflet ArcGIS dynamic layer factory ───────────────────────────────
-// Key insight: WMS tiles load as <img> elements — no CORS needed.
-// esri-leaflet's dynamicMapLayer makes a preliminary ?f=json XHR which
-// REQUIRES CORS headers and silently fails when the server doesn't provide them.
-// L.tileLayer.wms() avoids that XHR entirely — tiles go straight to <img>.
-function createDirectWMS(wmsUrl: string, options: L.WMSOptions): L.TileLayer.WMS {
-  return L.tileLayer.wms(wmsUrl, options)
+// ─── OSM → GeoJSON (Overpass API results) ───────────────────────────────────
+// Overpass API has proper CORS headers; tiles/vectors load via fetch(), not <img>.
+// No proxy, no WMS, no external map service dependency.
+interface OsmEl {
+  type: string; id: number
+  lat?: number; lon?: number
+  nodes?: number[]; tags?: Record<string, string>
+}
+function osmToGeoJSON(elements: OsmEl[]): GeoJSON.FeatureCollection {
+  const nodes = new Map<number, [number, number]>()
+  for (const el of elements) {
+    if (el.type === 'node' && el.lat !== undefined && el.lon !== undefined)
+      nodes.set(el.id, [el.lon, el.lat])
+  }
+  const features: GeoJSON.Feature[] = []
+  for (const el of elements) {
+    if (el.type !== 'way' || !el.nodes) continue
+    const coords = el.nodes.map(id => nodes.get(id)).filter((c): c is [number, number] => !!c)
+    if (coords.length < 4) continue
+    features.push({
+      type: 'Feature', id: el.id,
+      properties: el.tags ?? {},
+      geometry: { type: 'Polygon', coordinates: [coords] },
+    })
+  }
+  return { type: 'FeatureCollection', features }
 }
 
-// ─── Layer catalogue ──────────────────────────────────────────────────────────
+// ─── Static tile overlay catalogue ──────────────────────────────────────────
 interface WmsLayerDef {
   id: string
   label: string
   sublabel: string
   color: 'blue' | 'green' | 'amber'
-  wmsUrl: string
-  wmsOptions: L.WMSOptions
-  isTile?: boolean       // true = use L.tileLayer (XYZ), false = WMS
-  tileUrl?: string
+  tileUrl: string
   defaultOpacity: number
   defaultVisible: boolean
-  minZoom?: number
 }
 
 const WMS_LAYER_DEFS: WmsLayerDef[] = [
-  {
-    id: 'apia_lpis_2024',
-    label: 'LPIS APIA 2024',
-    sublabel: 'Referinta parcele 2024 (actualizat sept. 2024)',
-    color: 'green',
-    // ArcGIS WMS endpoint — tiles loaded as <img> (no CORS needed)
-    // WMS 1.1.1 + EPSG:3857 is supported by ArcGIS Server
-    wmsUrl: 'https://inspire.apia.org.ro/network/rest/services/INSPIRE/LPIS_referinta_2024/MapServer/WMSServer',
-    wmsOptions: {
-      layers: '0',
-      format: 'image/png',
-      transparent: true,
-      version: '1.1.1',
-      attribution: '© <a href="https://apia.org.ro" target="_blank">APIA Romania</a>',
-    },
-    defaultOpacity: 0.6,
-    defaultVisible: false,
-    minZoom: 12,
-  },
-  {
-    id: 'apia_lpis_ref',
-    label: 'LPIS APIA referinta',
-    sublabel: 'Parcele referinta INSPIRE (fallback)',
-    color: 'amber',
-    wmsUrl: 'https://inspire.apia.org.ro/network/rest/services/INSPIRE/LPIS_parcel_reference/MapServer/WMSServer',
-    wmsOptions: {
-      layers: '0',
-      format: 'image/png',
-      transparent: true,
-      version: '1.1.1',
-      attribution: '© <a href="https://apia.org.ro" target="_blank">APIA Romania</a>',
-    },
-    defaultOpacity: 0.45,
-    defaultVisible: false,
-    minZoom: 12,
-  },
   {
     id: 'esri_boundaries',
     label: 'Limite administrative',
     sublabel: 'ESRI World Boundaries (vector overlay)',
     color: 'blue',
-    // ESRI tile service — always works, globally hosted, HTTPS
-    isTile: true,
     tileUrl: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-    wmsUrl: '',  // unused when isTile=true
-    wmsOptions: {},
     defaultOpacity: 0.7,
     defaultVisible: false,
   },
@@ -280,8 +255,8 @@ export default function MapParcelSelector({
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null)
   const parcelLayersRef = useRef<Map<string, L.GeoJSON>>(new Map())
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Live Leaflet tile layer instances keyed by layer id
-  const wmsLayerRefs = useRef<Map<string, L.TileLayer | L.TileLayer.WMS>>(new Map())
+  // Static tile overlay instances keyed by layer id
+  const wmsLayerRefs = useRef<Map<string, L.TileLayer>>(new Map())
 
   const [parcels, setParcels] = useState<ParceleFitosanitar[]>([])
   const [loading, setLoading] = useState(true)
@@ -320,6 +295,14 @@ export default function MapParcelSelector({
   )
   const [wmsLayerErrors, setWmsLayerErrors] = useState<Record<string, boolean>>({})
 
+  // Overpass API (OSM farmland) overlay
+  const overpassLayerRef = useRef<L.GeoJSON | null>(null)
+  const overpassOpacityRef = useRef(0.6)
+  const [overpassVisible, setOverpassVisible] = useState(false)
+  const [overpassOpacity, setOverpassOpacity] = useState(0.6)
+  const [overpassLoading, setOverpassLoading] = useState(false)
+  const [overpassError, setOverpassError] = useState(false)
+
   // ── Init Leaflet map ────────────────────────────────────────────────────
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return
@@ -350,25 +333,9 @@ export default function MapParcelSelector({
       { position: 'topright' },
     ).addTo(map)
 
-    // Build overlay layers — direct browser requests, no proxy
+    // Build static tile overlays
     WMS_LAYER_DEFS.forEach(def => {
-      const layer: L.TileLayer | L.TileLayer.WMS = def.isTile
-        ? L.tileLayer(def.tileUrl!, { opacity: def.defaultOpacity, attribution: def.wmsOptions.attribution })
-        : createDirectWMS(def.wmsUrl, { ...def.wmsOptions, opacity: def.defaultOpacity })
-      // Error / load tracking
-      let errorFired = false
-      layer.on('tileerror', () => {
-        if (!errorFired) {
-          errorFired = true
-          setWmsLayerErrors(prev => ({ ...prev, [def.id]: true }))
-        }
-      })
-      layer.on('tileload', () => {
-        setWmsLayerErrors(prev => {
-          if (!prev[def.id]) return prev
-          return { ...prev, [def.id]: false }
-        })
-      })
+      const layer = L.tileLayer(def.tileUrl, { opacity: def.defaultOpacity })
       if (def.defaultVisible) layer.addTo(map)
       wmsLayerRefs.current.set(def.id, layer)
     })
@@ -429,6 +396,7 @@ export default function MapParcelSelector({
       mapRef.current = null
       drawnItemsRef.current = null
       wmsLayerRefs.current.clear()
+      if (overpassLayerRef.current) { overpassLayerRef.current.remove(); overpassLayerRef.current = null }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -449,6 +417,55 @@ export default function MapParcelSelector({
       }
     })
   }, [wmsLayerState])
+
+  // ── Overpass API farmland overlay ────────────────────────────────────────
+  const loadOverpassFarmland = useCallback(async () => {
+    const map = mapRef.current
+    if (!map || map.getZoom() < 12) return
+    const b = map.getBounds()
+    const s = b.getSouth().toFixed(5), w = b.getWest().toFixed(5)
+    const n = b.getNorth().toFixed(5), e = b.getEast().toFixed(5)
+    setOverpassLoading(true); setOverpassError(false)
+    try {
+      const q = `[out:json][timeout:15];(way["landuse"~"^(farmland|meadow|orchard|vineyard)$"](${s},${w},${n},${e}););out body;>;out skel qt;`
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        body: `data=${encodeURIComponent(q)}`,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json() as { elements: OsmEl[] }
+      if (overpassLayerRef.current) overpassLayerRef.current.remove()
+      overpassLayerRef.current = L.geoJSON(osmToGeoJSON(data.elements), {
+        style: { color: '#15803d', weight: 1.5, fillColor: '#4ade80', fillOpacity: overpassOpacityRef.current },
+        onEachFeature: (f, l) => {
+          const lu = (f.properties as Record<string, string>)?.landuse
+          if (lu) l.bindTooltip(lu, { sticky: true })
+        },
+      })
+      overpassLayerRef.current.addTo(map)
+    } catch { setOverpassError(true) }
+    finally { setOverpassLoading(false) }
+  }, [])
+
+  useEffect(() => {
+    overpassOpacityRef.current = overpassOpacity
+    overpassLayerRef.current?.setStyle({ fillOpacity: overpassOpacity })
+  }, [overpassOpacity])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    if (!overpassVisible) {
+      if (overpassLayerRef.current && map.hasLayer(overpassLayerRef.current))
+        map.removeLayer(overpassLayerRef.current)
+      return
+    }
+    if (map.getZoom() >= 12) void loadOverpassFarmland()
+    const onMoveEnd = () => { void loadOverpassFarmland() }
+    map.on('moveend', onMoveEnd)
+    return () => { map.off('moveend', onMoveEnd) }
+  }, [overpassVisible, loadOverpassFarmland])
 
   // ── Load parcels ────────────────────────────────────────────────────────
   const loadParcels = useCallback(async () => {
@@ -601,7 +618,7 @@ export default function MapParcelSelector({
 
   const deleteParcel = parcels.find(p => p.id === deleteId)
   const isModal = mode === 'modal'
-  const activeLayerCount = Object.values(wmsLayerState).filter(s => s.visible).length
+  const activeLayerCount = Object.values(wmsLayerState).filter(s => s.visible).length + (overpassVisible ? 1 : 0)
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
@@ -673,65 +690,78 @@ export default function MapParcelSelector({
               </div>
 
               <div className="divide-y divide-gray-100">
+                {/* ── OSM Farmland via Overpass API ── */}
+                <div className={`p-3 transition-colors ${overpassVisible ? 'bg-green-50' : 'bg-white'}`}>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setOverpassVisible(v => !v)}
+                      className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${overpassVisible ? 'bg-green-500' : 'bg-gray-200'}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${overpassVisible ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0 bg-green-500" />
+                        <span className={`text-sm font-medium ${overpassVisible ? 'text-green-700' : 'text-gray-700'}`}>
+                          Parcele agricole OSM
+                        </span>
+                        {overpassLoading && (
+                          <span className="inline-block w-3 h-3 border border-green-500 border-t-transparent rounded-full animate-spin" />
+                        )}
+                        {overpassError && overpassVisible && (
+                          <span className="text-[10px] bg-red-100 text-red-600 border border-red-200 px-1 py-0.5 rounded font-medium">eroare</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">OpenStreetMap farmland · zoom ≥ 12</div>
+                    </div>
+                  </div>
+                  {overpassVisible && (
+                    <div className="mt-2.5 flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-16 flex-shrink-0">Opacitate</span>
+                      <input type="range" min={10} max={100}
+                        value={Math.round(overpassOpacity * 100)}
+                        onChange={e => setOverpassOpacity(parseInt(e.target.value) / 100)}
+                        className="flex-1 h-1.5 accent-green-500" />
+                      <span className="text-xs text-gray-500 w-8 text-right">{Math.round(overpassOpacity * 100)}%</span>
+                    </div>
+                  )}
+                  {overpassError && overpassVisible && (
+                    <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 flex items-start gap-1.5">
+                      <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                      <span>Eroare la incarcarea datelor OSM. Incercati din nou sau mutati harta.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Static tile overlays (ESRI etc.) ── */}
                 {WMS_LAYER_DEFS.map(def => {
                   const state = wmsLayerState[def.id]
-                  const hasError = wmsLayerErrors[def.id]
                   const c = layerColors(def.color)
                   return (
                     <div key={def.id} className={`p-3 transition-colors ${state.visible ? c.bg : 'bg-white'}`}>
-                      {/* Toggle row */}
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => toggleWmsLayer(def.id)}
-                          className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
-                            state.visible ? c.toggle : 'bg-gray-200'
-                          }`}
-                          title={state.visible ? 'Dezactiveaza' : 'Activeaza'}
+                          className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${state.visible ? c.toggle : 'bg-gray-200'}`}
                         >
-                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                            state.visible ? 'translate-x-4' : 'translate-x-0.5'
-                          }`} />
+                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${state.visible ? 'translate-x-4' : 'translate-x-0.5'}`} />
                         </button>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5">
                             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${c.dot}`} />
-                            <span className={`text-sm font-medium ${state.visible ? c.text : 'text-gray-700'}`}>
-                              {def.label}
-                            </span>
-                            {hasError && state.visible && (
-                              <span className="text-[10px] bg-red-100 text-red-600 border border-red-200 px-1 py-0.5 rounded font-medium">
-                                indisponibil
-                              </span>
-                            )}
+                            <span className={`text-sm font-medium ${state.visible ? c.text : 'text-gray-700'}`}>{def.label}</span>
                           </div>
                           <div className="text-xs text-gray-500 mt-0.5 truncate">{def.sublabel}</div>
                         </div>
                       </div>
-
-                      {/* Opacity slider */}
                       {state.visible && (
                         <div className="mt-2.5 flex items-center gap-2">
                           <span className="text-xs text-gray-500 w-16 flex-shrink-0">Opacitate</span>
-                          <input
-                            type="range" min={10} max={100}
+                          <input type="range" min={10} max={100}
                             value={Math.round(state.opacity * 100)}
                             onChange={e => setWmsOpacity(def.id, parseInt(e.target.value) / 100)}
-                            className="flex-1 h-1.5 accent-indigo-500"
-                          />
-                          <span className="text-xs text-gray-500 w-8 text-right">
-                            {Math.round(state.opacity * 100)}%
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Error hint */}
-                      {hasError && state.visible && (
-                        <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 flex items-start gap-1.5">
-                          <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                          <span>
-                            Serviciul WMS poate fi indisponibil.
-                            {def.minZoom && ` Vizibil de la zoom ${def.minZoom}.`}
-                          </span>
+                            className="flex-1 h-1.5 accent-indigo-500" />
+                          <span className="text-xs text-gray-500 w-8 text-right">{Math.round(state.opacity * 100)}%</span>
                         </div>
                       )}
                     </div>
@@ -739,12 +769,11 @@ export default function MapParcelSelector({
                 })}
               </div>
 
-              <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500 space-y-0.5">
+              <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
                 <p className="flex items-center gap-1">
                   <Info className="w-3 h-3 flex-shrink-0" />
-                  APIA/ANCPI necesita zoom 12–15 pentru vizibilitate optima.
+                  Date agricole din OpenStreetMap — vizibile de la zoom 12.
                 </p>
-                <p>Toate cererile WMS trec prin proxy server (bypass CORS).</p>
               </div>
             </div>
           )}
