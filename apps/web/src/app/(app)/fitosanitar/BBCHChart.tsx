@@ -359,7 +359,6 @@ export function BBCHChart({ initialCultura = 'Grâu', highlightCode, onSelectCod
                             isHighlighted ? 'bg-yellow-50 border-l-2 border-yellow-400' : ''
                           }`}
                           onClick={() => {
-                            setHoveredStage(stage)
                             onSelectCode?.(stage.code, stage.descriere)
                           }}
                         >
