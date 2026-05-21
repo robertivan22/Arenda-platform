@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, UserCircle, Settings,
+  BarChart3, ChevronDown, X, FileSpreadsheet, UserCircle, Settings, Leaf,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -53,6 +53,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Istoric declarații',  href: '/declaratii/istoric' },
     ],
   },
+  { label: 'Registru Fitosanitar', href: '/fitosanitar', icon: Leaf, permKey: 'can_declaratii' },
   { label: 'Setari', href: '/setari', icon: Settings, permKey: 'can_setari' },
 ]
 

@@ -69,7 +69,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/plati') ||
     pathname.startsWith('/rapoarte') ||
     pathname.startsWith('/declaratii') ||
-    pathname.startsWith('/profil')
+    pathname.startsWith('/profil') ||
+    pathname.startsWith('/fitosanitar') ||
+    pathname.startsWith('/setari') ||
+    pathname.startsWith('/admin-cp') ||
+    pathname.startsWith('/print')
 
   if (!user && isAppPage) {
     // Not logged in — redirect to login
