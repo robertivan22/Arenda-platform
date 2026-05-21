@@ -26,6 +26,7 @@ interface Permissions {
   can_facturi: boolean
   can_rapoarte: boolean
   can_declaratii: boolean
+  can_fitosanitar: boolean
   can_setari: boolean
 }
 
@@ -42,21 +43,22 @@ type DocType = 'CONTRACT' | 'FACTURA' | 'AVIZ'
 
 // ─── Permission field labels ──────────────────────────────────────────────────
 const PERM_FIELDS: { key: keyof Omit<Permissions, 'user_id'>; label: string }[] = [
-  { key: 'can_dashboard',  label: 'Dashboard' },
-  { key: 'can_arendasi',   label: 'Arendași' },
-  { key: 'can_contracte',  label: 'Contracte' },
-  { key: 'can_parcele',    label: 'Parcele' },
-  { key: 'can_tranzactii', label: 'Tranzacții' },
-  { key: 'can_facturi',    label: 'Facturi & Avize' },
-  { key: 'can_rapoarte',   label: 'Rapoarte' },
-  { key: 'can_declaratii', label: 'Declarații' },
-  { key: 'can_setari',     label: 'Setări' },
+  { key: 'can_dashboard',    label: 'Dashboard' },
+  { key: 'can_arendasi',     label: 'Arendași' },
+  { key: 'can_contracte',    label: 'Contracte' },
+  { key: 'can_parcele',      label: 'Parcele' },
+  { key: 'can_tranzactii',   label: 'Tranzacții' },
+  { key: 'can_facturi',      label: 'Facturi & Avize' },
+  { key: 'can_rapoarte',     label: 'Rapoarte' },
+  { key: 'can_declaratii',   label: 'Declarații' },
+  { key: 'can_fitosanitar',  label: 'Registru Fitosanitar' },
+  { key: 'can_setari',       label: 'Setări' },
 ]
 
 const DEFAULT_PERMS: Omit<Permissions, 'user_id'> = {
   can_dashboard: true, can_arendasi: true, can_contracte: true,
   can_parcele: true, can_tranzactii: true, can_facturi: true,
-  can_rapoarte: true, can_declaratii: true, can_setari: true,
+  can_rapoarte: true, can_declaratii: true, can_fitosanitar: true, can_setari: true,
 }
 
 // (PLACEHOLDERS and STARTER_HTML removed — templates now use form-based JSON config)

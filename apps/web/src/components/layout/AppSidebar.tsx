@@ -53,7 +53,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Istoric declarații',  href: '/declaratii/istoric' },
     ],
   },
-  { label: 'Registru Fitosanitar', href: '/fitosanitar', icon: Leaf, permKey: 'can_declaratii' },
+  { label: 'Registru Fitosanitar', href: '/fitosanitar', icon: Leaf, permKey: 'can_fitosanitar' },
   { label: 'Setari', href: '/setari', icon: Settings, permKey: 'can_setari' },
 ]
 
