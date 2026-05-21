@@ -5,7 +5,7 @@ import { X, AlertTriangle, CheckCircle, Leaf } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
-  RegistruFitosanitar, FitosanitarFormData, TipAgent, UnitateDoza, UnitateCantitate,
+  RegistruFitosanitar, FitosanitarFormData, TipAgent, UnitateDoza, UnitateCantitate, MetodaAplicare,
   CULTURA_OPTIONS, JUDETE_ROMANIA, TIP_AGENT_LABELS, getBBCHForCultura, formatDateRO,
 } from '@/lib/bbch-data'
 import { BBCHSelector } from './BBCHChart'
@@ -21,33 +21,44 @@ interface FitosanitarModalProps {
 
 const EMPTY_FORM: FitosanitarFormData = {
   data_tratament: '',
+  ora_tratament: null,
   cultura: 'Grâu',
   parcela_id: null,
   locul_terenului: '',
   nr_parcela: null,
   judet: null,
+  cod_lpis_parcela: null,
+  nr_bloc_fizic: null,
   bbch_code: '',
   bbch_descriere: '',
   tip_agent: 'boala',
   agent_daunare: '',
   denumire_produs: '',
-  substanta_activa: null,
-  nr_omologare: null,
+  substanta_activa: '',
+  nr_omologare: '',
   doza_omologata_min: null,
   doza_omologata_max: null,
   doza_folosita: 0,
   unitate_doza: 'l/ha',
+  metoda_aplicare: 'stropire',
+  volum_apa_lha: null,
   suprafata_tratata: 0,
   cantitate_utilizata: 0,
   unitate_cantitate: 'litri',
   nume_prenume_responsabil: '',
+  nr_certificat_utilizator: null,
   semnatura_url: null,
   data_incepere_recoltare: null,
   phi_zile: null,
   numar_document: null,
   data_document: null,
   conditii_meteo: null,
+  temperatura_aplicare_c: null,
+  viteza_vant_max_ms: null,
+  umiditate_relativa_pct: null,
   echipament_utilizat: null,
+  nr_certificat_inspectie: null,
+  data_inspectie_echipament: null,
   observatii: null,
 }
 
@@ -56,10 +67,13 @@ type FormErrors = Partial<Record<keyof FitosanitarFormData, string>>
 // Form state uses string inputs (convert to numbers on save)
 interface FormState {
   data_tratament: string
+  ora_tratament: string
   cultura: string
   locul_terenului: string
   nr_parcela: string
   judet: string
+  cod_lpis_parcela: string
+  nr_bloc_fizic: string
   bbch_code: string
   bbch_descriere: string
   tip_agent: TipAgent | ''
@@ -71,25 +85,36 @@ interface FormState {
   doza_omologata_max: string
   doza_folosita: string
   unitate_doza: UnitateDoza
+  metoda_aplicare: MetodaAplicare
+  volum_apa_lha: string
   suprafata_tratata: string
   cantitate_utilizata: string
   unitate_cantitate: UnitateCantitate
-  nume_prenume_responsabil: string
+  nome_prenume_responsabil: string
+  nr_certificat_utilizator: string
   data_incepere_recoltare: string
   numar_document: string
   data_document: string
   conditii_meteo: string
+  temperatura_aplicare_c: string
+  viteza_vant_max_ms: string
+  umiditate_relativa_pct: string
   echipament_utilizat: string
+  nr_certificat_inspectie: string
+  data_inspectie_echipament: string
   observatii: string
 }
 
 function entryToFormState(e: RegistruFitosanitar): FormState {
   return {
     data_tratament: e.data_tratament ?? '',
+    ora_tratament: e.ora_tratament ?? '',
     cultura: e.cultura ?? 'Grâu',
     locul_terenului: e.locul_terenului ?? '',
     nr_parcela: e.nr_parcela ?? '',
     judet: e.judet ?? '',
+    cod_lpis_parcela: e.cod_lpis_parcela ?? '',
+    nr_bloc_fizic: e.nr_bloc_fizic ?? '',
     bbch_code: e.bbch_code ?? '',
     bbch_descriere: e.bbch_descriere ?? '',
     tip_agent: e.tip_agent ?? '',
@@ -101,28 +126,40 @@ function entryToFormState(e: RegistruFitosanitar): FormState {
     doza_omologata_max: e.doza_omologata_max?.toString() ?? '',
     doza_folosita: e.doza_folosita?.toString() ?? '',
     unitate_doza: e.unitate_doza ?? 'l/ha',
+    metoda_aplicare: e.metoda_aplicare ?? 'stropire',
+    volum_apa_lha: e.volum_apa_lha?.toString() ?? '',
     suprafata_tratata: e.suprafata_tratata?.toString() ?? '',
     cantitate_utilizata: e.cantitate_utilizata?.toString() ?? '',
     unitate_cantitate: e.unitate_cantitate ?? 'litri',
-    nume_prenume_responsabil: e.nume_prenume_responsabil ?? '',
+    nome_prenume_responsabil: e.nume_prenume_responsabil ?? '',
+    nr_certificat_utilizator: e.nr_certificat_utilizator ?? '',
     data_incepere_recoltare: e.data_incepere_recoltare ?? '',
     numar_document: e.numar_document ?? '',
     data_document: e.data_document ?? '',
     conditii_meteo: e.conditii_meteo ?? '',
+    temperatura_aplicare_c: e.temperatura_aplicare_c?.toString() ?? '',
+    viteza_vant_max_ms: e.viteza_vant_max_ms?.toString() ?? '',
+    umiditate_relativa_pct: e.umiditate_relativa_pct?.toString() ?? '',
     echipament_utilizat: e.echipament_utilizat ?? '',
+    nr_certificat_inspectie: e.nr_certificat_inspectie ?? '',
+    data_inspectie_echipament: e.data_inspectie_echipament ?? '',
     observatii: e.observatii ?? '',
   }
 }
 
 const emptyFormState: FormState = {
-  data_tratament: '', cultura: 'Grâu', locul_terenului: '', nr_parcela: '', judet: '',
+  data_tratament: '', ora_tratament: '', cultura: 'Grâu', locul_terenului: '',
+  nr_parcela: '', judet: '', cod_lpis_parcela: '', nr_bloc_fizic: '',
   bbch_code: '', bbch_descriere: '', tip_agent: '', agent_daunare: '',
   denumire_produs: '', substanta_activa: '', nr_omologare: '',
-  doza_omologata_min: '', doza_omologata_max: '', doza_folosita: '', unitate_doza: 'l/ha',
+  doza_omologata_min: '', doza_omologata_max: '', doza_folosita: '',
+  unitate_doza: 'l/ha', metoda_aplicare: 'stropire', volum_apa_lha: '',
   suprafata_tratata: '', cantitate_utilizata: '', unitate_cantitate: 'litri',
-  nume_prenume_responsabil: '', data_incepere_recoltare: '',
+  nome_prenume_responsabil: '', nr_certificat_utilizator: '', data_incepere_recoltare: '',
   numar_document: '', data_document: '',
-  conditii_meteo: '', echipament_utilizat: '', observatii: '',
+  conditii_meteo: '', temperatura_aplicare_c: '', viteza_vant_max_ms: '',
+  umiditate_relativa_pct: '', echipament_utilizat: '',
+  nr_certificat_inspectie: '', data_inspectie_echipament: '', observatii: '',
 }
 
 export function FitosanitarModal({ mode, initialData, onClose, onSaved }: FitosanitarModalProps) {
@@ -184,6 +221,8 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
     if (!form.tip_agent) e.tip_agent = 'Tipul agentului de dăunare este obligatoriu.'
     if (!form.agent_daunare.trim()) e.agent_daunare = 'Denumirea agentului de dăunare este obligatorie.'
     if (!form.denumire_produs.trim()) e.denumire_produs = 'Denumirea produsului PPP este obligatorie.'
+    if (!form.substanta_activa.trim()) e.substanta_activa = 'Substanța activă este obligatorie (DIR 2009/128/CE).'
+    if (!form.nr_omologare.trim()) e.nr_omologare = 'Nr. de omologare este obligatoriu (DIR 2009/128/CE).'
     if (!form.doza_folosita || parseFloat(form.doza_folosita) <= 0) {
       e.doza_folosita = 'Doza folosită trebuie să fie mai mare decât 0.'
     }
@@ -230,31 +269,40 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
     const payload = {
       user_id: user.id,
       data_tratament: form.data_tratament,
+      ora_tratament: form.ora_tratament || null,
       cultura: form.cultura,
       locul_terenului: form.locul_terenului.trim(),
       nr_parcela: form.nr_parcela.trim() || null,
       judet: form.judet || null,
+      cod_lpis_parcela: form.cod_lpis_parcela.trim() || null,
+      nr_bloc_fizic: form.nr_bloc_fizic.trim() || null,
       bbch_code: form.bbch_code,
       bbch_descriere: form.bbch_descriere,
       tip_agent: form.tip_agent as TipAgent,
       agent_daunare: form.agent_daunare.trim(),
       denumire_produs: form.denumire_produs.trim(),
-      substanta_activa: form.substanta_activa.trim() || null,
-      nr_omologare: form.nr_omologare.trim() || null,
+      substanta_activa: form.substanta_activa.trim(),
+      nr_omologare: form.nr_omologare.trim(),
       doza_omologata_min: form.doza_omologata_min ? parseFloat(form.doza_omologata_min) : null,
       doza_omologata_max: form.doza_omologata_max ? parseFloat(form.doza_omologata_max) : null,
       doza_folosita: parseFloat(form.doza_folosita),
       unitate_doza: form.unitate_doza,
+      metoda_aplicare: form.metoda_aplicare,
+      volum_apa_lha: form.volum_apa_lha ? parseFloat(form.volum_apa_lha) : null,
       suprafata_tratata: parseFloat(form.suprafata_tratata),
       cantitate_utilizata: parseFloat(form.cantitate_utilizata),
       unitate_cantitate: form.unitate_cantitate,
-      nume_prenume_responsabil: form.nume_prenume_responsabil.trim(),
-      data_incepere_recoltare: form.data_incepere_recoltare || null,
+      nume_prenume_responsabil: form.nume_prenume_responsabil.trim(),      nr_certificat_utilizator: form.nr_certificat_utilizator.trim() || null,      data_incepere_recoltare: form.data_incepere_recoltare || null,
       phi_zile: phi,
       numar_document: form.numar_document.trim() || null,
       data_document: form.data_document || null,
       conditii_meteo: form.conditii_meteo.trim() || null,
+      temperatura_aplicare_c: form.temperatura_aplicare_c ? parseFloat(form.temperatura_aplicare_c) : null,
+      viteza_vant_max_ms: form.viteza_vant_max_ms ? parseFloat(form.viteza_vant_max_ms) : null,
+      umiditate_relativa_pct: form.umiditate_relativa_pct ? parseFloat(form.umiditate_relativa_pct) : null,
       echipament_utilizat: form.echipament_utilizat.trim() || null,
+      nr_certificat_inspectie: form.nr_certificat_inspectie.trim() || null,
+      data_inspectie_echipament: form.data_inspectie_echipament || null,
       observatii: isCorrect
         ? `Corectare a înregistrării #${initialData?.numar_inregistrare ?? '?'}. ${form.observatii}`.trim()
         : form.observatii.trim() || null,
@@ -433,6 +481,27 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
                   />
                 </div>
                 <div>
+                  <label className={labelCls}>Cod LPIS / Bloc Fizic APIA <span className="text-blue-500 font-normal">[OUG53]</span></label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Cod LPIS"
+                      value={form.cod_lpis_parcela ?? ''}
+                      onChange={e => set('cod_lpis_parcela', e.target.value)}
+                      disabled={isView}
+                      className={`flex-1 ${inputCls('cod_lpis_parcela')}`}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Nr. bloc fizic"
+                      value={form.nr_bloc_fizic ?? ''}
+                      onChange={e => set('nr_bloc_fizic', e.target.value)}
+                      disabled={isView}
+                      className={`flex-1 ${inputCls('nr_bloc_fizic')}`}
+                    />
+                  </div>
+                </div>
+                <div>
                   <label className={labelCls}>Suprafață tratată (ha) *</label>
                   <input
                     type="number"
@@ -520,7 +589,7 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
                   {errors.denumire_produs && <p className={errCls}>{errors.denumire_produs}</p>}
                 </div>
                 <div>
-                  <label className={labelCls}>Substanța activă</label>
+                  <label className={labelCls}>Substanța activă * <span className="text-blue-500 font-normal">[DIR 2009]</span></label>
                   <input
                     type="text"
                     placeholder="Ex: Tebuconazole, Spiroxamine"
@@ -529,9 +598,10 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
                     disabled={isView}
                     className={inputCls('substanta_activa')}
                   />
+                  {errors.substanta_activa && <p className={errCls}>{errors.substanta_activa}</p>}
                 </div>
                 <div>
-                  <label className={labelCls}>Nr. omologare</label>
+                  <label className={labelCls}>Nr. omologare * <span className="text-blue-500 font-normal">[DIR 2009]</span></label>
                   <input
                     type="text"
                     placeholder="Ex: RO/0000123"
@@ -540,6 +610,7 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
                     disabled={isView}
                     className={inputCls('nr_omologare')}
                   />
+                  {errors.nr_omologare && <p className={errCls}>{errors.nr_omologare}</p>}
                 </div>
 
                 {/* Dose fields */}
@@ -597,11 +668,38 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
                     </div>
                   )}
                 </div>
+
+                {/* Metoda aplicare + volum apa */}
+                <div>
+                  <label className={labelCls}>Metoda de aplicare * <span className="text-blue-500 font-normal">[DIR 2009/OUG53]</span></label>
+                  <select
+                    value={form.metoda_aplicare}
+                    onChange={e => set('metoda_aplicare', e.target.value as MetodaAplicare)}
+                    disabled={isView}
+                    className={inputCls('metoda_aplicare')}
+                  >
+                    <option value="stropire">Stropire</option>
+                    <option value="pulverizare">Pulverizare</option>
+                    <option value="prafuire">Prăfuire</option>
+                    <option value="granule">Granule (aplicare la sol)</option>
+                    <option value="injectare">Injectare în sol</option>
+                    <option value="tratament_samanta">Tratament sămânță</option>
+                    <option value="altele">Altele</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Volum apă utilizat (l/ha) <span className="text-gray-400 font-normal">[DIR 2009]</span></label>
+                  <input
+                    type="number" step="1" min="0"
+                    placeholder="Ex: 300"
+                    value={form.volum_apa_lha ?? ''}
+                    onChange={e => set('volum_apa_lha', e.target.value)}
+                    disabled={isView}
+                    className={inputCls('volum_apa_lha')}
+                  />
+                </div>
               </div>
             </div>
-
-            {/* ─── Section 6: Cantitate ──────────────────────────────────── */}
-            <div>
               <SectionHeader num={6} title="Cantitate Utilizată" />
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -669,8 +767,17 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
                 {errors.nume_prenume_responsabil && (
                   <p className={errCls}>{errors.nume_prenume_responsabil}</p>
                 )}
-              </div>
-            </div>
+              </div>              <div className="mt-3">
+                <label className={labelCls}>Nr. certificat utilizator profesional <span className="text-blue-500 font-normal">[DIR 2009 Art.5]</span></label>
+                <input
+                  type="text"
+                  placeholder="Ex: AP-2025-001234"
+                  value={form.nr_certificat_utilizator ?? ''}
+                  onChange={e => set('nr_certificat_utilizator', e.target.value)}
+                  disabled={isView}
+                  className={inputCls('nr_certificat_utilizator')}
+                />
+              </div>            </div>
 
             {/* ─── Section 8: Recoltare și Documente ───────────────────── */}
             <div>
@@ -727,15 +834,15 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
               </div>
             </div>
 
-            {/* ─── Section 9: Informații suplimentare ───────────────────── */}
+            {/* ─── Section 9: Condiții meteo și Echipament ───────────────── */}
             <div>
-              <SectionHeader num={9} title="Informații Suplimentare (Opțional)" />
+              <SectionHeader num={9} title="Condiții Meteo și Echipament" />
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={labelCls}>Condiții meteo la aplicare</label>
+                  <label className={labelCls}>Descriere generală meteo</label>
                   <input
                     type="text"
-                    placeholder="Ex: Parțial noros, 18°C, vânt slab"
+                    placeholder="Ex: Parțial noros, vânt slab"
                     value={form.conditii_meteo ?? ''}
                     onChange={e => set('conditii_meteo', e.target.value)}
                     disabled={isView}
@@ -743,7 +850,43 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
                   />
                 </div>
                 <div>
-                  <label className={labelCls}>Echipament utilizat</label>
+                  <label className={labelCls}>Temperatură (°C) <span className="text-blue-500 font-normal">[DIR 2009]</span></label>
+                  <input
+                    type="number" step="0.1"
+                    placeholder="Ex: 18.5"
+                    value={form.temperatura_aplicare_c ?? ''}
+                    onChange={e => set('temperatura_aplicare_c', e.target.value)}
+                    disabled={isView}
+                    className={inputCls('temperatura_aplicare_c')}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Viteză max. vânt (m/s) <span className="text-blue-500 font-normal">[DIR 2009]</span></label>
+                  <input
+                    type="number" step="0.1" min="0"
+                    placeholder="Ex: 3.5"
+                    value={form.viteza_vant_max_ms ?? ''}
+                    onChange={e => set('viteza_vant_max_ms', e.target.value)}
+                    disabled={isView}
+                    className={inputCls('viteza_vant_max_ms')}
+                  />
+                  {form.viteza_vant_max_ms && parseFloat(form.viteza_vant_max_ms) > 5 && (
+                    <p className="text-xs text-orange-600 mt-0.5">⚠️ Viteză peste 5 m/s — verificați restricțiile produsului.</p>
+                  )}
+                </div>
+                <div>
+                  <label className={labelCls}>Umiditate relativă (%)</label>
+                  <input
+                    type="number" step="1" min="0" max="100"
+                    placeholder="Ex: 65"
+                    value={form.umiditate_relativa_pct ?? ''}
+                    onChange={e => set('umiditate_relativa_pct', e.target.value)}
+                    disabled={isView}
+                    className={inputCls('umiditate_relativa_pct')}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Echipament utilizat <span className="text-gray-400 font-normal">[DIR 2009 Art.8]</span></label>
                   <input
                     type="text"
                     placeholder="Ex: Pulverizator autopropulsat 3000 L"
@@ -751,6 +894,27 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
                     onChange={e => set('echipament_utilizat', e.target.value)}
                     disabled={isView}
                     className={inputCls('echipament_utilizat')}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Nr. certificat inspecție echipament <span className="text-blue-500 font-normal">[DIR 2009]</span></label>
+                  <input
+                    type="text"
+                    placeholder="Ex: INS-2024-00456"
+                    value={form.nr_certificat_inspectie ?? ''}
+                    onChange={e => set('nr_certificat_inspectie', e.target.value)}
+                    disabled={isView}
+                    className={inputCls('nr_certificat_inspectie')}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Data ultimei inspecții <span className="text-blue-500 font-normal">[DIR 2009]</span></label>
+                  <input
+                    type="date"
+                    value={form.data_inspectie_echipament ?? ''}
+                    onChange={e => set('data_inspectie_echipament', e.target.value)}
+                    disabled={isView}
+                    className={inputCls('data_inspectie_echipament')}
                   />
                 </div>
                 <div className="col-span-2">
@@ -772,7 +936,7 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
           {!isView && (
             <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
               <p className="text-xs text-gray-500">
-                * Câmpuri obligatorii · Înregistrările sunt imutabile (OG 4/1995)
+                * Câmpuri obligatorii · Înregistrările sunt imutabile (OG 4/1995 · OUG 53/2025)
               </p>
               <div className="flex gap-3">
                 <button

@@ -178,6 +178,7 @@ export const JUDETE_ROMANIA = [
 export type TipAgent = 'boala' | 'daunator' | 'buruiana' | 'mixt'
 export type UnitateDoza = 'l/ha' | 'kg/ha' | 'g/ha' | 'ml/ha'
 export type UnitateCantitate = 'litri' | 'kg'
+export type MetodaAplicare = 'stropire' | 'pulverizare' | 'prafuire' | 'granule' | 'injectare' | 'tratament_samanta' | 'altele'
 
 // ─── DB row type (mirrors registru_fitosanitar table) ─────────────────────────
 export interface RegistruFitosanitar {
@@ -187,33 +188,46 @@ export interface RegistruFitosanitar {
   created_at: string
   updated_at: string
   data_tratament: string
+  ora_tratament?: string | null           // [OUG53] HH:MM
   cultura: string
   parcela_id?: string | null
   locul_terenului: string
   nr_parcela?: string | null
   judet?: string | null
+  cod_lpis_parcela?: string | null        // [OUG53]
+  nr_bloc_fizic?: string | null           // [OUG53]
   bbch_code: string
   bbch_descriere: string
   tip_agent: TipAgent
   agent_daunare: string
   denumire_produs: string
-  substanta_activa?: string | null
-  nr_omologare?: string | null
+  substanta_activa: string               // [DIR2009] NOT NULL
+  nr_omologare: string                   // [DIR2009] NOT NULL
   doza_omologata_min?: number | null
   doza_omologata_max?: number | null
   doza_folosita: number
   unitate_doza: UnitateDoza
+  metoda_aplicare: MetodaAplicare         // [DIR2009/OUG53]
+  volum_apa_lha?: number | null           // [DIR2009]
   suprafata_tratata: number
   cantitate_utilizata: number
   unitate_cantitate: UnitateCantitate
   nume_prenume_responsabil: string
+  nr_certificat_utilizator?: string | null  // [DIR2009 Art.5]
   semnatura_url?: string | null
   data_incepere_recoltare?: string | null
   phi_zile?: number | null
   numar_document?: string | null
   data_document?: string | null
   conditii_meteo?: string | null
+  temperatura_aplicare_c?: number | null
+  viteza_vant_max_ms?: number | null
+  umiditate_relativa_pct?: number | null
   echipament_utilizat?: string | null
+  nr_certificat_inspectie?: string | null
+  data_inspectie_echipament?: string | null
+  an_registru?: number
+  exportat_anf_at?: string | null
   observatii?: string | null
   is_deleted: boolean
   deleted_at?: string | null
