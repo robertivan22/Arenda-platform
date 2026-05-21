@@ -56,14 +56,16 @@ function generateANFPdf(
     doc.rect(margin, infoY, labelColW, 4, 'F')
     doc.setTextColor(180, 30, 30)
     doc.setFont('helvetica', 'bold')
-    doc.text(label, margin + 1, infoY + 2.5, { maxWidth: labelColW - 2, fontSize: 7 })
+    doc.setFontSize(7)
+    doc.text(label, margin + 1, infoY + 2.5, { maxWidth: labelColW - 2 })
 
     // Value cell
     doc.setFillColor(255, 255, 255)
     doc.rect(margin + labelColW, infoY, valueColW, 4, 'F')
     doc.setTextColor(0, 0, 0)
     doc.setFont('helvetica', 'normal')
-    doc.text(value, margin + labelColW + 1, infoY + 2.5, { maxWidth: valueColW - 2, fontSize: 7 })
+    doc.setFontSize(7)
+    doc.text(value, margin + labelColW + 1, infoY + 2.5, { maxWidth: valueColW - 2 })
 
     infoY += 4
   }
