@@ -20,6 +20,8 @@ function generateANFPdf(
 ) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+  const margin = 10
 
   const now = new Date()
   const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
@@ -30,48 +32,59 @@ function generateANFPdf(
   doc.setTextColor(0, 0, 0)
   doc.text(
     'Registrul de evidență a tratamentelor cu produse de protecție a plantelor',
-    pageW / 2, 14, { align: 'center' },
+    pageW / 2, margin + 5, { align: 'center' },
   )
 
-  // ── Info block ─────────────────────────────────────────────────────────────
-  const labelColor: [number, number, number] = [180, 30, 30]
-  const infoRows: [string, string][] = [
+  // ── Info block (simple table format) ────────────────────────────────────────
+  const labelColW = 80
+  const valueColW = pageW - 2 * margin - labelColW
+  let infoY = margin + 12
+
+  const infoRows = [
     ['Nume si prenume persoana juridică/PFA/II/IF/PF', user.name || ''],
-    ['Domiciliu persoana juridică/PFA/II/IF/PF', user.address || ',,,'],
+    ['Domiciliu persoana juridică/PFA/II/IF/PF', user.address || ''],
     ['Denumire spațiu/suprafață', ''],
     ['Data generare', dateStr],
   ]
-  let y = 22
+
+  doc.setFontSize(7)
+  doc.setFont('helvetica', 'normal')
+
   for (const [label, value] of infoRows) {
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...labelColor)
-    doc.text(label, 14, y)
+    // Label cell
+    doc.setFillColor(240, 240, 240)
+    doc.rect(margin, infoY, labelColW, 4, 'F')
+    doc.setTextColor(180, 30, 30)
+    doc.setFont('helvetica', 'bold')
+    doc.text(label, margin + 1, infoY + 2.5, { maxWidth: labelColW - 2, fontSize: 7 })
+
+    // Value cell
+    doc.setFillColor(255, 255, 255)
+    doc.rect(margin + labelColW, infoY, valueColW, 4, 'F')
     doc.setTextColor(0, 0, 0)
-    doc.text(value, 100, y)
-    y += 6
+    doc.setFont('helvetica', 'normal')
+    doc.text(value, margin + labelColW + 1, infoY + 2.5, { maxWidth: valueColW - 2, fontSize: 7 })
+
+    infoY += 4
   }
 
   // ── Table ──────────────────────────────────────────────────────────────────
   autoTable(doc, {
-    startY: y + 2,
+    startY: infoY + 2,
     head: [
       [
-        { content: 'Tipul utilizării', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-        { content: 'Produsul de protecție a plantelor utilizat', colSpan: 6, styles: { halign: 'center' } },
-        { content: 'Momentul utilizării', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-        { content: 'Dimensiunea sau volumul zonei sau unității tratate', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-        { content: 'Localizarea sau identificarea zonei sau a unităților tratate', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-        { content: 'Observații', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-        { content: 'Dată', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-      ],
-      [
-        { content: 'Denumire', styles: { halign: 'center' } },
-        { content: 'Substanță activă', styles: { halign: 'center' } },
-        { content: 'Doză de aplicare', styles: { halign: 'center' } },
-        { content: 'Cultura sau situația/utilizarea terenului', styles: { halign: 'center' } },
-        { content: 'Organismul dăunător', styles: { halign: 'center' } },
-        { content: 'Cantitate produs de protecție a plantelor utilizată', styles: { halign: 'center' } },
+        'Tipul utilizării',
+        'Denumire',
+        'Substanță activă',
+        'Doză de aplicare',
+        'Cultura / Locul terenului',
+        'Organism dăunător',
+        'Cantitate utilizată',
+        'Momentul utilizării',
+        'Suprafață (ha)',
+        'Localizare',
+        'Observații',
+        'Dată',
       ],
     ],
     body: entries.map(row => [
@@ -81,31 +94,57 @@ function generateANFPdf(
       `${row.doza_folosita} ${row.unitate_doza}`,
       row.cultura + (row.locul_terenului ? ` / ${row.locul_terenului}` : ''),
       row.agent_daunare,
-      `${row.cantitate_utilizata} ${row.unitate_cantitate === 'litri' ? 'L' : 'kg'}`,
+      `${row.cantitate_utilizata}${row.unitate_cantitate === 'litri' ? 'L' : 'kg'}`,
       formatDateRO(row.data_tratament) + (row.ora_tratament ? ` ${row.ora_tratament}` : ''),
-      `${row.suprafata_tratata} ha`,
+      row.suprafata_tratata.toString(),
       row.locul_terenului ?? '',
       row.observatii ?? '',
       formatDateRO(row.data_tratament),
     ]),
-    styles: { fontSize: 7, cellPadding: 1.5, overflow: 'linebreak' },
-    headStyles: { fillColor: [30, 95, 164], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+    styles: {
+      fontSize: 6,
+      cellPadding: 1,
+      overflow: 'linebreak',
+      halign: 'left',
+      valign: 'top',
+    },
+    headStyles: {
+      fillColor: [30, 95, 164],
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 6,
+      halign: 'center',
+      valign: 'middle',
+      cellPadding: 1.5,
+    },
     alternateRowStyles: { fillColor: [245, 248, 252] },
     columnStyles: {
-      0: { cellWidth: 30 },
-      1: { cellWidth: 24 },
-      2: { cellWidth: 20 },
-      3: { cellWidth: 14 },
-      4: { cellWidth: 24 },
-      5: { cellWidth: 18 },
-      6: { cellWidth: 18 },
-      7: { cellWidth: 18 },
-      8: { cellWidth: 14 },
-      9: { cellWidth: 22 },
+      0: { cellWidth: 28 },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 18 },
+      3: { cellWidth: 15 },
+      4: { cellWidth: 28 },
+      5: { cellWidth: 20 },
+      6: { cellWidth: 16 },
+      7: { cellWidth: 20 },
+      8: { cellWidth: 12 },
+      9: { cellWidth: 20 },
       10: { cellWidth: 16 },
-      11: { cellWidth: 14 },
+      11: { cellWidth: 15 },
     },
-    margin: { left: 8, right: 8 },
+    margin: { left: margin, right: margin, top: 5, bottom: 5 },
+    didDrawPage: (data) => {
+      // Footer
+      const pageCount = doc.internal.pages.length - 1
+      doc.setFontSize(6)
+      doc.setTextColor(100, 100, 100)
+      doc.text(
+        `Pagina 1 din 1 | Generat de ArendaPro | ${dateStr}`,
+        pageW / 2,
+        pageH - 5,
+        { align: 'center' },
+      )
+    },
   })
 
   doc.save('registru-fitosanitar-anf.pdf')
