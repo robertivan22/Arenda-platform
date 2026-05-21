@@ -419,9 +419,17 @@ export default function MapParcelSelector({
     setSaving(true)
 
     const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) {
+      toast.error('Trebuie să fii autentificat pentru a salva o parcelă')
+      setSaving(false)
+      return
+    }
+
     const { data, error } = await db
       .from('parcele_fitosanitar')
       .insert([{
+        user_id: user.id,
         nume_parcela: saveName.trim(),
         judet: saveJudet || null,
         localitate: saveLocalitate || null,
