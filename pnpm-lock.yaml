@@ -210,6 +210,9 @@ importers:
       date-fns-tz:
         specifier: ^3.1.3
         version: 3.2.0(date-fns@3.6.0)
+      esri-leaflet:
+        specifier: ^3.0.19
+        version: 3.0.19(leaflet@1.9.4)
       exceljs:
         specifier: ^4.4.0
         version: 4.4.0
@@ -277,6 +280,9 @@ importers:
       '@cloudflare/next-on-pages':
         specifier: ^1.13.16
         version: 1.13.16(next@15.5.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(wrangler@4.90.0)
+      '@types/esri-leaflet':
+        specifier: ^3.0.4
+        version: 3.0.4
       '@types/leaflet':
         specifier: ^1.9.14
         version: 1.9.14
@@ -2025,6 +2031,12 @@ packages:
     resolution: {integrity: sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==}
     engines: {node: '>=12'}
 
+  '@terraformer/arcgis@2.1.2':
+    resolution: {integrity: sha512-IvdfqehcNAUtKU1OFMKwPT8EvdKlVFZ7q7ZKzkIF8XzYZIVsZLuXuOS1UBdRh5u/o+X5Gax7jiZhD8U/4TV+Jw==}
+
+  '@terraformer/common@2.1.2':
+    resolution: {integrity: sha512-cwPdTFzIpekZhZRrgDEkqLKNPoqbyCBQHiemaovnGIeUx0Pl336MY/eCxzJ5zXkrQLVo9zPalq/vYW5HnyKevQ==}
+
   '@tokenizer/inflate@0.2.7':
     resolution: {integrity: sha512-MADQgmZT1eKjp06jpI2yozxaU9uVs4GzzgSL+uEq7bVcJ9V1ZXQkeGNql1fsSI0gMy1vhvNTNbUqrx+pZfJVmg==}
     engines: {node: '>=18'}
@@ -2121,6 +2133,9 @@ packages:
 
   '@types/eslint@9.6.1':
     resolution: {integrity: sha512-FXx2pKgId/WyYo2jXw63kk7/+TY7u7AziEJxJAnSFzHlqTAS3Ync6SvgYAN/k4/PQpnnVuzoMuVnByKK2qp0ag==}
+
+  '@types/esri-leaflet@3.0.4':
+    resolution: {integrity: sha512-jbnsz9yo55gLYje8V9D8Oj1NkU2hyXUVIYq2hgTMPR5U/y8GCSLI07y4W71+wqeGaE2eCH81mMifYJs/nXpHxw==}
 
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
@@ -3513,6 +3528,11 @@ packages:
   esrecurse@4.3.0:
     resolution: {integrity: sha512-KmfKL3b6G+RXvP8N1vr3Tq1kL/oCFgn2NYXEtqP8/L3pKapUA4G8cFVaoF3SU323CD4XypR/ffioHmkti6/Tag==}
     engines: {node: '>=4.0'}
+
+  esri-leaflet@3.0.19:
+    resolution: {integrity: sha512-GBMRuRV0zyzVSxdImwKnnTh3ptMvzeaGdnsL68BwPLebibEOsgquRKArwLNpuIz0E03SXccaJafiDLCGvp2PGQ==}
+    peerDependencies:
+      leaflet: ^1.0.0
 
   estraverse@4.3.0:
     resolution: {integrity: sha512-39nnKffWz8xN1BU/2c79n9nB9HDzo0niYUqx6xyqUnyoAnQyyWpOTdZEeiCch8BBu515t4wp9ZmgVfVhn9EBpw==}
@@ -5362,6 +5382,9 @@ packages:
 
   through@2.3.8:
     resolution: {integrity: sha512-w89qg7PI8wAdvX60bMDP+bFoD5Dvhm9oLheFp5O4a2QF0cSBGsBX4qZmadPMvVqlLJBBci+WqGGOAPvcDeNSVg==}
+
+  tiny-binary-search@1.0.3:
+    resolution: {integrity: sha512-STSHX/L5nI9WTLv6wrzJbAPbO7OIISX83KFBh2GVbX1Uz/vgZOU/ANn/8iV6t35yMTpoPzzO+3OQid3mifE0CA==}
 
   tiny-invariant@1.3.3:
     resolution: {integrity: sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg==}
@@ -7804,6 +7827,12 @@ snapshots:
 
   '@tanstack/table-core@8.21.3': {}
 
+  '@terraformer/arcgis@2.1.2':
+    dependencies:
+      '@terraformer/common': 2.1.2
+
+  '@terraformer/common@2.1.2': {}
+
   '@tokenizer/inflate@0.2.7':
     dependencies:
       debug: 4.4.3
@@ -7894,6 +7923,10 @@ snapshots:
     dependencies:
       '@types/estree': 1.0.9
       '@types/json-schema': 7.0.15
+
+  '@types/esri-leaflet@3.0.4':
+    dependencies:
+      '@types/leaflet': 1.9.14
 
   '@types/estree@1.0.9': {}
 
@@ -9471,6 +9504,12 @@ snapshots:
   esrecurse@4.3.0:
     dependencies:
       estraverse: 5.3.0
+
+  esri-leaflet@3.0.19(leaflet@1.9.4):
+    dependencies:
+      '@terraformer/arcgis': 2.1.2
+      leaflet: 1.9.4
+      tiny-binary-search: 1.0.3
 
   estraverse@4.3.0: {}
 
@@ -11475,6 +11514,8 @@ snapshots:
       any-promise: 1.3.0
 
   through@2.3.8: {}
+
+  tiny-binary-search@1.0.3: {}
 
   tiny-invariant@1.3.3: {}
 

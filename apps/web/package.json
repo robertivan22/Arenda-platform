@@ -31,6 +31,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "date-fns-tz": "^3.1.3",
+    "esri-leaflet": "^3.0.19",
     "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
@@ -55,6 +56,7 @@
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",
+    "@types/esri-leaflet": "^3.0.4",
     "@types/leaflet": "^1.9.14",
     "@types/leaflet-draw": "^1.0.11",
     "@types/numeral": "^2.0.5",
