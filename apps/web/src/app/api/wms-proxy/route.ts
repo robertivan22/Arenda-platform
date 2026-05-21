@@ -17,18 +17,28 @@ export const runtime = 'edge'
  */
 
 const ALLOWED_HOSTS = new Set([
-  'inspire.ancpi.ro',
+  // ANCPI (Romanian National Cadastre) — uses plain HTTP
   'geoportal.ancpi.ro',
+  'inspire.ancpi.ro',
+  // APIA (Romanian Agency for Payments in Agriculture) — INSPIRE ArcGIS REST
+  'inspire.apia.org.ro',
   'geoportal.apia.org.ro',
+  // Other Romanian government services
   'servicii.apia.org.ro',
   'geoportal.madr.ro',
   'geoportal.gov.ro',
   'servicii.geo-spatial.org',
   'inspire.mmediu.ro',
+  // Third-party basemap/imagery services
   'server.arcgisonline.com',
   'services.arcgisonline.com',
   'ows.eea.europa.eu',
   'sgx.geodatenzentrum.de',
+])
+
+// Hosts that publish only over HTTP (not HTTPS) — Romanian government legacy
+const HTTP_ONLY_HOSTS = new Set([
+  'geoportal.ancpi.ro',
 ])
 
 // Content-types we accept from the upstream WMS
@@ -57,9 +67,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
   }
 
-  // Allow only https
-  if (parsed.protocol !== 'https:') {
-    return NextResponse.json({ error: 'Only HTTPS allowed' }, { status: 400 })
+  // Allow HTTPS for all; allow plain HTTP only for known HTTP-only government hosts
+  if (parsed.protocol === 'http:') {
+    if (!HTTP_ONLY_HOSTS.has(parsed.hostname)) {
+      return NextResponse.json({ error: 'HTTP only allowed for specific trusted hosts' }, { status: 400 })
+    }
+  } else if (parsed.protocol !== 'https:') {
+    return NextResponse.json({ error: 'Only HTTP/HTTPS allowed' }, { status: 400 })
   }
 
   // Whitelist check
@@ -76,7 +90,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!['GETMAP', 'GETTILE', 'GETCAPABILITIES', ''].includes(reqParam)) {
     return NextResponse.json({ error: 'Only GetMap/GetTile/GetCapabilities allowed' }, { status: 400 })
   }
-  if (!['WMS', 'WMTS'].includes(serviceParam)) {
+  // ArcGIS WMS sometimes sends an empty SERVICE param — allow it
+  if (serviceParam !== '' && !['WMS', 'WMTS'].includes(serviceParam)) {
     return NextResponse.json({ error: 'Only WMS/WMTS service allowed' }, { status: 400 })
   }
 

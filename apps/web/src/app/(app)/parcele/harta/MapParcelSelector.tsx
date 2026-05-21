@@ -66,36 +66,37 @@ const WMS_LAYER_DEFS: WmsLayerDef[] = [
   {
     id: 'ancpi_cadastru',
     label: 'Cadastru ANCPI',
-    sublabel: 'Parcele cadastrale (INSPIRE)',
+    sublabel: 'Parcele cadastrale CP_View (INSPIRE)',
     color: 'blue',
-    // ANCPI INSPIRE WMS — workspace CP, correct layer is CP:CP.CadastralParcel
-    wmsUrl: 'https://inspire.ancpi.ro/maps/geoserver/CP/wms',
+    // ANCPI ArcGIS INSPIRE WMS endpoint — layer 0 = CP.CadastralParcel
+    // Note: ANCPI geoportal uses HTTP (no HTTPS); proxy handles this.
+    wmsUrl: 'http://geoportal.ancpi.ro/arcgis/rest/services/CP/CP_View/MapServer/exts/InspireView/service',
     wmsOptions: {
-      layers: 'CP:CP.CadastralParcel',
+      layers: 'CP.CadastralParcel',
       format: 'image/png',
       transparent: true,
       version: '1.3.0',
-      // Must use EPSG:4326 for this INSPIRE endpoint (not 3857)
       crs: L.CRS.EPSG4326,
-      attribution: '© <a href="https://ancpi.ro" target="_blank">ANCPI</a> INSPIRE',
+      attribution: '© <a href="https://ancpi.ro" target="_blank">ANCPI</a>',
     },
     defaultOpacity: 0.65,
     defaultVisible: false,
     minZoom: 13,
   },
   {
-    id: 'apia_lpis',
-    label: 'LPIS APIA',
-    sublabel: 'Parcele eligibile subventii',
+    id: 'apia_lpis_2024',
+    label: 'LPIS APIA 2024',
+    sublabel: 'Referinta parcele 2024 (actualizat sept. 2024)',
     color: 'green',
-    // APIA Romania LPIS — published via INSPIRE AF theme obligation
-    wmsUrl: 'https://geoportal.apia.org.ro/geoserver/wms',
+    // APIA official ArcGIS INSPIRE service — 2024 dataset
+    // WMS endpoint appended as /WMSServer on the MapServer REST URL
+    wmsUrl: 'https://inspire.apia.org.ro/network/rest/services/INSPIRE/LPIS_referinta_2024/MapServer/WMSServer',
     wmsOptions: {
-      layers: 'lpis:parcele_eligibile',
+      // ArcGIS WMS: layer 0 = first (and only) layer in the service
+      layers: '0',
       format: 'image/png',
       transparent: true,
-      version: '1.3.0',
-      crs: L.CRS.EPSG4326,
+      version: '1.1.1',
       attribution: '© <a href="https://apia.org.ro" target="_blank">APIA Romania</a>',
     },
     defaultOpacity: 0.55,
@@ -103,17 +104,17 @@ const WMS_LAYER_DEFS: WmsLayerDef[] = [
     minZoom: 12,
   },
   {
-    id: 'apia_blocuri',
-    label: 'Blocuri fizice APIA',
-    sublabel: 'Blocuri fizice IACS/GSAA',
+    id: 'apia_lpis_ref',
+    label: 'LPIS APIA referinta',
+    sublabel: 'Parcele referinta INSPIRE (fallback)',
     color: 'amber',
-    wmsUrl: 'https://geoportal.apia.org.ro/geoserver/wms',
+    // APIA parcel reference service — historical/fallback
+    wmsUrl: 'https://inspire.apia.org.ro/network/rest/services/INSPIRE/LPIS_parcel_reference/MapServer/WMSServer',
     wmsOptions: {
-      layers: 'lpis:blocuri_fizice',
+      layers: '0',
       format: 'image/png',
       transparent: true,
-      version: '1.3.0',
-      crs: L.CRS.EPSG4326,
+      version: '1.1.1',
       attribution: '© <a href="https://apia.org.ro" target="_blank">APIA Romania</a>',
     },
     defaultOpacity: 0.45,
