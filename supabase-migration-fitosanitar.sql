@@ -130,6 +130,70 @@ CREATE TABLE IF NOT EXISTS public.registru_fitosanitar (
   CONSTRAINT chk_numar_inregistrare_pozitiv CHECK (numar_inregistrare > 0)
 );
 
+-- ── ALTER TABLE: add new columns to existing table (safe to re-run) ──────────
+-- These statements are no-ops if the column already exists (new installs).
+-- For existing installs where CREATE TABLE IF NOT EXISTS was skipped, they
+-- add the missing columns introduced by the OUG53/DIR2009 compliance update.
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS ora_tratament              TIME;
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS cod_lpis_parcela           TEXT;
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS nr_bloc_fizic              TEXT;
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS metoda_aplicare            TEXT NOT NULL DEFAULT 'stropire'
+    CONSTRAINT chk_metoda_aplicare CHECK (metoda_aplicare IN
+      ('stropire','pulverizare','prafuire','granule','injectare','tratament_samanta','altele'));
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS volum_apa_lha              NUMERIC(8,1);
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS nr_certificat_utilizator   TEXT;
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS temperatura_aplicare_c     NUMERIC(5,1);
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS viteza_vant_max_ms          NUMERIC(4,1);
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS umiditate_relativa_pct      NUMERIC(5,1)
+    CONSTRAINT chk_umiditate CHECK (umiditate_relativa_pct IS NULL
+      OR umiditate_relativa_pct BETWEEN 0 AND 100);
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS nr_certificat_inspectie    TEXT;
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS data_inspectie_echipament  DATE;
+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS exportat_anf_at            TIMESTAMPTZ;
+
+-- an_registru: generated column (computed from data_tratament)
+-- Must be added separately; ADD COLUMN IF NOT EXISTS works for generated columns in PG12+
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS an_registru               INTEGER
+    GENERATED ALWAYS AS (EXTRACT(YEAR FROM data_tratament)::INTEGER) STORED;
+
+-- Make substanta_activa and nr_omologare NOT NULL (were nullable in original schema)
+-- Safe only if no existing NULLs; wrap in DO block to avoid hard failure
+DO $$
+BEGIN
+  UPDATE public.registru_fitosanitar SET substanta_activa = '' WHERE substanta_activa IS NULL;
+  UPDATE public.registru_fitosanitar SET nr_omologare     = '' WHERE nr_omologare     IS NULL;
+  ALTER TABLE public.registru_fitosanitar ALTER COLUMN substanta_activa SET NOT NULL;
+  ALTER TABLE public.registru_fitosanitar ALTER COLUMN nr_omologare     SET NOT NULL;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Could not set NOT NULL on substanta_activa/nr_omologare: %', SQLERRM;
+END;
+$$;
+
 -- ── Indexes ──────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_fitosanitar_user_id
   ON public.registru_fitosanitar (user_id);
@@ -345,6 +409,3 @@ ORDER BY rf.user_id, rf.an_registru, rf.data_tratament;
 --     AND table_name = 'registru_fitosanitar'
 --   ORDER BY ordinal_position;
 -- ============================================================
-
-
--- (see verification block above section 8)
