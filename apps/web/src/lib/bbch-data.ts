@@ -93,16 +93,44 @@ export const BBCH_PORUMB: BBCHStage[] = [
 
 // ─── Visual metadata ──────────────────────────────────────────────────────────
 export const STAGE_COLORS: Record<number, { bg: string; hex: string; text: string }> = {
-  0: { bg: 'bg-gray-200',   hex: '#d1d5db', text: 'text-gray-700' },
-  1: { bg: 'bg-green-100',  hex: '#bbf7d0', text: 'text-green-900' },
-  2: { bg: 'bg-green-300',  hex: '#86efac', text: 'text-green-900' },
-  3: { bg: 'bg-green-500',  hex: '#22c55e', text: 'text-white' },
-  4: { bg: 'bg-teal-400',   hex: '#2dd4bf', text: 'text-white' },
-  5: { bg: 'bg-blue-400',   hex: '#60a5fa', text: 'text-white' },
-  6: { bg: 'bg-yellow-400', hex: '#facc15', text: 'text-yellow-900' },
-  7: { bg: 'bg-orange-400', hex: '#fb923c', text: 'text-white' },
-  8: { bg: 'bg-amber-500',  hex: '#f59e0b', text: 'text-white' },
-  9: { bg: 'bg-stone-600',  hex: '#78716c', text: 'text-white' },
+  0: { bg: 'bg-gray-400',   hex: '#9ca3af', text: '#374151' },
+  1: { bg: 'bg-green-300',  hex: '#86efac', text: '#14532d' },
+  2: { bg: 'bg-green-400',  hex: '#4ade80', text: '#14532d' },
+  3: { bg: 'bg-green-600',  hex: '#16a34a', text: '#ffffff' },
+  4: { bg: 'bg-teal-500',   hex: '#14b8a6', text: '#ffffff' },
+  5: { bg: 'bg-blue-500',   hex: '#3b82f6', text: '#ffffff' },
+  6: { bg: 'bg-amber-400',  hex: '#fbbf24', text: '#1a1a00' },
+  7: { bg: 'bg-orange-500', hex: '#f97316', text: '#ffffff' },
+  8: { bg: 'bg-amber-600',  hex: '#d97706', text: '#ffffff' },
+  9: { bg: 'bg-stone-600',  hex: '#57534e', text: '#ffffff' },
+}
+
+// Months when each principal BBCH stage typically occurs, per crop type
+export const STAGE_MONTHS: Record<BBCHCultura, Record<number, string>> = {
+  cereale: {
+    0: 'Sep.–Oct.',
+    1: 'Oct.–Nov.',
+    2: 'Nov.–Feb.',
+    3: 'Feb.–Apr.',
+    4: 'Apr.–Mai',
+    5: 'Mai',
+    6: 'Mai–Iun.',
+    7: 'Iun.–Iul.',
+    8: 'Iul.',
+    9: 'Iul.–Aug.',
+  },
+  porumb: {
+    0: 'Apr.–Mai',
+    1: 'Mai–Iun.',
+    2: '—',
+    3: 'Iun.–Iul.',
+    4: '—',
+    5: 'Iul.',
+    6: 'Iul.–Aug.',
+    7: 'Aug.',
+    8: 'Aug.–Sep.',
+    9: 'Sep.–Oct.',
+  },
 }
 
 export const STAGE_LABELS: Record<number, string> = {

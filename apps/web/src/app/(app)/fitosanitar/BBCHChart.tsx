@@ -1,19 +1,15 @@
 'use client'
 
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
-  BBCHStage, BBCH_CEREALE, BBCH_PORUMB,
-  STAGE_COLORS, STAGE_LABELS, getBBCHForCultura,
-  CULTURA_OPTIONS,
+  BBCHStage, STAGE_COLORS, STAGE_LABELS, STAGE_MONTHS,
+  getBBCHForCultura, CULTURA_OPTIONS, CULTURA_TO_BBCH,
 } from '@/lib/bbch-data'
 import { ChevronDown, ChevronRight, X, Info } from 'lucide-react'
 
 interface BBCHChartProps {
-  /** Pre-select a crop type; defaults to 'Grâu' */
   initialCultura?: string
-  /** BBCH code to highlight (e.g. from the form's current selection) */
   highlightCode?: string
-  /** Called when user clicks a stage in the chart to use it in the form */
   onSelectCode?: (code: string, descriere: string) => void
   onClose?: () => void
 }
@@ -32,14 +28,132 @@ const TREATMENT_WINDOWS: Record<number, string[]> = {
   0: ['Fungicide sămânță (tratament înainte de semănat)'],
 }
 
+// ─── Plant growth visual data ─────────────────────────────────────────────────
+const GND = 96  // ground Y in SVG units
+
+interface VisualStage {
+  x: number; code: string; label: [string, string]; month: string
+  h: number; tillers: number
+  head: 'none'|'half'|'full'|'flower'|'grain'|'ripe'
+      |'tassel-half'|'tassel'|'silk'|'corn-grain'|'corn-ripe'|'harvest'
+}
+
+const CEREALE_VISUAL: VisualStage[] = [
+  { x: 42,  code:'10', label:['Răsărire','3 frunze'],       month:'Oct.',     h:14, tillers:1, head:'none' },
+  { x: 127, code:'21', label:['Înc.','înfrățirii'],         month:'Noiem.',   h:19, tillers:2, head:'none' },
+  { x: 213, code:'25', label:['Înfrățire','deplină'],       month:'Noiem.',   h:22, tillers:3, head:'none' },
+  { x: 298, code:'29', label:['Sf.','înfrățirii'],          month:'Feb.',     h:24, tillers:3, head:'none' },
+  { x: 383, code:'30', label:['Înc. alung.','paiului'],     month:'Feb.–Mar.',h:30, tillers:1, head:'none' },
+  { x: 469, code:'31', label:['Primul nod','vizibil'],      month:'Apr.',     h:42, tillers:1, head:'none' },
+  { x: 554, code:'32', label:['Al doilea','nod vizibil'],   month:'Apr.',     h:52, tillers:1, head:'none' },
+  { x: 640, code:'37', label:['Apariția','fr. standard'],   month:'Mai',      h:62, tillers:1, head:'none' },
+  { x: 725, code:'49', label:['Primele','ariste vizib.'],   month:'Mai',      h:68, tillers:1, head:'none' },
+  { x: 810, code:'51', label:['Înc.','înspicării'],         month:'Mai',      h:72, tillers:1, head:'half' },
+  { x: 896, code:'59', label:['Sf.','înspicării'],          month:'Mai',      h:76, tillers:1, head:'full' },
+  { x: 982, code:'65', label:['Înflorire','deplină'],       month:'Mai–Iun.', h:76, tillers:1, head:'flower'},
+  { x:1067, code:'75', label:['Bob','lăptos'],              month:'Iun.–Iul.',h:76, tillers:1, head:'grain' },
+  { x:1152, code:'89', label:['Maturitate','deplină'],      month:'Iul.',     h:74, tillers:1, head:'ripe'  },
+]
+
+const PORUMB_VISUAL: VisualStage[] = [
+  { x: 55,  code:'10', label:['Răsărire',''],              month:'Apr.',     h:10, tillers:1, head:'none'       },
+  { x: 164, code:'13', label:['3 frunze','(V3)'],          month:'Apr.–Mai', h:18, tillers:1, head:'none'       },
+  { x: 273, code:'15', label:['5 frunze','(V5)'],          month:'Mai',      h:28, tillers:1, head:'none'       },
+  { x: 382, code:'19', label:['9+ frunze','(V9+)'],        month:'Mai–Iun.', h:40, tillers:1, head:'none'       },
+  { x: 491, code:'33', label:['3 internod.',''],           month:'Iun.',     h:55, tillers:1, head:'none'       },
+  { x: 600, code:'39', label:['Frunza','steag'],           month:'Iun.–Iul.',h:68, tillers:1, head:'none'       },
+  { x: 709, code:'55', label:['Panicul','50%'],            month:'Iul.',     h:74, tillers:1, head:'tassel-half'},
+  { x: 818, code:'61', label:['Mătasea','vizibilă'],       month:'Iul.',     h:76, tillers:1, head:'silk'       },
+  { x: 927, code:'73', label:['Bob','lăptos (R3)'],        month:'Aug.',     h:76, tillers:1, head:'corn-grain' },
+  { x:1036, code:'89', label:['Maturitate','fiziologică'], month:'Sep.',     h:75, tillers:1, head:'corn-ripe'  },
+  { x:1145, code:'99', label:['Recoltă',''],               month:'Sep.–Oct.',h:70, tillers:1, head:'harvest'    },
+]
+
+function CerealPlant({ x, h, tillers, head }: Pick<VisualStage,'x'|'h'|'tillers'|'head'>) {
+  const topY = GND - h
+  const isOld  = head === 'ripe' || head === 'grain'
+  const sc     = isOld ? '#a16207' : '#15803d'
+  const lc     = isOld ? '#ca8a04' : '#4ade80'
+  const spkClr = head==='ripe' ? '#d97706' : head==='flower' ? '#facc15' : head==='grain' ? '#eab308' : '#84cc16'
+  const spkH   = head === 'half' ? 7 : head !== 'none' ? 14 : 0
+  const spkTop = topY - spkH
+  return (
+    <g transform={`translate(${x},0)`}>
+      <line x1="0" y1={GND} x2="0" y2={topY} stroke={sc} strokeWidth="1.5" strokeLinecap="round" />
+      {h>8  && <path d={`M0,${GND-h*.22} C-5,${GND-h*.22-3} -8,${GND-h*.22-2} -10,${GND-h*.22}`}     stroke={lc} strokeWidth="1"   fill="none" />}
+      {h>15 && <path d={`M0,${GND-h*.42} C6,${GND-h*.42-4}  10,${GND-h*.42-3}  12,${GND-h*.42}`}     stroke={lc} strokeWidth="1"   fill="none" />}
+      {h>30 && <path d={`M0,${GND-h*.62} C-8,${GND-h*.62-5} -12,${GND-h*.62-4} -14,${GND-h*.62-1}`}  stroke={lc} strokeWidth="1.2" fill="none" />}
+      {h>50 && <path d={`M0,${GND-h*.82} C10,${GND-h*.82-7}  15,${GND-h*.82-5}  17,${GND-h*.82-1}`}  stroke={lc} strokeWidth="1.5" fill="none" />}
+      {tillers>=2 && <><line x1="-5" y1={GND} x2="-5" y2={GND-h*.58} stroke={sc} strokeWidth="1" />{h>10&&<path d={`M-5,${GND-h*.2} C-10,${GND-h*.2-3} -13,${GND-h*.2-2} -15,${GND-h*.2}`} stroke={lc} strokeWidth="0.8" fill="none" />}</>}
+      {tillers>=3 && <><line x1="5"  y1={GND} x2="5"  y2={GND-h*.53} stroke={sc} strokeWidth="1" />{h>10&&<path d={`M5,${GND-h*.2} C10,${GND-h*.2-3} 13,${GND-h*.2-2} 15,${GND-h*.2}`}   stroke={lc} strokeWidth="0.8" fill="none" />}</>}
+      {spkH>0 && <>
+        <rect x="-2.5" y={spkTop} width="5" height={spkH} rx="2" fill={spkClr} />
+        {['full','flower','grain','ripe'].includes(head) && <>
+          <line x1="2.5"  y1={spkTop+2} x2="7"  y2={spkTop-4} stroke={spkClr} strokeWidth="0.7" />
+          <line x1="2.5"  y1={spkTop+7} x2="7"  y2={spkTop+1} stroke={spkClr} strokeWidth="0.7" />
+          <line x1="-2.5" y1={spkTop+2} x2="-7" y2={spkTop-4} stroke={spkClr} strokeWidth="0.7" />
+          <line x1="-2.5" y1={spkTop+7} x2="-7" y2={spkTop+1} stroke={spkClr} strokeWidth="0.7" />
+        </>}
+        {(head==='ripe'||head==='grain') && <path d={`M0,${topY} Q4,${topY+8} 5,${topY+15}`} stroke={spkClr} strokeWidth="2" fill="none" strokeLinecap="round" />}
+      </>}
+    </g>
+  )
+}
+
+function CornPlant({ x, h, head }: Pick<VisualStage,'x'|'h'|'head'>) {
+  const topY  = GND - h
+  const isOld = head==='corn-ripe'||head==='harvest'
+  const sc    = isOld ? '#a16207' : '#166534'
+  const lc    = isOld ? '#ca8a04' : '#4ade80'
+  const tc    = '#d97706'
+  const cobY  = GND - h*.58
+  return (
+    <g transform={`translate(${x},0)`}>
+      <line x1="0" y1={GND} x2="0" y2={topY} stroke={sc} strokeWidth="2.5" strokeLinecap="round" />
+      {h>8  && <path d={`M0,${GND-h*.18} C-10,${GND-h*.18-7}  -15,${GND-h*.18-4} -18,${GND-h*.18-1}`} stroke={lc} strokeWidth="2"   fill="none" />}
+      {h>15 && <path d={`M0,${GND-h*.35} C12,${GND-h*.35-9}    18,${GND-h*.35-5}  21,${GND-h*.35-1}`}  stroke={lc} strokeWidth="2"   fill="none" />}
+      {h>24 && <path d={`M0,${GND-h*.5}  C-13,${GND-h*.5-10}  -19,${GND-h*.5-6} -22,${GND-h*.5-1}`}   stroke={lc} strokeWidth="2.5" fill="none" />}
+      {h>38 && <path d={`M0,${GND-h*.64} C14,${GND-h*.64-11}   21,${GND-h*.64-7}  24,${GND-h*.64-1}`}  stroke={lc} strokeWidth="2.5" fill="none" />}
+      {h>54 && <path d={`M0,${GND-h*.78} C-15,${GND-h*.78-13} -22,${GND-h*.78-8} -26,${GND-h*.78-1}`} stroke={lc} strokeWidth="3"   fill="none" />}
+      {h>66 && <path d={`M0,${GND-h*.9}  C16,${GND-h*.9-14}    24,${GND-h*.9-9}   28,${GND-h*.9-1}`}   stroke={lc} strokeWidth="3"   fill="none" />}
+      {['silk','corn-grain','corn-ripe','harvest'].includes(head)&&h>58&&<>
+        <path d={`M0,${cobY} Q8,${cobY+2} 8,${cobY+18} Q8,${cobY+22} 0,${cobY+24}`} stroke={sc} strokeWidth="2" fill={isOld?'#d97706':'#fde68a'} />
+        <line x1="8" y1={cobY+5}  x2="16" y2={cobY-4}  stroke={sc} strokeWidth="1.5" />
+        <line x1="8" y1={cobY+12} x2="16" y2={cobY+4}  stroke={sc} strokeWidth="1.5" />
+        <line x1="8" y1={cobY+18} x2="16" y2={cobY+12} stroke={sc} strokeWidth="1.5" />
+        {head==='silk'&&<path d={`M8,${cobY+2} Q14,${cobY-3} 12,${cobY-10}`} stroke="#fde68a" strokeWidth="0.8" fill="none" />}
+      </>}
+      {['tassel-half','tassel','silk','corn-grain','corn-ripe'].includes(head)&&<>
+        <line x1="0" y1={topY} x2="0" y2={topY-10} stroke={tc} strokeWidth="1.5" />
+        {head!=='tassel-half'&&<>
+          <line x1="0" y1={topY-7}  x2="-7" y2={topY-15} stroke={tc} strokeWidth="1" />
+          <line x1="0" y1={topY-5}  x2="7"  y2={topY-14} stroke={tc} strokeWidth="1" />
+          <line x1="0" y1={topY-3}  x2="-5" y2={topY-11} stroke={tc} strokeWidth="0.8" />
+        </>}
+      </>}
+      {head==='harvest'&&<line x1="0" y1={topY} x2="4" y2={topY+8} stroke={sc} strokeWidth="1.5" strokeLinecap="round" />}
+    </g>
+  )
+}
+
+function buildMonthBars(visuals: VisualStage[], svgW = 1200) {
+  const bars: { month: string; x1: number; x2: number }[] = []
+  visuals.forEach((s, i) => {
+    const x1 = i === 0 ? 0 : Math.floor((visuals[i-1].x + s.x) / 2)
+    const x2 = i === visuals.length-1 ? svgW : Math.floor((s.x + visuals[i+1].x) / 2)
+    const last = bars[bars.length-1]
+    if (last && last.month === s.month) { last.x2 = x2 } else { bars.push({ month: s.month, x1, x2 }) }
+  })
+  return bars
+}
+
 export function BBCHChart({ initialCultura = 'Grâu', highlightCode, onSelectCode, onClose }: BBCHChartProps) {
   const [cultura, setCultura] = useState(initialCultura)
-  const [hoveredStage, setHoveredStage] = useState<BBCHStage | null>(null)
   const [expandedPrincipal, setExpandedPrincipal] = useState<number | null>(null)
 
   const stages = useMemo(() => getBBCHForCultura(cultura), [cultura])
+  const culturaType = CULTURA_TO_BBCH[cultura] ?? 'cereale'
 
-  // Group by principal stage
   const byPrincipal = useMemo(() => {
     const map: Record<number, BBCHStage[]> = {}
     for (let i = 0; i <= 9; i++) map[i] = []
@@ -47,15 +161,16 @@ export function BBCHChart({ initialCultura = 'Grâu', highlightCode, onSelectCod
     return map
   }, [stages])
 
-  const highlightStagiu = useMemo(() => {
-    if (!highlightCode) return null
-    return stages.find(s => s.code === highlightCode)?.stagiu ?? null
-  }, [highlightCode, stages])
+  const highlightStagiu = useMemo(() =>
+    highlightCode ? stages.find(s => s.code === highlightCode)?.stagiu ?? null : null,
+    [highlightCode, stages])
 
-  // Auto-expand the principal stage that contains the current highlight
   useEffect(() => {
     if (highlightStagiu !== null) setExpandedPrincipal(highlightStagiu)
   }, [highlightStagiu])
+
+  const culturaVisuals = culturaType === 'porumb' ? PORUMB_VISUAL : CEREALE_VISUAL
+  const monthBars      = useMemo(() => buildMonthBars(culturaVisuals), [culturaVisuals])
 
   const inputCls = 'px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500'
 
@@ -87,42 +202,93 @@ export function BBCHChart({ initialCultura = 'Grâu', highlightCode, onSelectCod
         </div>
       </div>
 
+      {/* ── Plant growth timeline SVG ── */}
+      <div className="px-4 pt-3 pb-2 border-b border-gray-100 bg-gradient-to-b from-sky-50 to-white">
+        <p className="text-xs font-medium text-gray-500 mb-1.5">
+          🌱 Fazele de dezvoltare — model vizual
+        </p>
+        <div className="overflow-x-auto rounded-lg">
+          <svg viewBox="0 0 1200 168" className="w-full min-w-[820px] h-auto" style={{ display: 'block' }}>
+            <defs>
+              <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#f0f9ff" />
+                <stop offset="85%" stopColor="#e0f2fe" />
+              </linearGradient>
+            </defs>
+            <rect width="1200" height={GND} fill="url(#skyGrad)" />
+            {culturaVisuals.map(s =>
+              culturaType === 'porumb'
+                ? <CornPlant   key={s.code} x={s.x} h={s.h} head={s.head} />
+                : <CerealPlant key={s.code} x={s.x} h={s.h} tillers={s.tillers} head={s.head} />
+            )}
+            {culturaVisuals.map(s => (
+              <text key={`lbl-${s.code}`} x={s.x} y={GND - s.h - (s.head !== 'none' ? 18 : 5)}
+                fontSize="9" textAnchor="middle" fill="#1e40af" fontWeight="bold">{s.code}</text>
+            ))}
+            <rect x="0" y={GND} width="1200" height="10" fill="#7c2d12" />
+            <rect x="0" y={GND+10} width="1200" height="4" fill="#450a03" />
+            {culturaVisuals.map(s => (
+              <line key={`tick-${s.code}`} x1={s.x} y1={GND+14} x2={s.x} y2={GND+22} stroke="#9ca3af" strokeWidth="0.5" />
+            ))}
+            {culturaVisuals.map(s => s.label[0] ? (
+              <text key={`d1-${s.code}`} x={s.x} y={GND+31} fontSize="8" textAnchor="middle" fill="#374151">{s.label[0]}</text>
+            ) : null)}
+            {culturaVisuals.map(s => s.label[1] ? (
+              <text key={`d2-${s.code}`} x={s.x} y={GND+41} fontSize="8" textAnchor="middle" fill="#374151">{s.label[1]}</text>
+            ) : null)}
+            {monthBars.map((mb, i) => (
+              <g key={`mb-${i}`}>
+                <rect x={mb.x1+1} y={GND+50} width={mb.x2-mb.x1-2} height="18" rx="3" fill="#1e3a5f" />
+                <text x={(mb.x1+mb.x2)/2} y={GND+63} fontSize="9" textAnchor="middle" fill="#ffffff" fontWeight="bold">{mb.month}</text>
+              </g>
+            ))}
+          </svg>
+        </div>
+      </div>
+
       {/* Visual timeline strip */}
-      <div className="px-4 pt-4 pb-2">
-        <div className="flex rounded-lg overflow-hidden border border-gray-200 h-12">
+      <div className="px-4 pt-3 pb-1">
+        <div className="flex rounded-lg overflow-hidden border border-gray-200 h-14">
           {Array.from({ length: 10 }, (_, i) => {
-            const count = byPrincipal[i].length
-            const color = STAGE_COLORS[i]
-            const isActive = highlightStagiu === i
+            const count   = byPrincipal[i].length
+            const color   = STAGE_COLORS[i]
+            const isActive= highlightStagiu === i
             return (
               <button
                 key={i}
                 onClick={() => setExpandedPrincipal(expandedPrincipal === i ? null : i)}
-                className="flex-1 flex flex-col items-center justify-center transition-opacity border-r border-white/30 last:border-0 hover:opacity-90"
-                style={{ background: color.hex, opacity: isActive ? 1 : 0.75 }}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-opacity border-r border-white/20 last:border-0 hover:brightness-95"
+                style={{ background: color.hex, opacity: isActive ? 1 : 0.85 }}
                 title={STAGE_LABELS[i]}
               >
-                <span className="text-[10px] font-bold" style={{ color: i >= 3 && i <= 5 ? '#1a1a1a' : i === 6 ? '#713f12' : '#fff' }}>
+                <span className="text-[11px] font-bold leading-none" style={{ color: color.text }}>
                   {i * 10}
                 </span>
-                <span className="text-[9px] hidden sm:block leading-none mt-0.5" style={{ color: i >= 3 && i <= 5 ? '#1a1a1a' : i === 6 ? '#713f12' : '#fff' }}>
-                  {STAGE_LABELS[i].split('/')[0]}
+                <span className="text-[9px] hidden sm:block leading-none" style={{ color: color.text }}>
+                  {STAGE_LABELS[i]}
                 </span>
                 {count > 0 && (
-                  <span className="text-[8px] font-mono opacity-75" style={{ color: i >= 3 && i <= 5 ? '#1a1a1a' : i === 6 ? '#713f12' : '#fff' }}>
+                  <span className="text-[8px] leading-none opacity-80" style={{ color: color.text }}>
                     {count} cod{count !== 1 ? 'uri' : ''}
                   </span>
-                )}
-                {isActive && (
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-2 bg-red-500" />
                 )}
               </button>
             )
           })}
         </div>
-        <div className="flex justify-between mt-1 px-0.5">
+
+        {/* Month labels under strip */}
+        <div className="flex mt-0.5">
+          {Array.from({ length: 10 }, (_, i) => (
+            <div key={i} className="flex-1 text-center text-[8px] text-gray-400 truncate px-0.5 leading-tight">
+              {STAGE_MONTHS[culturaType][i]}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-between mt-0.5 px-0.5">
           <span className="text-[10px] text-gray-400">BBCH 00</span>
-          <span className="text-[10px] text-gray-400">→ timp / creștere →</span>
+          <span className="text-[10px] text-gray-400">→ creștere / timp →</span>
           <span className="text-[10px] text-gray-400">BBCH 99</span>
         </div>
       </div>
@@ -146,9 +312,7 @@ export function BBCHChart({ initialCultura = 'Grâu', highlightCode, onSelectCod
                   className="w-7 h-7 rounded flex items-center justify-center text-xs font-bold flex-shrink-0"
                   style={{ background: color.hex }}
                 >
-                  <span style={{ color: principal >= 3 && principal <= 5 ? '#1a1a1a' : principal === 6 ? '#713f12' : '#fff' }}>
-                    {principal}
-                  </span>
+                  <span style={{ color: color.text }}>{principal}</span>
                 </div>
                 <div className="flex-1 text-left">
                   <span className="text-sm font-medium text-gray-800">
@@ -164,6 +328,7 @@ export function BBCHChart({ initialCultura = 'Grâu', highlightCode, onSelectCod
                     </span>
                   )}
                 </div>
+                <span className="text-xs text-gray-400 mr-1">{STAGE_MONTHS[culturaType][principal]}</span>
                 <span className="text-xs text-gray-400">{codesInStage.length} etape</span>
                 {isExpanded
                   ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -202,7 +367,7 @@ export function BBCHChart({ initialCultura = 'Grâu', highlightCode, onSelectCod
                             className="w-9 h-7 rounded flex items-center justify-center text-xs font-mono font-bold flex-shrink-0"
                             style={{ background: color.hex }}
                           >
-                            <span style={{ color: principal >= 3 && principal <= 5 ? '#1a1a1a' : principal === 6 ? '#713f12' : '#fff' }}>
+                            <span style={{ color: color.text }}>
                               {stage.code}
                             </span>
                           </div>
