@@ -40,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'Lista parcele', href: '/parcele' },
       { label: 'Parcelă nouă', href: '/parcele/nou' },
+      { label: 'Hartă Parcele', href: '/parcele/harta' },
     ],
   },
   { label: 'Plăți',    href: '/plati',    icon: CreditCard,    permKey: 'can_facturi' },
