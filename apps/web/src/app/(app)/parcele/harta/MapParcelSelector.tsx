@@ -5,7 +5,6 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet-draw/dist/leaflet.draw.css'
 import 'leaflet-draw'
-import * as EsriLeaflet from 'esri-leaflet'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -38,22 +37,24 @@ function fixLeafletIcons() {
 }
 
 // ─── esri-leaflet ArcGIS dynamic layer factory ───────────────────────────────
-// APIA and ANCPI are ArcGIS MapServer services, not GeoServer WMS.
-// dynamicMapLayer makes requests directly from the user's browser to the ArcGIS
-// export endpoint. <img> elements load cross-origin images without CORS headers,
-// and the browser's certificate trust store handles Romanian government SSL certs
-// (which fail in Node.js/Cloudflare edge due to missing intermediate CAs).
-function createEsriLayer(url: string, opacity: number): EsriLeaflet.DynamicMapLayer {
-  return EsriLeaflet.dynamicMapLayer({ url, opacity })
+// Key insight: WMS tiles load as <img> elements — no CORS needed.
+// esri-leaflet's dynamicMapLayer makes a preliminary ?f=json XHR which
+// REQUIRES CORS headers and silently fails when the server doesn't provide them.
+// L.tileLayer.wms() avoids that XHR entirely — tiles go straight to <img>.
+function createDirectWMS(wmsUrl: string, options: L.WMSOptions): L.TileLayer.WMS {
+  return L.tileLayer.wms(wmsUrl, options)
 }
 
-// ─── ArcGIS Layer catalogue ───────────────────────────────────────────────────
+// ─── Layer catalogue ──────────────────────────────────────────────────────────
 interface WmsLayerDef {
   id: string
   label: string
   sublabel: string
   color: 'blue' | 'green' | 'amber'
-  url: string           // ArcGIS MapServer REST URL (no /WMSServer)
+  wmsUrl: string
+  wmsOptions: L.WMSOptions
+  isTile?: boolean       // true = use L.tileLayer (XYZ), false = WMS
+  tileUrl?: string
   defaultOpacity: number
   defaultVisible: boolean
   minZoom?: number
@@ -61,25 +62,21 @@ interface WmsLayerDef {
 
 const WMS_LAYER_DEFS: WmsLayerDef[] = [
   {
-    id: 'ancpi_cadastru',
-    label: 'Cadastru ANCPI',
-    sublabel: 'Parcele cadastrale CP_View (ArcGIS)',
-    color: 'blue',
-    // ANCPI ArcGIS MapServer — HTTP only (no HTTPS on their server)
-    // Browser fetches directly; <img> is cross-origin without CORS needed
-    url: 'http://geoportal.ancpi.ro/arcgis/rest/services/CP/CP_View/MapServer',
-    defaultOpacity: 0.65,
-    defaultVisible: false,
-    minZoom: 13,
-  },
-  {
     id: 'apia_lpis_2024',
     label: 'LPIS APIA 2024',
     sublabel: 'Referinta parcele 2024 (actualizat sept. 2024)',
     color: 'green',
-    // APIA INSPIRE ArcGIS MapServer — 2024 dataset (most current)
-    url: 'https://inspire.apia.org.ro/network/rest/services/INSPIRE/LPIS_referinta_2024/MapServer',
-    defaultOpacity: 0.55,
+    // ArcGIS WMS endpoint — tiles loaded as <img> (no CORS needed)
+    // WMS 1.1.1 + EPSG:3857 is supported by ArcGIS Server
+    wmsUrl: 'https://inspire.apia.org.ro/network/rest/services/INSPIRE/LPIS_referinta_2024/MapServer/WMSServer',
+    wmsOptions: {
+      layers: '0',
+      format: 'image/png',
+      transparent: true,
+      version: '1.1.1',
+      attribution: '© <a href="https://apia.org.ro" target="_blank">APIA Romania</a>',
+    },
+    defaultOpacity: 0.6,
     defaultVisible: false,
     minZoom: 12,
   },
@@ -88,11 +85,30 @@ const WMS_LAYER_DEFS: WmsLayerDef[] = [
     label: 'LPIS APIA referinta',
     sublabel: 'Parcele referinta INSPIRE (fallback)',
     color: 'amber',
-    // APIA parcel reference MapServer — historical / fallback
-    url: 'https://inspire.apia.org.ro/network/rest/services/INSPIRE/LPIS_parcel_reference/MapServer',
+    wmsUrl: 'https://inspire.apia.org.ro/network/rest/services/INSPIRE/LPIS_parcel_reference/MapServer/WMSServer',
+    wmsOptions: {
+      layers: '0',
+      format: 'image/png',
+      transparent: true,
+      version: '1.1.1',
+      attribution: '© <a href="https://apia.org.ro" target="_blank">APIA Romania</a>',
+    },
     defaultOpacity: 0.45,
     defaultVisible: false,
-    minZoom: 10,
+    minZoom: 12,
+  },
+  {
+    id: 'esri_boundaries',
+    label: 'Limite administrative',
+    sublabel: 'ESRI World Boundaries (vector overlay)',
+    color: 'blue',
+    // ESRI tile service — always works, globally hosted, HTTPS
+    isTile: true,
+    tileUrl: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    wmsUrl: '',  // unused when isTile=true
+    wmsOptions: {},
+    defaultOpacity: 0.7,
+    defaultVisible: false,
   },
 ]
 
@@ -264,8 +280,8 @@ export default function MapParcelSelector({
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null)
   const parcelLayersRef = useRef<Map<string, L.GeoJSON>>(new Map())
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Live esri-leaflet DynamicMapLayer instances keyed by layer id
-  const wmsLayerRefs = useRef<Map<string, EsriLeaflet.DynamicMapLayer>>(new Map())
+  // Live Leaflet tile layer instances keyed by layer id
+  const wmsLayerRefs = useRef<Map<string, L.TileLayer | L.TileLayer.WMS>>(new Map())
 
   const [parcels, setParcels] = useState<ParceleFitosanitar[]>([])
   const [loading, setLoading] = useState(true)
@@ -334,18 +350,20 @@ export default function MapParcelSelector({
       { position: 'topright' },
     ).addTo(map)
 
-    // Build esri-leaflet ArcGIS dynamic layers (browser-direct, no proxy)
+    // Build overlay layers — direct browser requests, no proxy
     WMS_LAYER_DEFS.forEach(def => {
-      const layer = createEsriLayer(def.url, def.defaultOpacity)
+      const layer: L.TileLayer | L.TileLayer.WMS = def.isTile
+        ? L.tileLayer(def.tileUrl!, { opacity: def.defaultOpacity, attribution: def.wmsOptions.attribution })
+        : createDirectWMS(def.wmsUrl, { ...def.wmsOptions, opacity: def.defaultOpacity })
       // Error / load tracking
       let errorFired = false
-      layer.on('loaderror', () => {
+      layer.on('tileerror', () => {
         if (!errorFired) {
           errorFired = true
           setWmsLayerErrors(prev => ({ ...prev, [def.id]: true }))
         }
       })
-      layer.on('load', () => {
+      layer.on('tileload', () => {
         setWmsLayerErrors(prev => {
           if (!prev[def.id]) return prev
           return { ...prev, [def.id]: false }
