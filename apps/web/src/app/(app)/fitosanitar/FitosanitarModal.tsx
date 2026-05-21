@@ -90,7 +90,7 @@ interface FormState {
   suprafata_tratata: string
   cantitate_utilizata: string
   unitate_cantitate: UnitateCantitate
-  nome_prenume_responsabil: string
+  nume_prenume_responsabil: string
   nr_certificat_utilizator: string
   data_incepere_recoltare: string
   numar_document: string
@@ -131,7 +131,7 @@ function entryToFormState(e: RegistruFitosanitar): FormState {
     suprafata_tratata: e.suprafata_tratata?.toString() ?? '',
     cantitate_utilizata: e.cantitate_utilizata?.toString() ?? '',
     unitate_cantitate: e.unitate_cantitate ?? 'litri',
-    nome_prenume_responsabil: e.nume_prenume_responsabil ?? '',
+    nume_prenume_responsabil: e.nume_prenume_responsabil ?? '',
     nr_certificat_utilizator: e.nr_certificat_utilizator ?? '',
     data_incepere_recoltare: e.data_incepere_recoltare ?? '',
     numar_document: e.numar_document ?? '',
@@ -155,7 +155,7 @@ const emptyFormState: FormState = {
   doza_omologata_min: '', doza_omologata_max: '', doza_folosita: '',
   unitate_doza: 'l/ha', metoda_aplicare: 'stropire', volum_apa_lha: '',
   suprafata_tratata: '', cantitate_utilizata: '', unitate_cantitate: 'litri',
-  nome_prenume_responsabil: '', nr_certificat_utilizator: '', data_incepere_recoltare: '',
+  nume_prenume_responsabil: '', nr_certificat_utilizator: '', data_incepere_recoltare: '',
   numar_document: '', data_document: '',
   conditii_meteo: '', temperatura_aplicare_c: '', viteza_vant_max_ms: '',
   umiditate_relativa_pct: '', echipament_utilizat: '',
