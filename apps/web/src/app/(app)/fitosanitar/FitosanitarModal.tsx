@@ -700,6 +700,9 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
                 </div>
               </div>
             </div>
+
+            {/* ─── Section 6: Cantitate ─────────────────────────────────── */}
+            <div>
               <SectionHeader num={6} title="Cantitate Utilizată" />
               <div className="grid grid-cols-2 gap-4">
                 <div>
