@@ -180,6 +180,31 @@ export type UnitateDoza = 'l/ha' | 'kg/ha' | 'g/ha' | 'ml/ha'
 export type UnitateCantitate = 'litri' | 'kg'
 export type MetodaAplicare = 'stropire' | 'pulverizare' | 'prafuire' | 'granule' | 'injectare' | 'tratament_samanta' | 'altele'
 
+// ─── ANF "Tipul utilizării" options (Regulamentul UE + OUG 53/2025) ────────────
+export const TIP_UTILIZARE_OPTIONS = [
+  'Tratamentul suprafețelor-terenuri agricole',
+  'Tratamentul suprafețelor-zone de agrement',
+  'Tratamentul suprafețelor-linii de cale ferată',
+  'Tratamentul suprafețelor-suprafețe necultivate',
+  'Tratamentul suprafețelor-sere',
+  'Tratamentul suprafețelor-drumuri și căi de comunicare',
+  'Tratamentul suprafețelor-zone riverane și de coastă',
+  'Tratamentul suprafețelor-păduri',
+  'Tratarea spațiilor închise sau în spații închise-tratarea prin nebulizare a spațiilor de depozitare',
+  'Tratarea spațiilor închise sau în spații închise-tratarea prin stropire a spațiilor de depozitare',
+  'Tratarea spațiilor închise sau în spații închise-tratarea prin nebulizare a depozitelor goale de cereale',
+  'Tratarea spațiilor închise sau în spații închise-tratarea prin stropire a depozitelor goale de cereale',
+  'Tratarea spațiilor închise sau în spații închise-tratarea prin nebulizare a serelor permanente',
+  'Tratarea spațiilor închise sau în spații închise-tratarea prin stropire a serelor permanente',
+  'Tratarea spațiilor închise sau în spații închise-tratarea prin nebulizare a serelor temporare',
+  'Tratarea spațiilor închise sau în spații închise-tratarea prin stropire a serelor temporare',
+  'Tratarea spațiilor închise sau în spații închise-fumigarea solului',
+  'Tratarea spațiilor închise sau în spații închise-alte tratamente în spații închise',
+  'Tratamentul semințelor-tratamentul semințelor agricole',
+  'Alte utilizări',
+] as const
+export type TipUtilizare = (typeof TIP_UTILIZARE_OPTIONS)[number]
+
 // ─── DB row type (mirrors registru_fitosanitar table) ─────────────────────────
 export interface RegistruFitosanitar {
   id: string
@@ -228,6 +253,7 @@ export interface RegistruFitosanitar {
   data_inspectie_echipament?: string | null
   an_registru?: number
   exportat_anf_at?: string | null
+  tip_utilizare?: string | null            // [ANF] tipul utilizării PPP
   observatii?: string | null
   is_deleted: boolean
   deleted_at?: string | null

@@ -175,6 +175,10 @@ ALTER TABLE public.registru_fitosanitar
 ALTER TABLE public.registru_fitosanitar
   ADD COLUMN IF NOT EXISTS exportat_anf_at            TIMESTAMPTZ;
 
+-- [ANF] Tipul utilizarii (categorii oficiale ANF pentru registrul digital)
+ALTER TABLE public.registru_fitosanitar
+  ADD COLUMN IF NOT EXISTS tip_utilizare              TEXT;
+
 -- an_registru: generated column (computed from data_tratament)
 -- Must be added separately; ADD COLUMN IF NOT EXISTS works for generated columns in PG12+
 ALTER TABLE public.registru_fitosanitar

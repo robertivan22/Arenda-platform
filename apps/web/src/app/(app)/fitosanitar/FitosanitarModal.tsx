@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import {
   RegistruFitosanitar, FitosanitarFormData, TipAgent, UnitateDoza, UnitateCantitate, MetodaAplicare,
   CULTURA_OPTIONS, JUDETE_ROMANIA, TIP_AGENT_LABELS, getBBCHForCultura, formatDateRO,
+  TIP_UTILIZARE_OPTIONS,
 } from '@/lib/bbch-data'
 import { BBCHSelector } from './BBCHChart'
 
@@ -103,6 +104,7 @@ interface FormState {
   nr_certificat_inspectie: string
   data_inspectie_echipament: string
   observatii: string
+  tip_utilizare: string
 }
 
 function entryToFormState(e: RegistruFitosanitar): FormState {
@@ -144,6 +146,7 @@ function entryToFormState(e: RegistruFitosanitar): FormState {
     nr_certificat_inspectie: e.nr_certificat_inspectie ?? '',
     data_inspectie_echipament: e.data_inspectie_echipament ?? '',
     observatii: e.observatii ?? '',
+    tip_utilizare: e.tip_utilizare ?? '',
   }
 }
 
@@ -160,6 +163,7 @@ const emptyFormState: FormState = {
   conditii_meteo: '', temperatura_aplicare_c: '', viteza_vant_max_ms: '',
   umiditate_relativa_pct: '', echipament_utilizat: '',
   nr_certificat_inspectie: '', data_inspectie_echipament: '', observatii: '',
+  tip_utilizare: '',
 }
 
 export function FitosanitarModal({ mode, initialData, onClose, onSaved }: FitosanitarModalProps) {
@@ -303,6 +307,7 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
       echipament_utilizat: form.echipament_utilizat.trim() || null,
       nr_certificat_inspectie: form.nr_certificat_inspectie.trim() || null,
       data_inspectie_echipament: form.data_inspectie_echipament || null,
+      tip_utilizare: form.tip_utilizare || null,
       observatii: isCorrect
         ? `Corectare a înregistrării #${initialData?.numar_inregistrare ?? '?'}. ${form.observatii}`.trim()
         : form.observatii.trim() || null,
@@ -425,6 +430,32 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
                     disabled
                     className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded bg-gray-50 text-gray-500"
                   />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className={labelCls}>Ora tratamentului <span className="text-blue-500 font-normal">[OUG53]</span></label>
+                  <input
+                    type="time"
+                    value={form.ora_tratament}
+                    onChange={e => set('ora_tratament', e.target.value)}
+                    disabled={isView}
+                    className={inputCls('ora_tratament')}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Tipul utilizării <span className="text-blue-500 font-normal">[ANF]</span></label>
+                  <select
+                    value={form.tip_utilizare}
+                    onChange={e => set('tip_utilizare', e.target.value)}
+                    disabled={isView}
+                    className={inputCls('tip_utilizare')}
+                  >
+                    <option value="">— Selectați —</option>
+                    {TIP_UTILIZARE_OPTIONS.map(o => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>

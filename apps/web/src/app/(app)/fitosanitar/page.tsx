@@ -17,6 +17,7 @@ import {
 import { exportFitosanitarToExcel, ExportUserSettings } from '@/lib/fitosanitar-export'
 import { FitosanitarModal } from './FitosanitarModal'
 import { BBCHChart } from './BBCHChart'
+import { FitosanitarANFView } from './FitosanitarANFView'
 
 // ─── Sort state ───────────────────────────────────────────────────────────────
 type SortField = keyof Pick<
@@ -51,6 +52,8 @@ export default function FitosanitarPage() {
   const [modalMode, setModalMode] = useState<'add' | 'view' | 'correct' | null>(null)
   const [selectedEntry, setSelectedEntry] = useState<RegistruFitosanitar | undefined>()
   const [showBBCHRef, setShowBBCHRef] = useState(false)
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'detaliat' | 'anf'>('detaliat')
 
   // ── Load data ─────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -203,7 +206,34 @@ export default function FitosanitarPage() {
         </p>
       </div>
 
-      {/* ── Filter bar ──────────────────────────────────────────────────── */}
+      {/* ── Tab switcher ─────────────────────────────────────────────────── */}
+      <div className="flex gap-0 mb-4 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('detaliat')}
+          className={`px-5 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'detaliat'
+              ? 'border-green-600 text-green-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Registru Detaliat
+        </button>
+        <button
+          onClick={() => setActiveTab('anf')}
+          className={`px-5 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'anf'
+              ? 'border-green-600 text-green-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Registru Fitosanitar Simplu ANF
+        </button>
+      </div>
+
+      {activeTab === 'anf' && <FitosanitarANFView />}
+
+      {activeTab === 'detaliat' && (
+      <>
       <div className="bg-white rounded-lg border border-gray-200 p-3 mb-4 flex flex-wrap gap-3 items-end">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -495,6 +525,8 @@ export default function FitosanitarPage() {
             <BBCHChart onClose={() => setShowBBCHRef(false)} />
           </div>
         </>
+      )}
+      </>
       )}
     </div>
   )
