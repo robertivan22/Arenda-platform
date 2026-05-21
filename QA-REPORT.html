@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ArendaPro — QA &amp; Security Report</title>
+<style>
+  :root {
+    --red:    #dc2626;
+    --orange: #d97706;
+    --yellow: #ca8a04;
+    --green:  #16a34a;
+    --blue:   #2563eb;
+    --gray:   #64748b;
+    --bg:     #f8fafc;
+    --card:   #ffffff;
+    --border: #e2e8f0;
+    --text:   #1e293b;
+    --muted:  #64748b;
+    --code-bg:#1e293b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: var(--text); line-height: 1.6; }
+
+  /* ─── Layout ───────────────────────────────────── */
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  /* ─── Header ───────────────────────────────────── */
+  .report-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+    color: #fff; padding: 48px 40px 36px; border-radius: 16px;
+    margin-bottom: 36px; position: relative; overflow: hidden;
+  }
+  .report-header::before {
+    content: ''; position: absolute; right: -60px; top: -60px;
+    width: 300px; height: 300px; border-radius: 50%;
+    background: rgba(255,255,255,.04);
+  }
+  .report-header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 6px; }
+  .report-header .subtitle { color: #94a3b8; font-size: .95rem; }
+  .report-header .meta { margin-top: 20px; display: flex; gap: 24px; flex-wrap: wrap; }
+  .meta-item { background: rgba(255,255,255,.08); border-radius: 8px;
+               padding: 8px 16px; font-size: .85rem; color: #e2e8f0; }
+  .meta-item strong { color: #fff; }
+
+  /* ─── Score cards ──────────────────────────────── */
+  .score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                gap: 16px; margin-bottom: 36px; }
+  .score-card { background: var(--card); border: 1px solid var(--border);
+                border-radius: 12px; padding: 20px; text-align: center; }
+  .score-card .score-num { font-size: 2.2rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+  .score-card .score-label { font-size: .8rem; color: var(--muted); text-transform: uppercase;
+                              letter-spacing: .05em; }
+  .score-card.red .score-num   { color: var(--red); }
+  .score-card.orange .score-num{ color: var(--orange); }
+  .score-card.yellow .score-num{ color: var(--yellow); }
+  .score-card.green .score-num { color: var(--green); }
+  .score-card.blue .score-num  { color: var(--blue); }
+
+  /* ─── Section title ────────────────────────────── */
+  .section-title {
+    font-size: 1.25rem; font-weight: 700; margin: 36px 0 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title .icon { font-size: 1.4rem; }
+
+  /* ─── Good items ───────────────────────────────── */
+  .good-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+               gap: 12px; margin-bottom: 8px; }
+  .good-item { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px;
+               padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; }
+  .good-item .tick { color: var(--green); font-size: 1.1rem; margin-top: 1px; flex-shrink: 0; }
+  .good-item .good-body strong { display: block; font-size: .9rem; margin-bottom: 2px; }
+  .good-item .good-body span { font-size: .82rem; color: var(--muted); }
+
+  /* ─── Issue card ───────────────────────────────── */
+  .issue-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    margin-bottom: 20px; overflow: hidden;
+  }
+  .issue-header {
+    padding: 16px 20px; display: flex; align-items: center; gap: 14px;
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 20px; font-size: .75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .04em; flex-shrink: 0;
+  }
+  .badge.critical { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
+  .badge.high     { background: #fff7ed; color: var(--orange); border: 1px solid #fed7aa; }
+  .badge.medium   { background: #fefce8; color: var(--yellow); border: 1px solid #fde68a; }
+  .badge.low      { background: #f0f9ff; color: var(--blue); border: 1px solid #bae6fd; }
+  .issue-id { font-size: .75rem; font-weight: 700; color: var(--muted);
+              background: #f1f5f9; padding: 3px 8px; border-radius: 6px; }
+  .issue-title { font-weight: 700; font-size: 1rem; flex: 1; min-width: 200px; }
+
+  .issue-body { padding: 16px 20px; }
+  .field-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px;
+               margin-bottom: 8px; font-size: .875rem; }
+  .field-label { font-weight: 600; color: var(--muted); padding-top: 1px; }
+  .field-value { color: var(--text); }
+  .file-link { font-family: 'SF Mono', 'Fira Code', monospace; font-size: .8rem;
+               color: var(--blue); text-decoration: none; }
+  .file-link:hover { text-decoration: underline; }
+
+  /* ─── Code blocks ──────────────────────────────── */
+  .code-block { margin-top: 14px; border-radius: 10px; overflow: hidden; }
+  .code-block-header {
+    background: #334155; color: #94a3b8; font-size: .75rem; font-weight: 600;
+    padding: 8px 16px; display: flex; justify-content: space-between;
+    align-items: center; text-transform: uppercase; letter-spacing: .05em;
+  }
+  .code-block-header .lang { color: #67e8f9; }
+  pre {
+    background: var(--code-bg); color: #e2e8f0; padding: 16px 20px;
+    overflow-x: auto; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: .82rem; line-height: 1.6; margin: 0;
+  }
+  .diff-add { color: #86efac; }
+  .diff-del { color: #fca5a5; text-decoration: line-through; opacity: .7; }
+  .diff-ctx { color: #94a3b8; }
+  .diff-hdr { color: #67e8f9; font-style: italic; }
+  .comment  { color: #6b7280; }
+
+  /* ─── Scalability table ────────────────────────── */
+  .score-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+  .score-table th { background: #f1f5f9; padding: 10px 14px; text-align: left;
+                    font-weight: 600; color: var(--muted); font-size: .8rem;
+                    text-transform: uppercase; letter-spacing: .04em; }
+  .score-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .score-table tr:last-child td { border-bottom: none; }
+  .score-bar { height: 8px; border-radius: 4px; background: #e2e8f0; overflow: hidden; display: inline-block; width: 100px; vertical-align: middle; }
+  .score-fill { height: 100%; border-radius: 4px; }
+
+  /* ─── Quick wins ───────────────────────────────── */
+  .qw-list { list-style: none; }
+  .qw-list li {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; margin-bottom: 10px;
+    display: grid; grid-template-columns: 32px 1fr auto; align-items: start; gap: 12px;
+  }
+  .qw-num { width: 28px; height: 28px; border-radius: 50%; background: #0f172a; color: #fff;
+            font-weight: 700; font-size: .8rem; display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; margin-top: 1px; }
+  .qw-body strong { display: block; font-size: .9rem; margin-bottom: 3px; }
+  .qw-body span { font-size: .82rem; color: var(--muted); }
+  .qw-effort { font-size: .75rem; color: var(--muted); background: #f1f5f9;
+               padding: 3px 10px; border-radius: 20px; white-space: nowrap; align-self: center; }
+
+  /* ─── Footer ───────────────────────────────────── */
+  .report-footer { margin-top: 60px; text-align: center; color: var(--muted); font-size: .82rem; }
+
+  @media (max-width: 640px) {
+    .report-header { padding: 32px 20px 28px; }
+    .report-header h1 { font-size: 1.5rem; }
+    .field-row { grid-template-columns: 1fr; gap: 2px; }
+    .field-label { color: var(--text); font-size: .78rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ════════════════════ HEADER ════════════════════ -->
+<div class="report-header">
+  <h1>🔍 ArendaPro — QA &amp; Security Report</h1>
+  <div class="subtitle">Senior code review · Security · Scalability · Code quality</div>
+  <div class="meta">
+    <div class="meta-item"><strong>Project:</strong> ArendaPro SaaS Platform</div>
+    <div class="meta-item"><strong>Stack:</strong> Next.js 15 · Supabase · Cloudflare Edge</div>
+    <div class="meta-item"><strong>Review date:</strong> 21 May 2026</div>
+    <div class="meta-item"><strong>Reviewer:</strong> GitHub Copilot (Claude Sonnet 4.6)</div>
+    <div class="meta-item"><strong>Files reviewed:</strong> 12 source files + migration SQL</div>
+  </div>
+</div>
+
+<!-- ════════════════════ SUMMARY SCORES ════════════════════ -->
+<div class="score-grid">
+  <div class="score-card red">
+    <div class="score-num">3</div>
+    <div class="score-label">🔴 Critical</div>
+  </div>
+  <div class="score-card orange">
+    <div class="score-num">4</div>
+    <div class="score-label">🟠 High</div>
+  </div>
+  <div class="score-card yellow">
+    <div class="score-num">4</div>
+    <div class="score-label">🟡 Medium</div>
+  </div>
+  <div class="score-card green">
+    <div class="score-num">8</div>
+    <div class="score-label">✅ What's good</div>
+  </div>
+  <div class="score-card blue">
+    <div class="score-num">5.5<span style="font-size:1rem">/10</span></div>
+    <div class="score-label">📊 Overall score</div>
+  </div>
+</div>
+
+<!-- ════════════════════ WHAT'S GOOD ════════════════════ -->
+<div class="section-title"><span class="icon">✅</span> What's Good</div>
+<div class="good-grid">
+  <div class="good-item">
+    <span class="tick">✓</span>
+    <div class="good-body">
+      <strong>Middleware uses getUser() not getSession()</strong>
+      <span>JWT is validated server-side on every request via Supabase. The comment in middleware.ts even explains why — best practice.</span>
+    </div>
+  </div>
+  <div class="good-item">
+    <span class="tick">✓</span>
+    <div class="good-body">
+      <strong>RLS enabled on all tables</strong>
+      <span>profiles, user_permissions, document_templates all have RLS on with correctly scoped policies.</span>
+    </div>
+  </div>
+  <div class="good-item">
+    <span class="tick">✓</span>
+    <div class="good-body">
+      <strong>is_admin_user() SECURITY DEFINER function</strong>
+      <span>Admin privilege check bypasses RLS safely and is used consistently in all admin policies.</span>
+    </div>
+  </div>
+  <div class="good-item">
+    <span class="tick">✓</span>
+    <div class="good-body">
+      <strong>API route validates Bearer token first</strong>
+      <span>d112/route.ts calls auth.getUser() and validates it before any DB access — no early-exit bypass.</span>
+    </div>
+  </div>
+  <div class="good-item">
+    <span class="tick">✓</span>
+    <div class="good-body">
+      <strong>Admin panel has secondary auth check</strong>
+      <span>admin-cp/page.tsx queries is_admin from profiles table client-side — defense in depth.</span>
+    </div>
+  </div>
+  <div class="good-item">
+    <span class="tick">✓</span>
+    <div class="good-body">
+      <strong>Print pages refactored to JSX (no dangerouslySetInnerHTML)</strong>
+      <span>Template system now uses JSON config + controlled JSX rendering. XSS surface eliminated.</span>
+    </div>
+  </div>
+  <div class="good-item">
+    <span class="tick">✓</span>
+    <div class="good-body">
+      <strong>fetchTextConfig falls back gracefully</strong>
+      <span>user config → system default → in-code defaults, with try/catch around JSON.parse.</span>
+    </div>
+  </div>
+  <div class="good-item">
+    <span class="tick">✓</span>
+    <div class="good-body">
+      <strong>Edge runtime declared on all pages</strong>
+      <span>export const runtime = 'edge' consistent across print and admin pages — Cloudflare-ready.</span>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════ ISSUES ════════════════════ -->
+<div class="section-title"><span class="icon">🚨</span> Issues Found</div>
+
+<!-- ─── C-1 ─── -->
+<div class="issue-card">
+  <div class="issue-header">
+    <span class="badge critical">🔴 Critical</span>
+    <span class="issue-id">C-1</span>
+    <span class="issue-title">/admin-cp and /setari unprotected in middleware — no redirect for unauthenticated users</span>
+  </div>
+  <div class="issue-body">
+    <div class="field-row">
+      <span class="field-label">Location</span>
+      <span class="field-value"><code>apps/web/src/middleware.ts</code> — lines 64–74 (<code>isAppPage</code> definition)</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Problem</span>
+      <span class="field-value">The <code>isAppPage</code> guard list is missing <code>/admin-cp</code> and <code>/setari</code>. An unauthenticated request to either route passes straight through the middleware without being redirected to <code>/login</code>. The admin panel falls back to a silent no-op (client-side check keeps <code>isAdmin = false</code>), but the page HTML is still served and the JS bundle is downloaded. For <code>/setari</code>, a user without a session would see a blank loading spinner — no redirect ever fires.</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Risk</span>
+      <span class="field-value">Unauthenticated HTML access to admin pages; violates defence-in-depth principle.</span>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>middleware.ts — fix</span><span class="lang">TypeScript diff</span></div>
+      <pre><span class="diff-hdr">@@ apps/web/src/middleware.ts @@</span>
+<span class="diff-ctx">  // App pages that require authentication</span>
+<span class="diff-ctx">  const isAppPage = pathname.startsWith('/dashboard') ||</span>
+<span class="diff-ctx">    pathname.startsWith('/arendatori') ||</span>
+<span class="diff-ctx">    pathname.startsWith('/contracte') ||</span>
+<span class="diff-ctx">    pathname.startsWith('/parcele') ||</span>
+<span class="diff-ctx">    pathname.startsWith('/plati') ||</span>
+<span class="diff-ctx">    pathname.startsWith('/rapoarte') ||</span>
+<span class="diff-ctx">    pathname.startsWith('/declaratii') ||</span>
+<span class="diff-del">    pathname.startsWith('/profil')</span>
+<span class="diff-add">    pathname.startsWith('/profil') ||</span>
+<span class="diff-add">    pathname.startsWith('/setari') ||</span>
+<span class="diff-add">    pathname.startsWith('/admin-cp') ||</span>
+<span class="diff-add">    pathname.startsWith('/print')</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ─── C-2 ─── -->
+<div class="issue-card">
+  <div class="issue-header">
+    <span class="badge critical">🔴 Critical</span>
+    <span class="issue-id">C-2</span>
+    <span class="issue-title">D112 API — req.json() not wrapped in try/catch + year/month not validated as numbers</span>
+  </div>
+  <div class="issue-body">
+    <div class="field-row">
+      <span class="field-label">Location</span>
+      <span class="field-value"><code>apps/web/src/app/api/d112/route.ts</code> — lines 30–40</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Problem 1</span>
+      <span class="field-value"><code>const body = await req.json()</code> throws an unhandled exception if the request body is not valid JSON (e.g. wrong Content-Type, empty body, network truncation). No try/catch means this surfaces as an unhandled 500.</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Problem 2</span>
+      <span class="field-value"><code>as { year: number; month: number }</code> is a compile-time cast only — it performs zero runtime validation. If a caller sends <code>{ "year": "abc", "month": "foo" }</code>: <code>!year</code> is <code>false</code> (truthy string), <code>month &lt; 1</code> is <code>false</code> (NaN comparison). Validation passes. <code>String(month).padStart(2, '0')</code> then emits <code>"foo"</code> into a DB date string, producing a malformed <code>periodTo</code> value and corrupted report data.</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Risk</span>
+      <span class="field-value">Unhandled 500 on invalid body; malformed date strings written into D112 report output; OWASP A03 (Injection — data).</span>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>api/d112/route.ts — fix</span><span class="lang">TypeScript diff</span></div>
+      <pre><span class="diff-del">  const body = await req.json() as { year: number; month: number }</span>
+<span class="diff-del">  const { year, month } = body</span>
+<span class="diff-del">  if (!year || !month || month &lt; 1 || month > 12) {</span>
+<span class="diff-del">    return NextResponse.json({ error: 'Parametrii lipsa: year, month (1-12)' }, { status: 400 })</span>
+<span class="diff-del">  }</span>
+
+<span class="diff-add">  let rawBody: unknown</span>
+<span class="diff-add">  try { rawBody = await req.json() } catch {</span>
+<span class="diff-add">    return NextResponse.json({ error: 'Body JSON invalid' }, { status: 400 })</span>
+<span class="diff-add">  }</span>
+<span class="diff-add">  const year  = Number((rawBody as any)?.year)</span>
+<span class="diff-add">  const month = Number((rawBody as any)?.month)</span>
+<span class="diff-add">  if (!Number.isInteger(year) || year &lt; 2000 || year > 2100 ||</span>
+<span class="diff-add">      !Number.isInteger(month) || month &lt; 1 || month > 12) {</span>
+<span class="diff-add">    return NextResponse.json({ error: 'Parametrii invalizi: year (2000-2100), month (1-12)' }, { status: 400 })</span>
+<span class="diff-add">  }</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ─── C-3 ─── -->
+<div class="issue-card">
+  <div class="issue-header">
+    <span class="badge critical">🔴 Critical</span>
+    <span class="issue-id">C-3</span>
+    <span class="issue-title">parseFloat(form.amount) — NaN can be inserted into the payments table</span>
+  </div>
+  <div class="issue-body">
+    <div class="field-row">
+      <span class="field-label">Location</span>
+      <span class="field-value"><code>apps/web/src/app/(app)/plati/page.tsx</code> — <code>handleAdd()</code> function</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Problem</span>
+      <span class="field-value"><code>parseFloat('')</code> → <code>NaN</code>. <code>parseFloat('abc')</code> → <code>NaN</code>. There is no guard between the form state and the insert call. PostgreSQL will reject <code>NaN</code> in a numeric column and return an error, but the error message exposed to the user via <code>toast.error(error.message)</code> will be a raw Supabase/Postgres error string — not a friendly validation message.</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Risk</span>
+      <span class="field-value">Data integrity; raw internal error messages leaked to UI.</span>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>plati/page.tsx — handleAdd fix</span><span class="lang">TypeScript diff</span></div>
+      <pre><span class="diff-ctx">  async function handleAdd(e: React.FormEvent) {</span>
+<span class="diff-ctx">    e.preventDefault()</span>
+<span class="diff-ctx">    setSaving(true)</span>
+<span class="diff-add">    const amount = parseFloat(form.amount)</span>
+<span class="diff-add">    if (isNaN(amount) || amount &lt;= 0) {</span>
+<span class="diff-add">      toast.error('Suma introdusă este invalidă.')</span>
+<span class="diff-add">      setSaving(false)</span>
+<span class="diff-add">      return</span>
+<span class="diff-add">    }</span>
+<span class="diff-ctx">    const db = createClient()</span>
+<span class="diff-ctx">    const { data: { user } } = await db.auth.getUser()</span>
+<span class="diff-ctx">    const contract = contracts.find(c => c.id === form.contractId)</span>
+<span class="diff-ctx">    const { error } = await db.from('payments').insert({</span>
+<span class="diff-ctx">      user_id: user!.id,</span>
+<span class="diff-ctx">      ...</span>
+<span class="diff-del">      amount: parseFloat(form.amount),</span>
+<span class="diff-add">      amount,</span>
+<span class="diff-ctx">      ...</span>
+<span class="diff-ctx">    })</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ─── H-1 ─── -->
+<div class="issue-card">
+  <div class="issue-header">
+    <span class="badge high">🟠 High</span>
+    <span class="issue-id">H-1</span>
+    <span class="issue-title">No .limit() on any list query — unbounded full-table scans on every page load</span>
+  </div>
+  <div class="issue-body">
+    <div class="field-row">
+      <span class="field-label">Location</span>
+      <span class="field-value"><code>contracte/page.tsx</code> line 26 · <code>arendatori/page.tsx</code> line 30 · <code>plati/page.tsx</code> lines 42, 87, 92 · all other list pages</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Problem</span>
+      <span class="field-value">All queries fetch every row the authenticated user owns, on every component mount. With 500 lessors or 2 000 payments the response body becomes large, the browser holds the entire dataset in memory, and the initial page paint is blocked waiting for the full response. Client-side filtering (<code>rows.filter(r =&gt; ...)</code>) is applied after the full fetch — there is no server-side search or pagination.</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Risk</span>
+      <span class="field-value">Performance degradation at scale; potential OOM crash in browser; poor UX for power users.</span>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>Quick mitigation — add safety cap (all list pages)</span><span class="lang">TypeScript</span></div>
+      <pre><span class="diff-ctx">  createClient()</span>
+<span class="diff-ctx">    .from('contracts')</span>
+<span class="diff-ctx">    .select('id, contract_number, ...')</span>
+<span class="diff-ctx">    .order('created_at', { ascending: false })</span>
+<span class="diff-add">    .limit(500)   <span class="comment">// safety cap — replace with pagination long-term</span></span>
+<span class="diff-ctx">    .then(({ data }) =&gt; { ... })</span></pre>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>Long-term — server-side search pattern</span><span class="lang">TypeScript</span></div>
+      <pre><span class="comment">// Replace client-side .filter() with a parameterised query:</span>
+const [search, setSearch] = useState('')
+const [debouncedSearch] = useDebounce(search, 300)
+
+useEffect(() => {
+  let q = createClient()
+    .from('contracts')
+    .select('id, contract_number, ...')
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (debouncedSearch) {
+    q = q.ilike('contract_number', `%${debouncedSearch}%`)
+  }
+
+  q.then(({ data, error }) => {
+    if (error) { toast.error('Eroare la încărcare.'); return }
+    if (data) setRows(data as Contract[])
+  })
+}, [debouncedSearch])</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ─── H-2 ─── -->
+<div class="issue-card">
+  <div class="issue-header">
+    <span class="badge high">🟠 High</span>
+    <span class="issue-id">H-2</span>
+    <span class="issue-title">Errors silently swallowed on all list-page Supabase queries</span>
+  </div>
+  <div class="issue-body">
+    <div class="field-row">
+      <span class="field-label">Location</span>
+      <span class="field-value">Every <code>useEffect</code> data fetch in <code>contracte/</code>, <code>arendatori/</code>, <code>plati/</code>, <code>parcele/</code>, <code>rapoarte/</code></span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Problem</span>
+      <span class="field-value">The common pattern is <code>.then(({ data }) =&gt; { if (data) setRows(data) })</code> — the <code>error</code> destructure is completely absent. If the query fails (network error, RLS policy misconfiguration, schema mismatch after a migration), the table silently renders "Nicio înregistrare". Users cannot distinguish between "no data" and "data failed to load". This also hides legitimate RLS failures during development.</span>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>Before / After pattern (arendatori/page.tsx)</span><span class="lang">TypeScript diff</span></div>
+      <pre><span class="diff-del">  .then(({ data }) =&gt; { if (data) setRows(data as Lessor[]) })</span>
+
+<span class="diff-add">  .then(({ data, error }) =&gt; {</span>
+<span class="diff-add">    if (error) { toast.error('Eroare la încărcarea arendatorilor.'); return }</span>
+<span class="diff-add">    if (data) setRows(data as Lessor[])</span>
+<span class="diff-add">  })</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ─── H-3 ─── -->
+<div class="issue-card">
+  <div class="issue-header">
+    <span class="badge high">🟠 High</span>
+    <span class="issue-id">H-3</span>
+    <span class="issue-title">Print pages have no explicit user ownership check — PII exposure if RLS has a gap</span>
+  </div>
+  <div class="issue-body">
+    <div class="field-row">
+      <span class="field-label">Location</span>
+      <span class="field-value"><code>print/contract/[id]/page.tsx</code> line 63 · <code>print/factura/[id]/page.tsx</code> line 50</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Problem</span>
+      <span class="field-value">The queries <code>db.from('contracts').select('*, lessors(*)').eq('id', id)</code> and <code>db.from('invoices').select('*').eq('id', id)</code> rely entirely on RLS to prevent cross-tenant reads. There is no explicit <code>.eq('user_id', user.id)</code> guard in the page. If RLS is ever misconfigured (or a policy is temporarily dropped during a migration), CNP, IBAN, full address and bank details for another tenant's lessors would be rendered by any authenticated session that knows a UUID.</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Risk</span>
+      <span class="field-value">PII/GDPR data leak (CNP, IBAN, address); OWASP A01 (Broken Access Control).</span>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>print/contract/[id]/page.tsx — fix</span><span class="lang">TypeScript diff</span></div>
+      <pre><span class="diff-ctx">  useEffect(() => {</span>
+<span class="diff-ctx">    const db = createClient()</span>
+<span class="diff-add">    db.auth.getUser().then(async ({ data: { user } }) => {</span>
+<span class="diff-add">      if (!user) return  <span class="comment">// middleware handles redirect</span></span>
+<span class="diff-ctx">      Promise.all([</span>
+<span class="diff-del">        db.from('contracts').select('*, lessors(*)').eq('id', id).single(),</span>
+<span class="diff-add">        db.from('contracts').select('*, lessors(*)')</span>
+<span class="diff-add">          .eq('id', id).eq('user_id', user.id).single(),</span>
+<span class="diff-ctx">        db.from('company_settings').select('*').single(),</span>
+<span class="diff-ctx">        db.from('contract_rent_levels').select('*').eq('contract_id', id).order('sort_order'),</span>
+<span class="diff-ctx">        db.from('parcels').select('*').eq('contract_id', id),</span>
+<span class="diff-ctx">      ]).then(async ([{ data: c }, ...]) => {</span>
+<span class="diff-ctx">        ...</span>
+<span class="diff-add">        const textCfg = await fetchTextConfig(db, user.id, 'CONTRACT')</span>
+<span class="diff-ctx">        ...</span>
+<span class="diff-add">      })</span>
+<span class="diff-add">    })</span>
+<span class="diff-ctx">  }, [id])</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ─── H-4 ─── -->
+<div class="issue-card">
+  <div class="issue-header">
+    <span class="badge high">🟠 High</span>
+    <span class="issue-id">H-4</span>
+    <span class="issue-title">fetchTemplate uses fragile includes('System default') string check for control flow</span>
+  </div>
+  <div class="issue-body">
+    <div class="field-row">
+      <span class="field-label">Location</span>
+      <span class="field-value"><code>apps/web/src/lib/templates.ts</code> — <code>fetchTemplate()</code> function, lines 57 &amp; 66</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Problem</span>
+      <span class="field-value"><code>if (!userTmpl.html_content.includes('System default'))</code> — any template whose stored content happens to contain the substring <em>"System default"</em> will be silently skipped and treated as if it doesn't exist. This is content-based control flow. The correct discriminator is the <code>user_id</code> column value, which is already being used as a query filter.</span>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>templates.ts — fix (remove string checks)</span><span class="lang">TypeScript diff</span></div>
+      <pre><span class="diff-ctx">  const { data: userTmpl } = await db</span>
+<span class="diff-ctx">    .from('document_templates')</span>
+<span class="diff-ctx">    .select('id, html_content, name')</span>
+<span class="diff-ctx">    .eq('user_id', userId)</span>
+<span class="diff-ctx">    .eq('doc_type', docType)</span>
+<span class="diff-ctx">    .eq('is_active', true)</span>
+<span class="diff-ctx">    .maybeSingle()</span>
+
+<span class="diff-del">  if (userTmpl?.html_content && !userTmpl.html_content.includes('System default')) {</span>
+<span class="diff-del">    return userTmpl as TemplateRow</span>
+<span class="diff-del">  }</span>
+<span class="diff-add">  if (userTmpl?.html_content) return userTmpl as TemplateRow</span>
+
+<span class="diff-ctx">  const { data: sysTmpl } = await db</span>
+<span class="diff-ctx">    .from('document_templates')</span>
+<span class="diff-ctx">    .select('id, html_content, name')</span>
+<span class="diff-ctx">    .is('user_id', null)</span>
+<span class="diff-ctx">    .eq('doc_type', docType)</span>
+<span class="diff-ctx">    .eq('is_active', true)</span>
+<span class="diff-ctx">    .maybeSingle()</span>
+
+<span class="diff-del">  if (sysTmpl?.html_content && !sysTmpl.html_content.includes('System default')) {</span>
+<span class="diff-del">    return sysTmpl as TemplateRow</span>
+<span class="diff-del">  }</span>
+<span class="diff-add">  if (sysTmpl?.html_content) return sysTmpl as TemplateRow</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ─── M-1 ─── -->
+<div class="issue-card">
+  <div class="issue-header">
+    <span class="badge medium">🟡 Medium</span>
+    <span class="issue-id">M-1</span>
+    <span class="issue-title">Dead code — PLACEHOLDERS + STARTER_HTML (~800 lines) still bundled in admin-cp</span>
+  </div>
+  <div class="issue-body">
+    <div class="field-row">
+      <span class="field-label">Location</span>
+      <span class="field-value"><code>apps/web/src/app/admin-cp/page.tsx</code> — approx. lines 62–340</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Problem</span>
+      <span class="field-value">The <code>PLACEHOLDERS</code> and <code>STARTER_HTML</code> constants are declared but never referenced anywhere in the component. They inflate the compiled JS bundle by ~15–20 KB (minified). On Cloudflare Workers, bundle size directly affects cold-start latency and approaches the 1 MB compressed limit. A comment on line 63 even says "removed" — but the constants weren't actually deleted.</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Risk</span>
+      <span class="field-value">Bundle bloat; slower cold starts on the edge; misleading comment in code.</span>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>Fix — delete both constants entirely</span><span class="lang">TypeScript diff</span></div>
+      <pre><span class="diff-del">// (PLACEHOLDERS and STARTER_HTML removed — templates now use form-based JSON config)</span>
+<span class="diff-del">// ─── Config stub ─────────────────────────────────────────────────────────────</span>
+<span class="diff-del">const PLACEHOLDERS: Record&lt;DocType, string[]&gt; = {</span>
+<span class="diff-del">  FACTURA: [ ... ],  <span class="comment">// ~30 lines</span></span>
+<span class="diff-del">  AVIZ: [ ... ],</span>
+<span class="diff-del">  CONTRACT: [ ... ],</span>
+<span class="diff-del">}</span>
+<span class="diff-del"></span>
+<span class="diff-del">const STARTER_HTML: Record&lt;DocType, string&gt; = {</span>
+<span class="diff-del">  FACTURA: `...`,  <span class="comment">// ~100 lines of HTML strings</span></span>
+<span class="diff-del">  AVIZ: `...`,</span>
+<span class="diff-del">  CONTRACT: `...`,</span>
+<span class="diff-del">}</span>
+<span class="comment">// → delete everything above, save ~800 lines / ~15 KB</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ─── M-2 ─── -->
+<div class="issue-card">
+  <div class="issue-header">
+    <span class="badge medium">🟡 Medium</span>
+    <span class="issue-id">M-2</span>
+    <span class="issue-title">company_settings.single() without user filter — crashes if no row exists yet</span>
+  </div>
+  <div class="issue-body">
+    <div class="field-row">
+      <span class="field-label">Location</span>
+      <span class="field-value"><code>print/contract/[id]/page.tsx</code> · <code>print/factura/[id]/page.tsx</code> · <code>setari/page.tsx</code></span>
+    </div>
+    <div class="field-row">
+      <span class="field-value">
+        <strong>Problem 1:</strong> <code>db.from('company_settings').select('*').single()</code> throws a PostgREST error if zero rows match (new user who hasn't filled in their company data yet). <code>.single()</code> expects exactly one row; <code>.maybeSingle()</code> returns <code>null</code> gracefully.<br/><br/>
+        <strong>Problem 2:</strong> There is no <code>.eq('user_id', user.id)</code> filter. The query depends entirely on RLS to return the correct tenant's row. If RLS is ever misconfigured, any user could receive another tenant's company settings in their print documents.
+      </span>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>Fix — maybeSingle + explicit user filter</span><span class="lang">TypeScript diff</span></div>
+      <pre><span class="diff-del">  db.from('company_settings').select('*').single()</span>
+<span class="diff-del">    .then(({ data }) =&gt; { if (data) setCompany(data as any) })</span>
+
+<span class="diff-add">  const { data: { user } } = await db.auth.getUser()</span>
+<span class="diff-add">  db.from('company_settings')</span>
+<span class="diff-add">    .select('*')</span>
+<span class="diff-add">    .eq('user_id', user?.id)</span>
+<span class="diff-add">    .maybeSingle()</span>
+<span class="diff-add">    .then(({ data, error }) =&gt; {</span>
+<span class="diff-add">      if (error) { toast.error('Eroare la datele firmei.'); return }</span>
+<span class="diff-add">      if (data) setCompany(data as CompanySettings)</span>
+<span class="diff-add">    })</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ─── M-3 ─── -->
+<div class="issue-card">
+  <div class="issue-header">
+    <span class="badge medium">🟡 Medium</span>
+    <span class="issue-id">M-3</span>
+    <span class="issue-title">Hardcoded admin email in SQL migration — recovery risk</span>
+  </div>
+  <div class="issue-body">
+    <div class="field-row">
+      <span class="field-label">Location</span>
+      <span class="field-value"><code>supabase-migration-admin.sql</code> — Section 4, line ~143</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Problem</span>
+      <span class="field-value">The only way to grant admin access is to edit this SQL file and re-run the <code>UPDATE profiles SET is_admin = TRUE WHERE email = '...'</code> block. If the admin user is deleted from <code>auth.users</code>, or the email changes, the entire admin control panel becomes inaccessible without direct DB access. There is no documented recovery procedure.</span>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>supabase-migration-admin.sql — add recovery helper</span><span class="lang">SQL diff</span></div>
+      <pre><span class="diff-ctx">-- ============================================================</span>
+<span class="diff-ctx">-- 4. MAKE YOURSELF ADMIN</span>
+<span class="diff-ctx">-- ============================================================</span>
+<span class="diff-ctx">UPDATE public.profiles</span>
+<span class="diff-ctx">SET is_admin = TRUE</span>
+<span class="diff-ctx">WHERE email = 'robert.ivan@lseg.com';</span>
+
+<span class="diff-add">-- ============================================================</span>
+<span class="diff-add">-- 4b. ADMIN RECOVERY HELPER</span>
+<span class="diff-add">-- Run this in the Supabase SQL editor if admin access is lost:</span>
+<span class="diff-add">--   SELECT grant_admin('your-email@example.com');</span>
+<span class="diff-add">-- ============================================================</span>
+<span class="diff-add">CREATE OR REPLACE FUNCTION public.grant_admin(target_email TEXT)</span>
+<span class="diff-add">RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$</span>
+<span class="diff-add">BEGIN</span>
+<span class="diff-add">  UPDATE public.profiles SET is_admin = TRUE WHERE email = target_email;</span>
+<span class="diff-add">  IF NOT FOUND THEN</span>
+<span class="diff-add">    RAISE EXCEPTION 'No profile found for email: %', target_email;</span>
+<span class="diff-add">  END IF;</span>
+<span class="diff-add">END;</span>
+<span class="diff-add">$$;</span>
+<span class="diff-add"><span class="comment">-- Revoke public execute — this function must be called from the SQL editor only</span></span>
+<span class="diff-add">REVOKE EXECUTE ON FUNCTION public.grant_admin(TEXT) FROM PUBLIC, anon, authenticated;</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ─── M-4 ─── -->
+<div class="issue-card">
+  <div class="issue-header">
+    <span class="badge medium">🟡 Medium</span>
+    <span class="issue-id">M-4</span>
+    <span class="issue-title">user!.id non-null assertion — crashes if session expires mid-form</span>
+  </div>
+  <div class="issue-body">
+    <div class="field-row">
+      <span class="field-label">Location</span>
+      <span class="field-value"><code>plati/page.tsx</code> <code>handleAdd()</code> · <code>setari/page.tsx</code> <code>saveCompany()</code> / <code>addProduct()</code></span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Problem</span>
+      <span class="field-value"><code>const { data: { user } } = await db.auth.getUser()</code> followed immediately by <code>user!.id</code> (non-null assertion). If the session has expired between page load and form submit (e.g., token silently invalidated, Supabase outage), <code>user</code> will be <code>null</code> and the app will throw an unhandled runtime error with no user-facing message.</span>
+    </div>
+    <div class="code-block">
+      <div class="code-block-header"><span>Fix</span><span class="lang">TypeScript diff</span></div>
+      <pre><span class="diff-ctx">  const { data: { user } } = await db.auth.getUser()</span>
+<span class="diff-del">  const { error } = await db.from('payments').insert({</span>
+<span class="diff-del">    user_id: user!.id,</span>
+<span class="diff-add">  if (!user) { toast.error('Sesiunea a expirat. Reautentificați-vă.'); setSaving(false); return }</span>
+<span class="diff-add">  const { error } = await db.from('payments').insert({</span>
+<span class="diff-add">    user_id: user.id,</span></pre>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════ SCALABILITY ════════════════════ -->
+<div class="section-title"><span class="icon">📊</span> Scalability Score: 5.5 / 10</div>
+
+<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:8px;">
+  <table class="score-table">
+    <thead>
+      <tr>
+        <th style="width:200px">Area</th>
+        <th style="width:120px">Score</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>DB query safety</strong></td>
+        <td>
+          <span class="score-bar"><span class="score-fill" style="width:40%;background:#dc2626"></span></span>
+          <strong style="color:#dc2626;margin-left:8px">4 / 10</strong>
+        </td>
+        <td>No limits, no pagination, silent errors — breaks at scale</td>
+      </tr>
+      <tr>
+        <td><strong>Multi-tenant isolation</strong></td>
+        <td>
+          <span class="score-bar"><span class="score-fill" style="width:80%;background:#16a34a"></span></span>
+          <strong style="color:#16a34a;margin-left:8px">8 / 10</strong>
+        </td>
+        <td>RLS is solid; explicit user_id filters missing in print pages</td>
+      </tr>
+      <tr>
+        <td><strong>Bundle / edge perf</strong></td>
+        <td>
+          <span class="score-bar"><span class="score-fill" style="width:60%;background:#d97706"></span></span>
+          <strong style="color:#d97706;margin-left:8px">6 / 10</strong>
+        </td>
+        <td>Dead code inflates bundle ~15 KB; edge runtime is correct choice</td>
+      </tr>
+      <tr>
+        <td><strong>Auth architecture</strong></td>
+        <td>
+          <span class="score-bar"><span class="score-fill" style="width:80%;background:#16a34a"></span></span>
+          <strong style="color:#16a34a;margin-left:8px">8 / 10</strong>
+        </td>
+        <td>getUser() everywhere, SECURITY DEFINER admin, correct cookie handling</td>
+      </tr>
+      <tr>
+        <td><strong>Error resilience</strong></td>
+        <td>
+          <span class="score-bar"><span class="score-fill" style="width:40%;background:#dc2626"></span></span>
+          <strong style="color:#dc2626;margin-left:8px">4 / 10</strong>
+        </td>
+        <td>Silent swallows throughout; no loading/error states on fetch failures</td>
+      </tr>
+      <tr>
+        <td><strong>API input validation</strong></td>
+        <td>
+          <span class="score-bar"><span class="score-fill" style="width:50%;background:#d97706"></span></span>
+          <strong style="color:#d97706;margin-left:8px">5 / 10</strong>
+        </td>
+        <td>D112 route has real type coercion bypass; form inputs lack frontend guards</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ════════════════════ QUICK WINS ════════════════════ -->
+<div class="section-title"><span class="icon">🔧</span> Quick Wins — Ordered by Impact / Effort</div>
+<ul class="qw-list">
+  <li>
+    <div class="qw-num">1</div>
+    <div class="qw-body">
+      <strong>Add /admin-cp, /setari, /print to middleware isAppPage <span style="color:var(--red)">[C-1]</span></strong>
+      <span>3-line change. Eliminates the unauthenticated redirect gap for the admin panel and settings page. Highest security impact for lowest effort.</span>
+    </div>
+    <span class="qw-effort">⏱ 5 min</span>
+  </li>
+  <li>
+    <div class="qw-num">2</div>
+    <div class="qw-body">
+      <strong>Add try/catch + Number() validation in D112 API route <span style="color:var(--red)">[C-2]</span></strong>
+      <span>Prevents malformed date strings from reaching report output and stops unhandled 500s on invalid request bodies.</span>
+    </div>
+    <span class="qw-effort">⏱ 10 min</span>
+  </li>
+  <li>
+    <div class="qw-num">3</div>
+    <div class="qw-body">
+      <strong>Delete PLACEHOLDERS + STARTER_HTML from admin-cp/page.tsx <span style="color:var(--yellow)">[M-1]</span></strong>
+      <span>Remove ~800 dead lines. Shrinks the admin bundle by ~15 KB. Already has a comment saying it was removed — finish the job.</span>
+    </div>
+    <span class="qw-effort">⏱ 5 min</span>
+  </li>
+  <li>
+    <div class="qw-num">4</div>
+    <div class="qw-body">
+      <strong>Add NaN guard in plati/page.tsx handleAdd() before parseFloat <span style="color:var(--red)">[C-3]</span></strong>
+      <span>Prevents silent bad inserts and replaces raw Postgres error strings with friendly UI messages.</span>
+    </div>
+    <span class="qw-effort">⏱ 5 min</span>
+  </li>
+  <li>
+    <div class="qw-num">5</div>
+    <div class="qw-body">
+      <strong>Add .limit(500) to all list queries <span style="color:var(--orange)">[H-1]</span></strong>
+      <span>Immediate safety cap on all unbounded queries. Prevents OOM on large accounts. Implement server-side search as the next step.</span>
+    </div>
+    <span class="qw-effort">⏱ 15 min</span>
+  </li>
+  <li>
+    <div class="qw-num">6</div>
+    <div class="qw-body">
+      <strong>Add error destructure to all list-page useEffect fetches <span style="color:var(--orange)">[H-2]</span></strong>
+      <span>Replace <code>{ data }</code> with <code>{ data, error }</code> and add toast.error() — one-liner per fetch, eliminates silent failure blindness.</span>
+    </div>
+    <span class="qw-effort">⏱ 20 min</span>
+  </li>
+  <li>
+    <div class="qw-num">7</div>
+    <div class="qw-body">
+      <strong>Remove includes('System default') checks from fetchTemplate <span style="color:var(--orange)">[H-4]</span></strong>
+      <span>2-line deletion. The query filters already correctly discriminate user vs. system rows.</span>
+    </div>
+    <span class="qw-effort">⏱ 2 min</span>
+  </li>
+  <li>
+    <div class="qw-num">8</div>
+    <div class="qw-body">
+      <strong>Add explicit .eq('user_id', user.id) to print page queries <span style="color:var(--orange)">[H-3]</span></strong>
+      <span>Adds defence-in-depth ownership check for PII documents. Low effort, eliminates single point of failure if RLS is ever misconfigured.</span>
+    </div>
+    <span class="qw-effort">⏱ 15 min</span>
+  </li>
+</ul>
+
+
+<!-- ════════════════════ FOOTER ════════════════════ -->
+<div class="report-footer">
+  <p>Generated by GitHub Copilot · Claude Sonnet 4.6 · ArendaPro v1.0 · 21 May 2026</p>
+  <p style="margin-top:4px">This report reflects the state of the codebase at the time of review. Re-run after applying fixes.</p>
+</div>
+
+</div>
+</body>
+</html>

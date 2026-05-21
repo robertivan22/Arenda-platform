@@ -322,14 +322,22 @@ export default function FitosanitarPage() {
                 {rows.map(row => {
                   const isOverDose =
                     row.doza_omologata_max != null && row.doza_folosita > row.doza_omologata_max
+                  const isReplaced = typeof row.observatii === 'string' && row.observatii.startsWith('[ÎNLOCUIT]')
                   return (
                     <tr
                       key={row.id}
-                      className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                      className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${isReplaced ? 'opacity-60 bg-gray-50' : ''}`}
                       onClick={() => { setSelectedEntry(row); setModalMode('view') }}
                     >
                       <td className="px-3 py-2 font-mono text-xs text-gray-500 font-medium">
                         #{row.numar_inregistrare}
+                        {isReplaced && (
+                          <div className="mt-0.5">
+                            <span className="inline-block bg-gray-200 text-gray-600 text-[9px] font-medium px-1.5 py-0.5 rounded">
+                              Inactiv
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className={tdCls + ' whitespace-nowrap'}>
                         {formatDateRO(row.data_tratament)}

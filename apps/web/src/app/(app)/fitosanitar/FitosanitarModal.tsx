@@ -8,7 +8,7 @@ import {
   RegistruFitosanitar, FitosanitarFormData, TipAgent, UnitateDoza, UnitateCantitate,
   CULTURA_OPTIONS, JUDETE_ROMANIA, TIP_AGENT_LABELS, getBBCHForCultura, formatDateRO,
 } from '@/lib/bbch-data'
-import { BBCHSelector, BBCHChart } from './BBCHChart'
+import { BBCHSelector } from './BBCHChart'
 
 type ModalMode = 'add' | 'view' | 'correct'
 
@@ -134,8 +134,6 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
   )
   const [errors, setErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
-  const [showBBCHChart, setShowBBCHChart] = useState(false)
-
   // ── Derived computed values ─────────────────────────────────────────────────
   const phiZile = useMemo(() => {
     if (!form.data_incepere_recoltare || !form.data_tratament) return null
@@ -269,13 +267,11 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
       return
     }
 
-    // If correction mode: soft-mark old entry with annotation
+    // If correction mode: mark old entry as replaced (keeps it visible with status badge)
     if (isCorrect && initialData) {
       await db.from('registru_fitosanitar')
         .update({
           observatii: `[ÎNLOCUIT] ${initialData.observatii ?? ''}`.trim(),
-          is_deleted: true,
-          deleted_at: new Date().toISOString(),
         })
         .eq('id', initialData.id)
         .eq('user_id', user.id)
@@ -337,12 +333,6 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowBBCHChart(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600"
-              >
-                📊 Referință BBCH
-              </button>
               <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-200 text-gray-500">
                 <X className="w-4 h-4" />
               </button>
@@ -814,23 +804,6 @@ export function FitosanitarModal({ mode, initialData, onClose, onSaved }: Fitosa
         </div>
       </div>
 
-      {/* BBCH Chart overlay */}
-      {showBBCHChart && (
-        <>
-          <div className="fixed inset-0 bg-black/30 z-60" onClick={() => setShowBBCHChart(false)} />
-          <div className="fixed inset-4 z-70 bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden">
-            <BBCHChart
-              initialCultura={form.cultura}
-              highlightCode={form.bbch_code}
-              onSelectCode={(code, descriere) => {
-                handleBBCHSelect(code, descriere)
-                setShowBBCHChart(false)
-              }}
-              onClose={() => setShowBBCHChart(false)}
-            />
-          </div>
-        </>
-      )}
     </>
   )
 }

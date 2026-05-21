@@ -5,7 +5,7 @@ export const runtime = 'edge'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Save, ChevronDown, ChevronRight, Shield, FileText, Users } from 'lucide-react'
+import { Save, ChevronDown, ChevronRight, Shield, FileText, Users, Leaf } from 'lucide-react'
 import { CONFIG_FIELDS, getDefaults, DocConfig } from '@/lib/doc-config-fields'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -308,7 +308,7 @@ const tdCls = 'px-3 py-2 text-sm text-gray-800'
 export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [tab, setTab] = useState<'users' | 'templates'>('users')
+  const [tab, setTab] = useState<'users' | 'templates' | 'fitosanitar'>('users')
 
   // Users
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -322,6 +322,16 @@ export default function AdminPage() {
   const [templates, setTemplates] = useState<Record<string, Record<DocType, Template | null>>>({})
   const [editingConfig, setEditingConfig] = useState<DocConfig>({})
   const [savingTemplate, setSavingTemplate] = useState(false)
+
+  // Fitosanitar
+  interface FitoRow {
+    id: string; user_id: string; user_email?: string
+    numar_inregistrare: number; data_tratament: string; cultura: string
+    denumire_produs: string; agent_daunare: string; suprafata_tratata: number
+    tip_agent: string; observatii?: string | null
+  }
+  const [fitoRows, setFitoRows] = useState<FitoRow[]>([])
+  const [fitoLoading, setFitoLoading] = useState(false)
 
   // ── Auth check ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -390,6 +400,19 @@ export default function AdminPage() {
     const updated = { ...current, [field]: !current[field] }
     setPermissions(prev => ({ ...prev, [userId]: updated }))
   }
+
+  const loadFitosanitar = useCallback(async () => {
+    setFitoLoading(true)
+    const db = createClient()
+    const [{ data: entries }, { data: profs }] = await Promise.all([
+      db.from('registru_fitosanitar').select('id,user_id,numar_inregistrare,data_tratament,cultura,denumire_produs,agent_daunare,suprafata_tratata,tip_agent,observatii').order('data_tratament', { ascending: false }).limit(500),
+      db.from('profiles').select('id,email'),
+    ])
+    const emailMap: Record<string, string> = {}
+    ;(profs ?? []).forEach((p: { id: string; email: string | null }) => { emailMap[p.id] = p.email ?? p.id })
+    setFitoRows(((entries ?? []) as FitoRow[]).map(r => ({ ...r, user_email: emailMap[r.user_id] ?? r.user_id })))
+    setFitoLoading(false)
+  }, [])
 
   // ── Toggle is_admin ─────────────────────────────────────────────────────────
   async function toggleAdmin(profile: Profile) {
@@ -479,10 +502,13 @@ export default function AdminPage() {
       {/* Tab bar */}
       <div className="bg-white border-b border-gray-200 px-6">
         <div className="flex gap-0">
-          {([['users', 'Utilizatori'], ['templates', 'Template-uri']] as const).map(([k, l]) => (
+          {([['users', 'Utilizatori'], ['templates', 'Template-uri'], ['fitosanitar', 'Registru Fitosanitar']] as const).map(([k, l]) => (
             <button
               key={k}
-              onClick={() => setTab(k)}
+              onClick={() => {
+                setTab(k)
+                if (k === 'fitosanitar') void loadFitosanitar()
+              }}
               className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                 tab === k ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
@@ -747,6 +773,79 @@ export default function AdminPage() {
               <strong>Cum funcționează:</strong> Textele editate aici vor fi afișate în documentele generate pentru utilizatorul selectat.
               Dacă nu există o configurație salvată, se folosesc valorile implicite din aplicație.
               Selectați „Template implicit (sistem)" pentru a schimba valorile pentru toți utilizatorii care nu au configurație proprie.
+            </div>
+          </div>
+        )}
+
+        {/* ══ FITOSANITAR TAB ════════════════════════════════════════════════ */}
+        {tab === 'fitosanitar' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Leaf className="w-4 h-4 text-green-600" />
+              <h2 className="font-semibold text-gray-800">Registru Fitosanitar — Toate înregistrările ({fitoRows.length})</h2>
+              <button
+                onClick={() => void loadFitosanitar()}
+                className="ml-auto px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50 text-gray-600"
+              >
+                Reîncarcă
+              </button>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              {fitoLoading ? (
+                <div className="py-12 text-center text-sm text-gray-400">Se încarcă...</div>
+              ) : fitoRows.length === 0 ? (
+                <div className="py-12 text-center text-sm text-gray-400">
+                  Nicio înregistrare. Rulați migrarea SQL în Supabase dacă tabela nu există.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th className={thCls}>Utilizator</th>
+                        <th className={thCls}>Nr.</th>
+                        <th className={thCls}>Data Tratam.</th>
+                        <th className={thCls}>Cultură</th>
+                        <th className={thCls}>Produs PPP</th>
+                        <th className={thCls}>Agent Dăunare</th>
+                        <th className={thCls}>Tip Agent</th>
+                        <th className={`${thCls} text-right`}>Ha</th>
+                        <th className={thCls}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fitoRows.map(row => {
+                        const isReplaced = typeof row.observatii === 'string' && row.observatii.startsWith('[ÎNLOCUIT]')
+                        return (
+                          <tr key={row.id} className={`border-b border-gray-100 ${isReplaced ? 'opacity-55 bg-gray-50' : 'hover:bg-gray-50'}`}>
+                            <td className={`${tdCls} text-xs text-gray-500 max-w-[160px] truncate`}>{row.user_email}</td>
+                            <td className="px-3 py-2 font-mono text-xs text-gray-500">#{row.numar_inregistrare}</td>
+                            <td className={`${tdCls} whitespace-nowrap`}>{row.data_tratament}</td>
+                            <td className={tdCls}>{row.cultura}</td>
+                            <td className={`${tdCls} max-w-[160px] truncate`}>{row.denumire_produs}</td>
+                            <td className={`${tdCls} max-w-[140px] truncate`}>{row.agent_daunare}</td>
+                            <td className={tdCls}>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                row.tip_agent === 'boala'    ? 'bg-purple-100 text-purple-700' :
+                                row.tip_agent === 'daunator' ? 'bg-red-100 text-red-700' :
+                                row.tip_agent === 'buruiana' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>{row.tip_agent}</span>
+                            </td>
+                            <td className="px-3 py-2 text-right text-sm">{row.suprafata_tratata}</td>
+                            <td className={tdCls}>
+                              {isReplaced
+                                ? <span className="bg-gray-200 text-gray-600 text-[10px] font-medium px-1.5 py-0.5 rounded">Inactiv</span>
+                                : <span className="bg-green-100 text-green-700 text-[10px] font-medium px-1.5 py-0.5 rounded">Activ</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}

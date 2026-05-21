@@ -87,7 +87,7 @@ export async function exportFitosanitarToExcel(
 
   // ── Title ────────────────────────────────────────────────────────────────────────
   mergedRow(
-    'REGISTRU DE EVIDENȞĂ A TRATAMENTELOR CU PRODUSE DE PROTECȞIE A PLANTELOR',
+    'REGISTRU DE EVIDENȚĂ A TRATAMENTELOR CU PRODUSE DE PROTECȚIE A PLANTELOR',
     C.DARK_BLUE, C.WHITE, { bold: true, size: 13, height: 30 },
   )
   mergedRow(

@@ -70,31 +70,55 @@ const PORUMB_VISUAL: VisualStage[] = [
 ]
 
 function CerealPlant({ x, h, tillers, head }: Pick<VisualStage,'x'|'h'|'tillers'|'head'>) {
-  const topY = GND - h
-  const isOld  = head === 'ripe' || head === 'grain'
-  const sc     = isOld ? '#a16207' : '#15803d'
-  const lc     = isOld ? '#ca8a04' : '#4ade80'
-  const spkClr = head==='ripe' ? '#d97706' : head==='flower' ? '#facc15' : head==='grain' ? '#eab308' : '#84cc16'
-  const spkH   = head === 'half' ? 7 : head !== 'none' ? 14 : 0
+  const topY   = GND - h
+  const isRipe = head === 'ripe'
+  const isMat  = isRipe || head === 'grain'
+  const sc     = isRipe ? '#92400e' : isMat ? '#a16207' : '#15803d'
+  const lFill  = isRipe ? '#ca8a04' : isMat ? '#fde68a' : '#86efac'
+  const lStk   = isRipe ? '#a16207' : isMat ? '#ca8a04' : '#166534'
+  const spkH   = head === 'half' ? 9 : ['full','flower','grain','ripe'].includes(head) ? 17 : 0
   const spkTop = topY - spkH
+  const spkFill = head==='ripe'?'#b45309': head==='grain'?'#d97706': head==='flower'?'#fbbf24': '#4ade80'
+
+  // Filled leaf shape from stem attachment point y, leaning to side (±1), length len
+  function leaf(y: number, side: 1|-1, len: number) {
+    const dx = side * len
+    return `M0,${y} C${dx*.6},${y-len*.45} ${dx},${y-len*.2} ${dx*.88},${y+1.5} C${dx*.55},${y+2.5} ${dx*.25},${y+2} 0,${y}`
+  }
+
   return (
     <g transform={`translate(${x},0)`}>
-      <line x1="0" y1={GND} x2="0" y2={topY} stroke={sc} strokeWidth="1.5" strokeLinecap="round" />
-      {h>8  && <path d={`M0,${GND-h*.22} C-5,${GND-h*.22-3} -8,${GND-h*.22-2} -10,${GND-h*.22}`}     stroke={lc} strokeWidth="1"   fill="none" />}
-      {h>15 && <path d={`M0,${GND-h*.42} C6,${GND-h*.42-4}  10,${GND-h*.42-3}  12,${GND-h*.42}`}     stroke={lc} strokeWidth="1"   fill="none" />}
-      {h>30 && <path d={`M0,${GND-h*.62} C-8,${GND-h*.62-5} -12,${GND-h*.62-4} -14,${GND-h*.62-1}`}  stroke={lc} strokeWidth="1.2" fill="none" />}
-      {h>50 && <path d={`M0,${GND-h*.82} C10,${GND-h*.82-7}  15,${GND-h*.82-5}  17,${GND-h*.82-1}`}  stroke={lc} strokeWidth="1.5" fill="none" />}
-      {tillers>=2 && <><line x1="-5" y1={GND} x2="-5" y2={GND-h*.58} stroke={sc} strokeWidth="1" />{h>10&&<path d={`M-5,${GND-h*.2} C-10,${GND-h*.2-3} -13,${GND-h*.2-2} -15,${GND-h*.2}`} stroke={lc} strokeWidth="0.8" fill="none" />}</>}
-      {tillers>=3 && <><line x1="5"  y1={GND} x2="5"  y2={GND-h*.53} stroke={sc} strokeWidth="1" />{h>10&&<path d={`M5,${GND-h*.2} C10,${GND-h*.2-3} 13,${GND-h*.2-2} 15,${GND-h*.2}`}   stroke={lc} strokeWidth="0.8" fill="none" />}</>}
+      {/* Tillers */}
+      {tillers>=2 && <>
+        <line x1="-5" y1={GND} x2="-5" y2={GND-h*.56} stroke={lStk} strokeWidth="1.1" strokeLinecap="round" />
+        {h>12 && <path d={leaf(GND-h*.22, -1, 11)} fill={lFill} stroke={lStk} strokeWidth="0.5" fillOpacity="0.7" />}
+      </>}
+      {tillers>=3 && <>
+        <line x1="5" y1={GND} x2="5" y2={GND-h*.51} stroke={lStk} strokeWidth="1.1" strokeLinecap="round" />
+        {h>12 && <path d={leaf(GND-h*.22, 1, 11)} fill={lFill} stroke={lStk} strokeWidth="0.5" fillOpacity="0.7" />}
+      </>}
+      {/* Main stem */}
+      <line x1="0" y1={GND} x2="0" y2={topY} stroke={sc} strokeWidth="1.6" strokeLinecap="round" />
+      {/* Leaves — filled lens shapes alternating sides */}
+      {h> 8 && <path d={leaf(GND-h*.18, -1, h>40?13:9)}  fill={lFill} stroke={lStk} strokeWidth="0.6" fillOpacity="0.78" />}
+      {h>15 && <path d={leaf(GND-h*.36, 1,  h>40?15:11)} fill={lFill} stroke={lStk} strokeWidth="0.6" fillOpacity="0.78" />}
+      {h>30 && <path d={leaf(GND-h*.54, -1, h>55?16:13)} fill={lFill} stroke={lStk} strokeWidth="0.7" fillOpacity="0.82" />}
+      {/* Flag leaf — long, just below spike */}
+      {h>55 && <path d={leaf(GND-h*.79, 1, 19)} fill={lFill} stroke={lStk} strokeWidth="0.8" fillOpacity="0.88" />}
+      {/* Spike */}
       {spkH>0 && <>
-        <rect x="-2.5" y={spkTop} width="5" height={spkH} rx="2" fill={spkClr} />
+        <rect x="-3" y={spkTop} width="6" height={spkH} rx="3" fill={spkFill} />
         {['full','flower','grain','ripe'].includes(head) && <>
-          <line x1="2.5"  y1={spkTop+2} x2="7"  y2={spkTop-4} stroke={spkClr} strokeWidth="0.7" />
-          <line x1="2.5"  y1={spkTop+7} x2="7"  y2={spkTop+1} stroke={spkClr} strokeWidth="0.7" />
-          <line x1="-2.5" y1={spkTop+2} x2="-7" y2={spkTop-4} stroke={spkClr} strokeWidth="0.7" />
-          <line x1="-2.5" y1={spkTop+7} x2="-7" y2={spkTop+1} stroke={spkClr} strokeWidth="0.7" />
+          <line x1="2.5" y1={spkTop+2}  x2="10" y2={spkTop-6}  stroke={spkFill} strokeWidth="1" />
+          <line x1="2.5" y1={spkTop+6}  x2="11" y2={spkTop+0}  stroke={spkFill} strokeWidth="1" />
+          <line x1="2.5" y1={spkTop+10} x2="10" y2={spkTop+5}  stroke={spkFill} strokeWidth="0.9" />
+          <line x1="2.5" y1={spkTop+14} x2="8"  y2={spkTop+10} stroke={spkFill} strokeWidth="0.8" />
+          <line x1="-2.5" y1={spkTop+2}  x2="-10" y2={spkTop-6}  stroke={spkFill} strokeWidth="1" />
+          <line x1="-2.5" y1={spkTop+6}  x2="-11" y2={spkTop+0}  stroke={spkFill} strokeWidth="1" />
+          <line x1="-2.5" y1={spkTop+10} x2="-10" y2={spkTop+5}  stroke={spkFill} strokeWidth="0.9" />
+          <line x1="-2.5" y1={spkTop+14} x2="-8"  y2={spkTop+10} stroke={spkFill} strokeWidth="0.8" />
         </>}
-        {(head==='ripe'||head==='grain') && <path d={`M0,${topY} Q4,${topY+8} 5,${topY+15}`} stroke={spkClr} strokeWidth="2" fill="none" strokeLinecap="round" />}
+        {(head==='ripe'||head==='grain') && <path d={`M0,${topY} Q6,${topY+11} 7,${topY+20}`} stroke={spkFill} strokeWidth="2.2" fill="none" strokeLinecap="round" />}
       </>}
     </g>
   )
@@ -103,35 +127,53 @@ function CerealPlant({ x, h, tillers, head }: Pick<VisualStage,'x'|'h'|'tillers'
 function CornPlant({ x, h, head }: Pick<VisualStage,'x'|'h'|'head'>) {
   const topY  = GND - h
   const isOld = head==='corn-ripe'||head==='harvest'
-  const sc    = isOld ? '#a16207' : '#166534'
-  const lc    = isOld ? '#ca8a04' : '#4ade80'
-  const tc    = '#d97706'
-  const cobY  = GND - h*.58
+  const sc    = isOld ? '#92400e' : '#15803d'
+  const lFill = isOld ? '#d97706' : '#4ade80'
+  const lStk  = isOld ? '#b45309' : '#166534'
+  const cobY  = GND - h*.56
+
+  // Corn leaf — wide arching shape, wider than wheat
+  function cornLeaf(y: number, side: 1|-1, reach: number, lift: number) {
+    const dx = side * reach
+    return `M0,${y} C${dx*.5},${y-lift*.7} ${dx},${y-lift*.35} ${dx*.85},${y+2} C${dx*.6},${y+3.5} ${dx*.25},${y+2.5} 0,${y}`
+  }
+
   return (
     <g transform={`translate(${x},0)`}>
-      <line x1="0" y1={GND} x2="0" y2={topY} stroke={sc} strokeWidth="2.5" strokeLinecap="round" />
-      {h>8  && <path d={`M0,${GND-h*.18} C-10,${GND-h*.18-7}  -15,${GND-h*.18-4} -18,${GND-h*.18-1}`} stroke={lc} strokeWidth="2"   fill="none" />}
-      {h>15 && <path d={`M0,${GND-h*.35} C12,${GND-h*.35-9}    18,${GND-h*.35-5}  21,${GND-h*.35-1}`}  stroke={lc} strokeWidth="2"   fill="none" />}
-      {h>24 && <path d={`M0,${GND-h*.5}  C-13,${GND-h*.5-10}  -19,${GND-h*.5-6} -22,${GND-h*.5-1}`}   stroke={lc} strokeWidth="2.5" fill="none" />}
-      {h>38 && <path d={`M0,${GND-h*.64} C14,${GND-h*.64-11}   21,${GND-h*.64-7}  24,${GND-h*.64-1}`}  stroke={lc} strokeWidth="2.5" fill="none" />}
-      {h>54 && <path d={`M0,${GND-h*.78} C-15,${GND-h*.78-13} -22,${GND-h*.78-8} -26,${GND-h*.78-1}`} stroke={lc} strokeWidth="3"   fill="none" />}
-      {h>66 && <path d={`M0,${GND-h*.9}  C16,${GND-h*.9-14}    24,${GND-h*.9-9}   28,${GND-h*.9-1}`}   stroke={lc} strokeWidth="3"   fill="none" />}
-      {['silk','corn-grain','corn-ripe','harvest'].includes(head)&&h>58&&<>
-        <path d={`M0,${cobY} Q8,${cobY+2} 8,${cobY+18} Q8,${cobY+22} 0,${cobY+24}`} stroke={sc} strokeWidth="2" fill={isOld?'#d97706':'#fde68a'} />
-        <line x1="8" y1={cobY+5}  x2="16" y2={cobY-4}  stroke={sc} strokeWidth="1.5" />
-        <line x1="8" y1={cobY+12} x2="16" y2={cobY+4}  stroke={sc} strokeWidth="1.5" />
-        <line x1="8" y1={cobY+18} x2="16" y2={cobY+12} stroke={sc} strokeWidth="1.5" />
-        {head==='silk'&&<path d={`M8,${cobY+2} Q14,${cobY-3} 12,${cobY-10}`} stroke="#fde68a" strokeWidth="0.8" fill="none" />}
+      {/* Main stem — thick */}
+      <line x1="0" y1={GND} x2="0" y2={topY} stroke={sc} strokeWidth="2.8" strokeLinecap="round" />
+      {/* Leaves — corn characteristic wide arching shape */}
+      {h> 8 && <path d={cornLeaf(GND-h*.17, -1, h>50?22:13, h>50?12:6)}  fill={lFill} stroke={lStk} strokeWidth="1.3" fillOpacity="0.68" />}
+      {h>14 && <path d={cornLeaf(GND-h*.31, 1,  h>50?27:17, h>50?15:8)}  fill={lFill} stroke={lStk} strokeWidth="1.5" fillOpacity="0.7"  />}
+      {h>26 && <path d={cornLeaf(GND-h*.46, -1, h>50?29:20, h>50?16:10)} fill={lFill} stroke={lStk} strokeWidth="1.8" fillOpacity="0.72" />}
+      {h>40 && <path d={cornLeaf(GND-h*.61, 1,  32, 17)} fill={lFill} stroke={lStk} strokeWidth="2.1" fillOpacity="0.73" />}
+      {h>56 && <path d={cornLeaf(GND-h*.76, -1, 34, 18)} fill={lFill} stroke={lStk} strokeWidth="2.4" fillOpacity="0.75" />}
+      {h>70 && <path d={cornLeaf(GND-h*.90, 1,  36, 19)} fill={lFill} stroke={lStk} strokeWidth="2.5" fillOpacity="0.76" />}
+      {/* Cob */}
+      {['silk','corn-grain','corn-ripe','harvest'].includes(head) && h>55 && <>
+        {/* Husk wrap */}
+        <path d={`M2,${cobY} C16,${cobY+5} 15,${cobY+22} 2,${cobY+28}`}
+          stroke={lStk} strokeWidth="1.5" fill={isOld?'#d97706':'#4ade80'} fillOpacity="0.52" />
+        {/* Cob body */}
+        <ellipse cx="9" cy={cobY+14} rx="5" ry="11" fill={isOld?'#fbbf24':'#fde68a'} stroke={isOld?'#d97706':'#ca8a04'} strokeWidth="0.9" />
+        {/* Row lines on cob */}
+        <line x1="9" y1={cobY+5} x2="9" y2={cobY+23} stroke={isOld?'#d97706':'#ca8a04'} strokeWidth="0.6" strokeDasharray="2,2" />
+        {/* Silk threads */}
+        {head==='silk' && <path d={`M14,${cobY+5} Q20,${cobY} 18,${cobY-9}`} stroke="#fde68a" strokeWidth="1" fill="none" />}
       </>}
-      {['tassel-half','tassel','silk','corn-grain','corn-ripe'].includes(head)&&<>
-        <line x1="0" y1={topY} x2="0" y2={topY-10} stroke={tc} strokeWidth="1.5" />
-        {head!=='tassel-half'&&<>
-          <line x1="0" y1={topY-7}  x2="-7" y2={topY-15} stroke={tc} strokeWidth="1" />
-          <line x1="0" y1={topY-5}  x2="7"  y2={topY-14} stroke={tc} strokeWidth="1" />
-          <line x1="0" y1={topY-3}  x2="-5" y2={topY-11} stroke={tc} strokeWidth="0.8" />
+      {/* Tassel */}
+      {['tassel-half','tassel','silk','corn-grain','corn-ripe'].includes(head) && <>
+        <line x1="0" y1={topY} x2="0" y2={topY-13} stroke="#d97706" strokeWidth="1.6" />
+        {head!=='tassel-half' && <>
+          <line x1="0" y1={topY-9}  x2="-10" y2={topY-20} stroke="#d97706" strokeWidth="1.3" />
+          <line x1="0" y1={topY-9}  x2="10"  y2={topY-20} stroke="#d97706" strokeWidth="1.3" />
+          <line x1="0" y1={topY-5}  x2="-6"  y2={topY-14} stroke="#d97706" strokeWidth="1"   />
+          <line x1="0" y1={topY-5}  x2="6"   y2={topY-14} stroke="#d97706" strokeWidth="1"   />
+          <line x1="0" y1={topY-12} x2="-13" y2={topY-24} stroke="#d97706" strokeWidth="1.1" />
+          <line x1="0" y1={topY-12} x2="13"  y2={topY-24} stroke="#d97706" strokeWidth="1.1" />
         </>}
       </>}
-      {head==='harvest'&&<line x1="0" y1={topY} x2="4" y2={topY+8} stroke={sc} strokeWidth="1.5" strokeLinecap="round" />}
+      {head==='harvest' && <line x1="0" y1={topY} x2="6" y2={topY+10} stroke={sc} strokeWidth="2" strokeLinecap="round" />}
     </g>
   )
 }
