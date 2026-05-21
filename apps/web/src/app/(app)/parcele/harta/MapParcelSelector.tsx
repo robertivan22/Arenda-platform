@@ -10,7 +10,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
-  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info,
+  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers,
 } from 'lucide-react'
 import type { ParceleFitosanitar, GeoJSONPolygon, MapSearchResult } from '@/lib/parcele-types'
 import {
@@ -35,6 +35,92 @@ function fixLeafletIcons() {
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
   })
 }
+
+// ─── Proxy-backed WMS layer factory ─────────────────────────────────────────
+// Romanian government WMS services block browser cross-origin requests (CORS).
+// Route every tile through /api/wms-proxy so the fetch is made server-side.
+function createProxiedWMS(baseUrl: string, options: L.WMSOptions): L.TileLayer.WMS {
+  const layer = L.tileLayer.wms(baseUrl, options)
+  const origGetTileUrl = layer.getTileUrl.bind(layer)
+  layer.getTileUrl = function (coords: L.Coords): string {
+    const tileUrl = origGetTileUrl(coords)
+    return `/api/wms-proxy?url=${encodeURIComponent(tileUrl)}`
+  }
+  return layer
+}
+
+// ─── WMS Layer catalogue ─────────────────────────────────────────────────────
+interface WmsLayerDef {
+  id: string
+  label: string
+  sublabel: string
+  color: 'blue' | 'green' | 'amber'
+  wmsUrl: string
+  wmsOptions: L.WMSOptions
+  defaultOpacity: number
+  defaultVisible: boolean
+  minZoom?: number
+}
+
+const WMS_LAYER_DEFS: WmsLayerDef[] = [
+  {
+    id: 'ancpi_cadastru',
+    label: 'Cadastru ANCPI',
+    sublabel: 'Parcele cadastrale (INSPIRE)',
+    color: 'blue',
+    // ANCPI INSPIRE WMS — workspace CP, correct layer is CP:CP.CadastralParcel
+    wmsUrl: 'https://inspire.ancpi.ro/maps/geoserver/CP/wms',
+    wmsOptions: {
+      layers: 'CP:CP.CadastralParcel',
+      format: 'image/png',
+      transparent: true,
+      version: '1.3.0',
+      // Must use EPSG:4326 for this INSPIRE endpoint (not 3857)
+      crs: L.CRS.EPSG4326,
+      attribution: '© <a href="https://ancpi.ro" target="_blank">ANCPI</a> INSPIRE',
+    },
+    defaultOpacity: 0.65,
+    defaultVisible: false,
+    minZoom: 13,
+  },
+  {
+    id: 'apia_lpis',
+    label: 'LPIS APIA',
+    sublabel: 'Parcele eligibile subventii',
+    color: 'green',
+    // APIA Romania LPIS — published via INSPIRE AF theme obligation
+    wmsUrl: 'https://geoportal.apia.org.ro/geoserver/wms',
+    wmsOptions: {
+      layers: 'lpis:parcele_eligibile',
+      format: 'image/png',
+      transparent: true,
+      version: '1.3.0',
+      crs: L.CRS.EPSG4326,
+      attribution: '© <a href="https://apia.org.ro" target="_blank">APIA Romania</a>',
+    },
+    defaultOpacity: 0.55,
+    defaultVisible: false,
+    minZoom: 12,
+  },
+  {
+    id: 'apia_blocuri',
+    label: 'Blocuri fizice APIA',
+    sublabel: 'Blocuri fizice IACS/GSAA',
+    color: 'amber',
+    wmsUrl: 'https://geoportal.apia.org.ro/geoserver/wms',
+    wmsOptions: {
+      layers: 'lpis:blocuri_fizice',
+      format: 'image/png',
+      transparent: true,
+      version: '1.3.0',
+      crs: L.CRS.EPSG4326,
+      attribution: '© <a href="https://apia.org.ro" target="_blank">APIA Romania</a>',
+    },
+    defaultOpacity: 0.45,
+    defaultVisible: false,
+    minZoom: 10,
+  },
+]
 
 // ─── Nominatim address search ────────────────────────────────────────────────
 async function searchNominatim(query: string): Promise<MapSearchResult[]> {
@@ -79,11 +165,11 @@ export interface MapParcelSelectorProps {
   showList?: boolean
   height?: string
   allowDraw?: boolean
-  initialCenter?: [number, number] // WGS84 [lat, lng]
+  initialCenter?: [number, number]  // WGS84 [lat, lng]
   initialZoom?: number
 }
 
-// ─── Coordinate display badge ─────────────────────────────────────────────────
+// ─── Coordinate badge ─────────────────────────────────────────────────────────
 function CoordBadge({ ring }: { ring: number[][] }) {
   const [cx, cy] = centroidStereo70(ring)
   const [lat, lng] = stereo70ToLeaflet(cx, cy)
@@ -117,13 +203,19 @@ function CoordBadge({ ring }: { ring: number[][] }) {
   )
 }
 
+// ─── WMS layer color helper ───────────────────────────────────────────────────
+function layerColors(color: WmsLayerDef['color']) {
+  const map = {
+    blue:  { bg: 'bg-blue-50',  border: 'border-blue-200',  text: 'text-blue-700',  dot: 'bg-blue-500',  toggle: 'bg-blue-500'  },
+    green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', dot: 'bg-green-500', toggle: 'bg-green-500' },
+    amber: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', dot: 'bg-amber-500', toggle: 'bg-amber-500' },
+  }
+  return map[color]
+}
+
 // ─── Parcel list item ─────────────────────────────────────────────────────────
 function ParcelItem({
-  parcel,
-  isSelected,
-  onView,
-  onDelete,
-  onSelect,
+  parcel, isSelected, onView, onDelete, onSelect,
 }: {
   parcel: ParceleFitosanitar
   isSelected: boolean
@@ -133,13 +225,10 @@ function ParcelItem({
 }) {
   const ring = parcel.geometry_geojson?.coordinates?.[0] ?? []
   const isStereo = ring.length > 0 && isLikelyStereo70(ring[0])
-
   return (
-    <div className={`p-3 rounded-lg border transition-all ${
-      isSelected
-        ? 'border-blue-500 bg-blue-50 shadow-sm'
-        : 'border-gray-200 bg-white hover:border-green-300 hover:bg-green-50'
-    }`}>
+    <div className={`p-3 rounded-lg border transition-all ${isSelected
+      ? 'border-blue-500 bg-blue-50 shadow-sm'
+      : 'border-gray-200 bg-white hover:border-green-300 hover:bg-green-50'}`}>
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm text-gray-800 truncate">{parcel.nume_parcela}</div>
@@ -154,11 +243,9 @@ function ParcelItem({
                 {Number(parcel.suprafata_ha).toFixed(2)} ha
               </span>
             )}
-            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
-              isStereo
-                ? 'text-blue-600 bg-blue-50 border-blue-200'
-                : 'text-orange-600 bg-orange-50 border-orange-200'
-            }`}>
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${isStereo
+              ? 'text-blue-600 bg-blue-50 border-blue-200'
+              : 'text-orange-600 bg-orange-50 border-orange-200'}`}>
               {isStereo ? 'Stereo 70' : 'WGS84'}
             </span>
           </div>
@@ -203,12 +290,14 @@ export default function MapParcelSelector({
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null)
   const parcelLayersRef = useRef<Map<string, L.GeoJSON>>(new Map())
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Live Leaflet WMS layer instances keyed by id
+  const wmsLayerRefs = useRef<Map<string, L.TileLayer.WMS>>(new Map())
 
   const [parcels, setParcels] = useState<ParceleFitosanitar[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(initialParcelId ?? null)
 
-  // Drawing state — ring always kept in Stereo 70
+  // Drawing — ring stored in Stereo 70
   const [drawnRingStereo, setDrawnRingStereo] = useState<number[][] | null>(null)
   const [showSaveModal, setShowSaveModal] = useState(false)
 
@@ -228,9 +317,18 @@ export default function MapParcelSelector({
   const [searchResults, setSearchResults] = useState<MapSearchResult[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
 
-  // Status bar cursor coords
+  // Cursor coordinates
   const [cursorWgs84, setCursorWgs84] = useState<{ lat: number; lng: number } | null>(null)
   const [cursorStereo, setCursorStereo] = useState<{ x: number; y: number } | null>(null)
+
+  // WMS layer panel
+  const [showLayerPanel, setShowLayerPanel] = useState(false)
+  const [wmsLayerState, setWmsLayerState] = useState<Record<string, { visible: boolean; opacity: number }>>(
+    () => Object.fromEntries(
+      WMS_LAYER_DEFS.map(d => [d.id, { visible: d.defaultVisible, opacity: d.defaultOpacity }])
+    )
+  )
+  const [wmsLayerErrors, setWmsLayerErrors] = useState<Record<string, boolean>>({})
 
   // ── Init Leaflet map ────────────────────────────────────────────────────
   useEffect(() => {
@@ -253,44 +351,52 @@ export default function MapParcelSelector({
       { attribution: '© Esri World Imagery', maxZoom: 19 },
     )
     const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenTopoMap',
-      maxZoom: 17,
+      attribution: '© OpenTopoMap', maxZoom: 17,
     })
-
-    // ANCPI cadastru WMS overlay (Romanian national cadastre — public INSPIRE)
-    const cadastru = L.tileLayer.wms('https://inspire.ancpi.ro/maps/geoserver/ows', {
-      layers: 'CP.CadastralParcel',
-      format: 'image/png',
-      transparent: true,
-      version: '1.3.0',
-      attribution: '© ANCPI Cadastru',
-      opacity: 0.55,
-    })
-
     osm.addTo(map)
     L.control.layers(
       { OpenStreetMap: osm, Satelit: satellite, Teren: topo },
-      { 'Cadastru ANCPI': cadastru },
+      {},
       { position: 'topright' },
     ).addTo(map)
 
-    // Cursor coordinate tracker → convert to Stereo 70 in real time
+    // Build proxy-backed WMS layers; add to map if defaultVisible
+    WMS_LAYER_DEFS.forEach(def => {
+      const wmsLayer = createProxiedWMS(def.wmsUrl, {
+        ...def.wmsOptions,
+        opacity: def.defaultOpacity,
+      })
+      // Tile error tracking
+      let errorFired = false
+      wmsLayer.on('tileerror', () => {
+        if (!errorFired) {
+          errorFired = true
+          setWmsLayerErrors(prev => ({ ...prev, [def.id]: true }))
+        }
+      })
+      wmsLayer.on('tileload', () => {
+        setWmsLayerErrors(prev => {
+          if (!prev[def.id]) return prev
+          return { ...prev, [def.id]: false }
+        })
+      })
+      if (def.defaultVisible) wmsLayer.addTo(map)
+      wmsLayerRefs.current.set(def.id, wmsLayer)
+    })
+
+    // Cursor coordinate tracker → realtime Stereo 70 conversion
     map.on('mousemove', (e: L.LeafletMouseEvent) => {
       setCursorWgs84({ lat: e.latlng.lat, lng: e.latlng.lng })
       const [x, y] = wgs84ToStereo70(e.latlng.lng, e.latlng.lat)
       setCursorStereo({ x, y })
     })
-    map.on('mouseout', () => {
-      setCursorWgs84(null)
-      setCursorStereo(null)
-    })
+    map.on('mouseout', () => { setCursorWgs84(null); setCursorStereo(null) })
 
     // Draw controls
     if (allowDraw) {
       const drawnItems = new L.FeatureGroup()
       map.addLayer(drawnItems)
       drawnItemsRef.current = drawnItems
-
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const DrawControl = (L as any).Control.Draw
       const drawControl = new DrawControl({
@@ -299,18 +405,9 @@ export default function MapParcelSelector({
           polygon: {
             allowIntersection: false,
             showArea: true,
-            shapeOptions: {
-              color: '#16a34a',
-              fillColor: '#16a34a',
-              fillOpacity: 0.25,
-              weight: 2,
-            },
+            shapeOptions: { color: '#16a34a', fillColor: '#16a34a', fillOpacity: 0.25, weight: 2 },
           },
-          polyline: false,
-          rectangle: false,
-          circle: false,
-          circlemarker: false,
-          marker: false,
+          polyline: false, rectangle: false, circle: false, circlemarker: false, marker: false,
         },
         edit: { featureGroup: drawnItems },
       })
@@ -321,16 +418,9 @@ export default function MapParcelSelector({
         const layer = (e as any).layer as L.Polygon
         drawnItems.clearLayers()
         drawnItems.addLayer(layer)
-
-        // Leaflet returns WGS84 [lng, lat] coordinates in GeoJSON
         const geo = layer.toGeoJSON() as GeoJSON.Feature<GeoJSON.Polygon>
-        const ringWgs84 = geo.geometry.coordinates[0]
-
-        // Convert to Stereo 70 for storage + accurate area
-        const ringStereo = ringWgs84ToStereo70(ringWgs84)
+        const ringStereo = ringWgs84ToStereo70(geo.geometry.coordinates[0])
         setDrawnRingStereo(ringStereo)
-
-        // Auto-fill address via reverse geocoding
         const center = layer.getBounds().getCenter()
         try {
           const addr = await reverseGeocode(center.lat, center.lng)
@@ -338,7 +428,6 @@ export default function MapParcelSelector({
           setSaveLocalitate(addr.localitate)
           setSaveAdresa(addr.adresa)
         } catch { /* non-blocking */ }
-
         setSaveName('')
         setSaveNote('')
         setShowSaveModal(true)
@@ -350,11 +439,29 @@ export default function MapParcelSelector({
       map.remove()
       mapRef.current = null
       drawnItemsRef.current = null
+      wmsLayerRefs.current.clear()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Load parcels from Supabase ──────────────────────────────────────────
+  // ── Sync WMS visibility + opacity → Leaflet ─────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    WMS_LAYER_DEFS.forEach(def => {
+      const layer = wmsLayerRefs.current.get(def.id)
+      if (!layer) return
+      const { visible, opacity } = wmsLayerState[def.id]
+      layer.setOpacity(opacity)
+      if (visible && !map.hasLayer(layer)) {
+        layer.addTo(map)
+      } else if (!visible && map.hasLayer(layer)) {
+        map.removeLayer(layer)
+      }
+    })
+  }, [wmsLayerState])
+
+  // ── Load parcels ────────────────────────────────────────────────────────
   const loadParcels = useCallback(async () => {
     setLoading(true)
     const db = createClient()
@@ -362,34 +469,23 @@ export default function MapParcelSelector({
       .from('parcele_fitosanitar')
       .select('*')
       .order('created_at', { ascending: false })
-    if (error) {
-      toast.error('Eroare la incarcare: ' + error.message)
-    } else {
-      setParcels((data ?? []) as ParceleFitosanitar[])
-    }
+    if (error) toast.error('Eroare la incarcare: ' + error.message)
+    else setParcels((data ?? []) as ParceleFitosanitar[])
     setLoading(false)
   }, [])
 
   useEffect(() => { void loadParcels() }, [loadParcels])
 
-  // ── Render parcel polygons on map ───────────────────────────────────────
-  // Stored in Stereo 70 → convert back to WGS84 [lng,lat] for Leaflet
+  // ── Render parcel polygons ──────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-
     parcelLayersRef.current.forEach(l => map.removeLayer(l))
     parcelLayersRef.current.clear()
-
     parcels.forEach(parcel => {
       const ring = parcel.geometry_geojson?.coordinates?.[0]
       if (!ring || ring.length < 3) return
-
-      // Auto-detect projection and normalise to WGS84 for display
-      const ringWgs84 = isLikelyStereo70(ring[0])
-        ? ringStereo70ToWgs84(ring)
-        : ring
-
+      const ringWgs84 = isLikelyStereo70(ring[0]) ? ringStereo70ToWgs84(ring) : ring
       const isSelected = parcel.id === selectedId
       const layer = L.geoJSON(
         { type: 'Polygon', coordinates: [ringWgs84] } as GeoJSON.GeoJsonObject,
@@ -404,14 +500,12 @@ export default function MapParcelSelector({
       )
         .bindTooltip(parcel.nume_parcela, { sticky: true })
         .on('click', () => focusParcel(parcel))
-
       layer.addTo(map)
       parcelLayersRef.current.set(parcel.id, layer)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parcels, selectedId])
 
-  // ── Focus / select parcel ───────────────────────────────────────────────
   function focusParcel(parcel: ParceleFitosanitar) {
     setSelectedId(parcel.id)
     onParcelSelected?.(parcel)
@@ -423,7 +517,7 @@ export default function MapParcelSelector({
     }
   }
 
-  // ── Address search (Nominatim → WGS84 → pan map) ───────────────────────
+  // ── Address search ──────────────────────────────────────────────────────
   function handleSearchInput(value: string) {
     setSearchQuery(value)
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
@@ -444,41 +538,31 @@ export default function MapParcelSelector({
     mapRef.current?.setView([r.lat, r.lng], 14)
   }
 
-  // ── Save parcel (geometry stored in Stereo 70) ──────────────────────────
+  // ── WMS layer controls ──────────────────────────────────────────────────
+  function toggleWmsLayer(id: string) {
+    setWmsLayerState(prev => ({ ...prev, [id]: { ...prev[id], visible: !prev[id].visible } }))
+    setWmsLayerErrors(prev => ({ ...prev, [id]: false }))
+  }
+
+  function setWmsOpacity(id: string, opacity: number) {
+    setWmsLayerState(prev => ({ ...prev, [id]: { ...prev[id], opacity } }))
+  }
+
+  // ── Save parcel ─────────────────────────────────────────────────────────
   async function handleSaveParcel() {
     if (!drawnRingStereo || !saveName.trim()) {
-      toast.error('Introdu un nume pentru parcela')
-      return
+      toast.error('Introdu un nume pentru parcela'); return
     }
     const area = calcAreaHaStereo70(drawnRingStereo)
-    if (area <= 0) {
-      toast.error('Deseneaza un poligon valid cu minimum 3 puncte')
-      return
-    }
-    if (area > 10000) {
-      toast.error('Suprafata trebuie sa fie intre 0.01 si 10,000 ha')
-      return
-    }
-
-    // Centroid in Stereo 70 → convert to WGS84 for map panning
+    if (area <= 0) { toast.error('Deseneaza un poligon valid'); return }
+    if (area > 10000) { toast.error('Suprafata maxima 10,000 ha'); return }
     const [cx, cy] = centroidStereo70(drawnRingStereo)
     const [centruLat, centruLng] = stereo70ToLeaflet(cx, cy)
-
     setSaving(true)
     const db = createClient()
     const { data: { user } } = await db.auth.getUser()
-    if (!user) {
-      toast.error('Trebuie sa fii autentificat')
-      setSaving(false)
-      return
-    }
-
-    // geometry stored in Stereo 70 (EPSG:3844) — APIA/ANCPI compliant
-    const geometryStereo70: GeoJSONPolygon = {
-      type: 'Polygon',
-      coordinates: [drawnRingStereo],
-    }
-
+    if (!user) { toast.error('Trebuie sa fii autentificat'); setSaving(false); return }
+    const geometryStereo70: GeoJSONPolygon = { type: 'Polygon', coordinates: [drawnRingStereo] }
     const { data, error } = await db
       .from('parcele_fitosanitar')
       .insert([{
@@ -489,16 +573,14 @@ export default function MapParcelSelector({
         adresa: saveAdresa || null,
         suprafata_ha: area,
         geometry_geojson: geometryStereo70,
-        centru_lat: centruLat,  // WGS84 for quick map pan
+        centru_lat: centruLat,
         centru_lng: centruLng,
         note: saveNote || null,
       }])
       .select()
       .single()
-
-    if (error) {
-      toast.error('Eroare la salvare: ' + error.message)
-    } else {
+    if (error) toast.error('Eroare la salvare: ' + error.message)
+    else {
       toast.success(`Parcela "${saveName}" salvata in Stereo 70!`)
       closeSaveModal()
       await loadParcels()
@@ -509,11 +591,7 @@ export default function MapParcelSelector({
 
   function closeSaveModal() {
     setShowSaveModal(false)
-    setSaveName('')
-    setSaveLocalitate('')
-    setSaveJudet('')
-    setSaveAdresa('')
-    setSaveNote('')
+    setSaveName(''); setSaveLocalitate(''); setSaveJudet(''); setSaveAdresa(''); setSaveNote('')
     setDrawnRingStereo(null)
     drawnItemsRef.current?.clearLayers()
   }
@@ -523,9 +601,8 @@ export default function MapParcelSelector({
     if (!deleteId) return
     const db = createClient()
     const { error } = await db.from('parcele_fitosanitar').delete().eq('id', deleteId)
-    if (error) {
-      toast.error('Eroare la stergere: ' + error.message)
-    } else {
+    if (error) toast.error('Eroare la stergere: ' + error.message)
+    else {
       toast.success('Parcela stearsa')
       if (selectedId === deleteId) setSelectedId(null)
       await loadParcels()
@@ -535,6 +612,7 @@ export default function MapParcelSelector({
 
   const deleteParcel = parcels.find(p => p.id === deleteId)
   const isModal = mode === 'modal'
+  const activeLayerCount = Object.values(wmsLayerState).filter(s => s.visible).length
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
@@ -551,8 +629,7 @@ export default function MapParcelSelector({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
-              type="text"
-              value={searchQuery}
+              type="text" value={searchQuery}
               onChange={e => handleSearchInput(e.target.value)}
               onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
@@ -574,6 +651,115 @@ export default function MapParcelSelector({
             )}
           </div>
 
+          {/* ── Layer panel toggle ── */}
+          <button
+            onClick={() => setShowLayerPanel(v => !v)}
+            className={`flex items-center justify-between w-full px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              showLayerPanel
+                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                : 'bg-white border-gray-200 text-gray-700 hover:border-indigo-300 hover:bg-indigo-50'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <Layers className="w-4 h-4" />
+              Straturi hartă
+            </span>
+            <span className="flex items-center gap-1.5">
+              {activeLayerCount > 0 && (
+                <span className="text-xs bg-indigo-600 text-white rounded-full px-1.5 py-0.5 leading-none">
+                  {activeLayerCount}
+                </span>
+              )}
+              <span className="text-xs text-gray-400">{showLayerPanel ? '▲' : '▼'}</span>
+            </span>
+          </button>
+
+          {/* ── Layer panel ── */}
+          {showLayerPanel && (
+            <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Straturi oficiale România
+                </p>
+              </div>
+
+              <div className="divide-y divide-gray-100">
+                {WMS_LAYER_DEFS.map(def => {
+                  const state = wmsLayerState[def.id]
+                  const hasError = wmsLayerErrors[def.id]
+                  const c = layerColors(def.color)
+                  return (
+                    <div key={def.id} className={`p-3 transition-colors ${state.visible ? c.bg : 'bg-white'}`}>
+                      {/* Toggle row */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => toggleWmsLayer(def.id)}
+                          className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
+                            state.visible ? c.toggle : 'bg-gray-200'
+                          }`}
+                          title={state.visible ? 'Dezactiveaza' : 'Activeaza'}
+                        >
+                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                            state.visible ? 'translate-x-4' : 'translate-x-0.5'
+                          }`} />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${c.dot}`} />
+                            <span className={`text-sm font-medium ${state.visible ? c.text : 'text-gray-700'}`}>
+                              {def.label}
+                            </span>
+                            {hasError && state.visible && (
+                              <span className="text-[10px] bg-red-100 text-red-600 border border-red-200 px-1 py-0.5 rounded font-medium">
+                                indisponibil
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-0.5 truncate">{def.sublabel}</div>
+                        </div>
+                      </div>
+
+                      {/* Opacity slider */}
+                      {state.visible && (
+                        <div className="mt-2.5 flex items-center gap-2">
+                          <span className="text-xs text-gray-500 w-16 flex-shrink-0">Opacitate</span>
+                          <input
+                            type="range" min={10} max={100}
+                            value={Math.round(state.opacity * 100)}
+                            onChange={e => setWmsOpacity(def.id, parseInt(e.target.value) / 100)}
+                            className="flex-1 h-1.5 accent-indigo-500"
+                          />
+                          <span className="text-xs text-gray-500 w-8 text-right">
+                            {Math.round(state.opacity * 100)}%
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Error hint */}
+                      {hasError && state.visible && (
+                        <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 flex items-start gap-1.5">
+                          <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                          <span>
+                            Serviciul WMS poate fi indisponibil.
+                            {def.minZoom && ` Vizibil de la zoom ${def.minZoom}.`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500 space-y-0.5">
+                <p className="flex items-center gap-1">
+                  <Info className="w-3 h-3 flex-shrink-0" />
+                  APIA/ANCPI necesita zoom 12–15 pentru vizibilitate optima.
+                </p>
+                <p>Toate cererile WMS trec prin proxy server (bypass CORS).</p>
+              </div>
+            </div>
+          )}
+
           {/* Projection badge */}
           <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
             <Info className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
@@ -582,12 +768,14 @@ export default function MapParcelSelector({
             </div>
           </div>
 
-          {/* List header */}
+          {/* Parcel list header */}
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
               <MapPin className="w-4 h-4 text-green-600" />
               Parcelele mele
-              {!loading && <span className="text-xs font-normal text-gray-400 ml-1">({parcels.length})</span>}
+              {!loading && (
+                <span className="text-xs font-normal text-gray-400 ml-1">({parcels.length})</span>
+              )}
             </h3>
             <button onClick={() => void loadParcels()} title="Reincarcare"
               className="p-1 text-gray-400 hover:text-gray-600 rounded">
@@ -606,9 +794,7 @@ export default function MapParcelSelector({
               <div className="text-center py-10 text-gray-400">
                 <MapPin className="w-10 h-10 mx-auto mb-2 opacity-20" />
                 <p className="text-sm">Nu ai parcele salvate.</p>
-                {allowDraw && (
-                  <p className="text-xs mt-1">Foloseste butonul ✏️ de pe harta pentru a desena.</p>
-                )}
+                {allowDraw && <p className="text-xs mt-1">Foloseste butonul ✏️ de pe harta pentru a desena.</p>}
               </div>
             ) : (
               parcels.map(parcel => (
@@ -638,14 +824,13 @@ export default function MapParcelSelector({
         className="flex-1 flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm"
         style={!isModal ? { height } : undefined}
       >
-        {/* Leaflet canvas */}
         <div
           ref={containerRef}
           className="flex-1 w-full"
           style={!isModal ? { minHeight: height } : undefined}
         />
 
-        {/* Coordinate status bar */}
+        {/* Status bar */}
         <div className="flex items-center justify-between px-3 py-1.5 bg-gray-900 text-xs font-mono border-t border-gray-700 flex-shrink-0">
           {cursorStereo ? (
             <>
@@ -664,6 +849,11 @@ export default function MapParcelSelector({
           ) : (
             <span className="text-gray-600">Muta cursorul pe harta pentru coordonate Stereo 70</span>
           )}
+          {activeLayerCount > 0 && (
+            <span className="text-indigo-400 hidden md:inline ml-2">
+              {activeLayerCount} {activeLayerCount === 1 ? 'strat activ' : 'straturi active'}
+            </span>
+          )}
         </div>
       </div>
 
@@ -678,28 +868,16 @@ export default function MapParcelSelector({
                 <X className="w-4 h-4" />
               </button>
             </div>
-
             <div className="px-6 py-4 space-y-4">
-              {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Nume parcela <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={saveName}
-                  onChange={e => setSaveName(e.target.value)}
-                  placeholder="ex: Teren Campie Nord"
-                  autoFocus
-                  maxLength={100}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <input type="text" value={saveName} onChange={e => setSaveName(e.target.value)}
+                  placeholder="ex: Teren Campie Nord" autoFocus maxLength={100}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
-
-              {/* Coordinate info with area */}
               <CoordBadge ring={drawnRingStereo} />
-
-              {/* Judet + Localitate */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Judet</label>
@@ -714,16 +892,12 @@ export default function MapParcelSelector({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                 </div>
               </div>
-
-              {/* Note */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Note (optional)</label>
                 <textarea value={saveNote} onChange={e => setSaveNote(e.target.value)} rows={2}
                   placeholder="Note suplimentare..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
               </div>
-
-              {/* APIA compliance notice */}
               <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
                 <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                 <span>
@@ -732,7 +906,6 @@ export default function MapParcelSelector({
                 </span>
               </div>
             </div>
-
             <div className="flex gap-3 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
               <button onClick={closeSaveModal}
                 className="flex-1 px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
