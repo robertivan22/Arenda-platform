@@ -5,6 +5,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet-draw/dist/leaflet.draw.css'
 import 'leaflet-draw'
+import * as EsriLeaflet from 'esri-leaflet'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -36,55 +37,51 @@ function fixLeafletIcons() {
   })
 }
 
-// ─── OSM → GeoJSON (Overpass API results) ───────────────────────────────────
-// Overpass API has proper CORS headers; tiles/vectors load via fetch(), not <img>.
-// No proxy, no WMS, no external map service dependency.
-interface OsmEl {
-  type: string; id: number
-  lat?: number; lon?: number
-  nodes?: number[]; tags?: Record<string, string>
-}
-function osmToGeoJSON(elements: OsmEl[]): GeoJSON.FeatureCollection {
-  const nodes = new Map<number, [number, number]>()
-  for (const el of elements) {
-    if (el.type === 'node' && el.lat !== undefined && el.lon !== undefined)
-      nodes.set(el.id, [el.lon, el.lat])
-  }
-  const features: GeoJSON.Feature[] = []
-  for (const el of elements) {
-    if (el.type !== 'way' || !el.nodes) continue
-    const coords = el.nodes.map(id => nodes.get(id)).filter((c): c is [number, number] => !!c)
-    if (coords.length < 4) continue
-    features.push({
-      type: 'Feature', id: el.id,
-      properties: el.tags ?? {},
-      geometry: { type: 'Polygon', coordinates: [coords] },
-    })
-  }
-  return { type: 'FeatureCollection', features }
+// ─── esri-leaflet ArcGIS dynamic layer factory ───────────────────────────────
+// APIA and ANCPI are ArcGIS MapServer services, not GeoServer WMS.
+// dynamicMapLayer makes requests directly from the user's browser to the ArcGIS
+// export endpoint. <img> elements load cross-origin images without CORS headers,
+// and the browser's certificate trust store handles Romanian government SSL certs
+// (which fail in Node.js/Cloudflare edge due to missing intermediate CAs).
+function createEsriLayer(url: string, opacity: number): EsriLeaflet.DynamicMapLayer {
+  return EsriLeaflet.dynamicMapLayer({ url, opacity })
 }
 
-// ─── Static tile overlay catalogue ──────────────────────────────────────────
+// ─── ArcGIS Layer catalogue ───────────────────────────────────────────────────
 interface WmsLayerDef {
   id: string
   label: string
   sublabel: string
   color: 'blue' | 'green' | 'amber'
-  tileUrl: string
+  url: string           // ArcGIS MapServer REST URL (no /WMSServer)
   defaultOpacity: number
   defaultVisible: boolean
+  minZoom?: number
 }
 
 const WMS_LAYER_DEFS: WmsLayerDef[] = [
   {
-    id: 'esri_boundaries',
-    label: 'Limite administrative',
-    sublabel: 'ESRI World Boundaries (vector overlay)',
-    color: 'blue',
-    tileUrl: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-    defaultOpacity: 0.7,
+    id: 'apia_lpis_2024',
+    label: 'LPIS APIA',
+    sublabel: 'Referinta parcele 2024',
+    color: 'green',
+    // APIA INSPIRE ArcGIS MapServer — 2024 dataset (most current)
+    url: 'https://inspire.apia.org.ro/network/rest/services/INSPIRE/LPIS_referinta_2024/MapServer',
+    defaultOpacity: 0.55,
     defaultVisible: false,
+    minZoom: 12,
   },
+]
+
+type LegendItem = {
+  id: string
+  label: string
+  color: string
+}
+
+const DEFAULT_LEGEND_ITEMS: LegendItem[] = [
+  { id: 'grau', label: 'Grau', color: '#ef4444' },
+  { id: 'porumb', label: 'Porumb', color: '#f59e0b' },
 ]
 
 // ─── Nominatim address search ────────────────────────────────────────────────
@@ -178,15 +175,25 @@ function layerColors(color: WmsLayerDef['color']) {
   return map[color]
 }
 
+function makeLegendId(label: string) {
+  return label
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || `legend-${Date.now()}`
+}
+
 // ─── Parcel list item ─────────────────────────────────────────────────────────
 function ParcelItem({
-  parcel, isSelected, onView, onDelete, onSelect,
+  parcel, isSelected, onView, onDelete, onSelect, legendLabel, legendColor,
 }: {
   parcel: ParceleFitosanitar
   isSelected: boolean
   onView: () => void
   onDelete: () => void
   onSelect?: () => void
+  legendLabel?: string
+  legendColor?: string
 }) {
   const ring = parcel.geometry_geojson?.coordinates?.[0] ?? []
   const isStereo = ring.length > 0 && isLikelyStereo70(ring[0])
@@ -206,6 +213,12 @@ function ParcelItem({
             {parcel.suprafata_ha != null && (
               <span className="text-xs font-semibold text-green-700 bg-green-50 px-1.5 py-0.5 rounded">
                 {Number(parcel.suprafata_ha).toFixed(2)} ha
+              </span>
+            )}
+            {legendLabel && (
+              <span className="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: legendColor ?? '#22c55e' }} />
+                {legendLabel}
               </span>
             )}
             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${isStereo
@@ -255,8 +268,8 @@ export default function MapParcelSelector({
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null)
   const parcelLayersRef = useRef<Map<string, L.GeoJSON>>(new Map())
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Static tile overlay instances keyed by layer id
-  const wmsLayerRefs = useRef<Map<string, L.TileLayer>>(new Map())
+  // Live esri-leaflet DynamicMapLayer instances keyed by layer id
+  const wmsLayerRefs = useRef<Map<string, EsriLeaflet.DynamicMapLayer>>(new Map())
 
   const [parcels, setParcels] = useState<ParceleFitosanitar[]>([])
   const [loading, setLoading] = useState(true)
@@ -294,14 +307,43 @@ export default function MapParcelSelector({
     )
   )
   const [wmsLayerErrors, setWmsLayerErrors] = useState<Record<string, boolean>>({})
+  const [legendItems, setLegendItems] = useState<LegendItem[]>(DEFAULT_LEGEND_ITEMS)
+  const [parcelLegendMap, setParcelLegendMap] = useState<Record<string, string>>({})
+  const [saveLegendId, setSaveLegendId] = useState(DEFAULT_LEGEND_ITEMS[0].id)
+  const [showLegendAdd, setShowLegendAdd] = useState(false)
+  const [newLegendLabel, setNewLegendLabel] = useState('')
+  const [newLegendColor, setNewLegendColor] = useState('#22c55e')
 
-  // Overpass API (OSM farmland) overlay
-  const overpassLayerRef = useRef<L.GeoJSON | null>(null)
-  const overpassOpacityRef = useRef(0.6)
-  const [overpassVisible, setOverpassVisible] = useState(false)
-  const [overpassOpacity, setOverpassOpacity] = useState(0.6)
-  const [overpassLoading, setOverpassLoading] = useState(false)
-  const [overpassError, setOverpassError] = useState(false)
+  useEffect(() => {
+    try {
+      const rawLegend = localStorage.getItem('map_legend_items')
+      const rawParcelLegend = localStorage.getItem('map_parcel_legend_map')
+      if (rawLegend) {
+        const parsed = JSON.parse(rawLegend) as LegendItem[]
+        if (Array.isArray(parsed) && parsed.length > 0) setLegendItems(parsed)
+      }
+      if (rawParcelLegend) {
+        const parsed = JSON.parse(rawParcelLegend) as Record<string, string>
+        if (parsed && typeof parsed === 'object') setParcelLegendMap(parsed)
+      }
+    } catch {
+      // ignore localStorage parsing errors
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('map_legend_items', JSON.stringify(legendItems))
+  }, [legendItems])
+
+  useEffect(() => {
+    localStorage.setItem('map_parcel_legend_map', JSON.stringify(parcelLegendMap))
+  }, [parcelLegendMap])
+
+  useEffect(() => {
+    if (!legendItems.some(item => item.id === saveLegendId) && legendItems[0]) {
+      setSaveLegendId(legendItems[0].id)
+    }
+  }, [legendItems, saveLegendId])
 
   // ── Init Leaflet map ────────────────────────────────────────────────────
   useEffect(() => {
@@ -333,9 +375,23 @@ export default function MapParcelSelector({
       { position: 'topright' },
     ).addTo(map)
 
-    // Build static tile overlays
+    // Build esri-leaflet ArcGIS dynamic layers (browser-direct, no proxy)
     WMS_LAYER_DEFS.forEach(def => {
-      const layer = L.tileLayer(def.tileUrl, { opacity: def.defaultOpacity })
+      const layer = createEsriLayer(def.url, def.defaultOpacity)
+      // Error / load tracking
+      let errorFired = false
+      layer.on('loaderror', () => {
+        if (!errorFired) {
+          errorFired = true
+          setWmsLayerErrors(prev => ({ ...prev, [def.id]: true }))
+        }
+      })
+      layer.on('load', () => {
+        setWmsLayerErrors(prev => {
+          if (!prev[def.id]) return prev
+          return { ...prev, [def.id]: false }
+        })
+      })
       if (def.defaultVisible) layer.addTo(map)
       wmsLayerRefs.current.set(def.id, layer)
     })
@@ -396,7 +452,6 @@ export default function MapParcelSelector({
       mapRef.current = null
       drawnItemsRef.current = null
       wmsLayerRefs.current.clear()
-      if (overpassLayerRef.current) { overpassLayerRef.current.remove(); overpassLayerRef.current = null }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -417,55 +472,6 @@ export default function MapParcelSelector({
       }
     })
   }, [wmsLayerState])
-
-  // ── Overpass API farmland overlay ────────────────────────────────────────
-  const loadOverpassFarmland = useCallback(async () => {
-    const map = mapRef.current
-    if (!map || map.getZoom() < 12) return
-    const b = map.getBounds()
-    const s = b.getSouth().toFixed(5), w = b.getWest().toFixed(5)
-    const n = b.getNorth().toFixed(5), e = b.getEast().toFixed(5)
-    setOverpassLoading(true); setOverpassError(false)
-    try {
-      const q = `[out:json][timeout:15];(way["landuse"~"^(farmland|meadow|orchard|vineyard)$"](${s},${w},${n},${e}););out body;>;out skel qt;`
-      const res = await fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        body: `data=${encodeURIComponent(q)}`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json() as { elements: OsmEl[] }
-      if (overpassLayerRef.current) overpassLayerRef.current.remove()
-      overpassLayerRef.current = L.geoJSON(osmToGeoJSON(data.elements), {
-        style: { color: '#15803d', weight: 1.5, fillColor: '#4ade80', fillOpacity: overpassOpacityRef.current },
-        onEachFeature: (f, l) => {
-          const lu = (f.properties as Record<string, string>)?.landuse
-          if (lu) l.bindTooltip(lu, { sticky: true })
-        },
-      })
-      overpassLayerRef.current.addTo(map)
-    } catch { setOverpassError(true) }
-    finally { setOverpassLoading(false) }
-  }, [])
-
-  useEffect(() => {
-    overpassOpacityRef.current = overpassOpacity
-    overpassLayerRef.current?.setStyle({ fillOpacity: overpassOpacity })
-  }, [overpassOpacity])
-
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-    if (!overpassVisible) {
-      if (overpassLayerRef.current && map.hasLayer(overpassLayerRef.current))
-        map.removeLayer(overpassLayerRef.current)
-      return
-    }
-    if (map.getZoom() >= 12) void loadOverpassFarmland()
-    const onMoveEnd = () => { void loadOverpassFarmland() }
-    map.on('moveend', onMoveEnd)
-    return () => { map.off('moveend', onMoveEnd) }
-  }, [overpassVisible, loadOverpassFarmland])
 
   // ── Load parcels ────────────────────────────────────────────────────────
   const loadParcels = useCallback(async () => {
@@ -493,12 +499,15 @@ export default function MapParcelSelector({
       if (!ring || ring.length < 3) return
       const ringWgs84 = isLikelyStereo70(ring[0]) ? ringStereo70ToWgs84(ring) : ring
       const isSelected = parcel.id === selectedId
+      const legendId = parcelLegendMap[parcel.id]
+      const legend = legendItems.find(item => item.id === legendId)
+      const parcelColor = legend?.color ?? '#22c55e'
       const layer = L.geoJSON(
         { type: 'Polygon', coordinates: [ringWgs84] } as GeoJSON.GeoJsonObject,
         {
           style: {
-            color: isSelected ? '#1d4ed8' : '#15803d',
-            fillColor: isSelected ? '#3b82f6' : '#22c55e',
+            color: isSelected ? '#1d4ed8' : parcelColor,
+            fillColor: isSelected ? '#3b82f6' : parcelColor,
             fillOpacity: isSelected ? 0.35 : 0.2,
             weight: isSelected ? 3 : 2,
           },
@@ -510,7 +519,7 @@ export default function MapParcelSelector({
       parcelLayersRef.current.set(parcel.id, layer)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parcels, selectedId])
+  }, [parcels, selectedId, parcelLegendMap, legendItems])
 
   function focusParcel(parcel: ParceleFitosanitar) {
     setSelectedId(parcel.id)
@@ -554,6 +563,27 @@ export default function MapParcelSelector({
     setWmsLayerState(prev => ({ ...prev, [id]: { ...prev[id], opacity } }))
   }
 
+  function addLegendItem() {
+    const label = newLegendLabel.trim()
+    if (!label) {
+      toast.error('Introdu denumirea culturii')
+      return
+    }
+    const baseId = makeLegendId(label)
+    const id = legendItems.some(item => item.id === baseId) ? `${baseId}-${Date.now()}` : baseId
+    const newItem: LegendItem = { id, label, color: newLegendColor }
+    setLegendItems(prev => [...prev, newItem])
+    setSaveLegendId(id)
+    setNewLegendLabel('')
+    setNewLegendColor('#22c55e')
+    setShowLegendAdd(false)
+  }
+
+  function getLegendForParcel(parcelId: string) {
+    const legendId = parcelLegendMap[parcelId]
+    return legendItems.find(item => item.id === legendId)
+  }
+
   // ── Save parcel ─────────────────────────────────────────────────────────
   async function handleSaveParcel() {
     if (!drawnRingStereo || !saveName.trim()) {
@@ -590,7 +620,10 @@ export default function MapParcelSelector({
       toast.success(`Parcela "${saveName}" salvata in Stereo 70!`)
       closeSaveModal()
       await loadParcels()
-      if (data) focusParcel(data as ParceleFitosanitar)
+      if (data) {
+        setParcelLegendMap(prev => ({ ...prev, [data.id]: saveLegendId }))
+        focusParcel(data as ParceleFitosanitar)
+      }
     }
     setSaving(false)
   }
@@ -611,6 +644,11 @@ export default function MapParcelSelector({
     else {
       toast.success('Parcela stearsa')
       if (selectedId === deleteId) setSelectedId(null)
+      setParcelLegendMap(prev => {
+        const next = { ...prev }
+        delete next[deleteId]
+        return next
+      })
       await loadParcels()
     }
     setDeleteId(null)
@@ -618,7 +656,7 @@ export default function MapParcelSelector({
 
   const deleteParcel = parcels.find(p => p.id === deleteId)
   const isModal = mode === 'modal'
-  const activeLayerCount = Object.values(wmsLayerState).filter(s => s.visible).length + (overpassVisible ? 1 : 0)
+  const activeLayerCount = Object.values(wmsLayerState).filter(s => s.visible).length
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
@@ -690,78 +728,62 @@ export default function MapParcelSelector({
               </div>
 
               <div className="divide-y divide-gray-100">
-                {/* ── OSM Farmland via Overpass API ── */}
-                <div className={`p-3 transition-colors ${overpassVisible ? 'bg-green-50' : 'bg-white'}`}>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setOverpassVisible(v => !v)}
-                      className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${overpassVisible ? 'bg-green-500' : 'bg-gray-200'}`}
-                    >
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${overpassVisible ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0 bg-green-500" />
-                        <span className={`text-sm font-medium ${overpassVisible ? 'text-green-700' : 'text-gray-700'}`}>
-                          Parcele agricole OSM
-                        </span>
-                        {overpassLoading && (
-                          <span className="inline-block w-3 h-3 border border-green-500 border-t-transparent rounded-full animate-spin" />
-                        )}
-                        {overpassError && overpassVisible && (
-                          <span className="text-[10px] bg-red-100 text-red-600 border border-red-200 px-1 py-0.5 rounded font-medium">eroare</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">OpenStreetMap farmland · zoom ≥ 12</div>
-                    </div>
-                  </div>
-                  {overpassVisible && (
-                    <div className="mt-2.5 flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-16 flex-shrink-0">Opacitate</span>
-                      <input type="range" min={10} max={100}
-                        value={Math.round(overpassOpacity * 100)}
-                        onChange={e => setOverpassOpacity(parseInt(e.target.value) / 100)}
-                        className="flex-1 h-1.5 accent-green-500" />
-                      <span className="text-xs text-gray-500 w-8 text-right">{Math.round(overpassOpacity * 100)}%</span>
-                    </div>
-                  )}
-                  {overpassError && overpassVisible && (
-                    <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 flex items-start gap-1.5">
-                      <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                      <span>Eroare la incarcarea datelor OSM. Incercati din nou sau mutati harta.</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Static tile overlays (ESRI etc.) ── */}
                 {WMS_LAYER_DEFS.map(def => {
                   const state = wmsLayerState[def.id]
+                  const hasError = wmsLayerErrors[def.id]
                   const c = layerColors(def.color)
                   return (
                     <div key={def.id} className={`p-3 transition-colors ${state.visible ? c.bg : 'bg-white'}`}>
+                      {/* Toggle row */}
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => toggleWmsLayer(def.id)}
-                          className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${state.visible ? c.toggle : 'bg-gray-200'}`}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 ${
+                            state.visible ? c.toggle : 'bg-gray-200'
+                          }`}
+                          title={state.visible ? 'Dezactiveaza' : 'Activeaza'}
                         >
-                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${state.visible ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                          <span className={`absolute left-0.5 top-1/2 h-4 w-4 -translate-y-1/2 bg-white rounded-full shadow transition-transform ${
+                            state.visible ? 'translate-x-4' : 'translate-x-0.5'
+                          }`} />
                         </button>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${c.dot}`} />
-                            <span className={`text-sm font-medium ${state.visible ? c.text : 'text-gray-700'}`}>{def.label}</span>
+                            <span className={`text-sm font-medium ${state.visible ? c.text : 'text-gray-700'}`}>
+                              {def.label}
+                            </span>
+                            {hasError && state.visible && (
+                              <span className="text-[10px] bg-red-100 text-red-600 border border-red-200 px-1 py-0.5 rounded font-medium">
+                                indisponibil
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-gray-500 mt-0.5 truncate">{def.sublabel}</div>
                         </div>
                       </div>
+
+                      {/* Opacity slider */}
                       {state.visible && (
                         <div className="mt-2.5 flex items-center gap-2">
                           <span className="text-xs text-gray-500 w-16 flex-shrink-0">Opacitate</span>
-                          <input type="range" min={10} max={100}
+                          <input
+                            type="range" min={10} max={100}
                             value={Math.round(state.opacity * 100)}
                             onChange={e => setWmsOpacity(def.id, parseInt(e.target.value) / 100)}
-                            className="flex-1 h-1.5 accent-indigo-500" />
-                          <span className="text-xs text-gray-500 w-8 text-right">{Math.round(state.opacity * 100)}%</span>
+                            className="flex-1 h-1.5 accent-indigo-500"
+                          />
+                          <span className="text-xs text-gray-500 w-8 text-right">
+                            {Math.round(state.opacity * 100)}%
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Error hint */}
+                      {hasError && state.visible && (
+                        <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 flex items-start gap-1.5">
+                          <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                          <span>Stratul poate fi temporar indisponibil.</span>
                         </div>
                       )}
                     </div>
@@ -769,14 +791,54 @@ export default function MapParcelSelector({
                 })}
               </div>
 
-              <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
-                <p className="flex items-center gap-1">
-                  <Info className="w-3 h-3 flex-shrink-0" />
-                  Date agricole din OpenStreetMap — vizibile de la zoom 12.
-                </p>
-              </div>
             </div>
           )}
+
+          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Legenda culturi</p>
+              <button
+                onClick={() => setShowLegendAdd(v => !v)}
+                className="inline-flex items-center justify-center w-6 h-6 rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
+                title="Adauga legenda"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="p-3 space-y-2 bg-white">
+              {legendItems.map(item => (
+                <div key={item.id} className="flex items-center gap-2 text-sm text-gray-700">
+                  <span className="inline-block w-3 h-3 rounded-full border border-gray-200" style={{ backgroundColor: item.color }} />
+                  <span>{item.label}</span>
+                </div>
+              ))}
+              {showLegendAdd && (
+                <div className="mt-2 pt-2 border-t border-gray-100 space-y-2">
+                  <input
+                    type="text"
+                    value={newLegendLabel}
+                    onChange={e => setNewLegendLabel(e.target.value)}
+                    placeholder="Ex: Rapita"
+                    className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={newLegendColor}
+                      onChange={e => setNewLegendColor(e.target.value)}
+                      className="w-10 h-8 p-0 border border-gray-300 rounded cursor-pointer"
+                    />
+                    <button
+                      onClick={addLegendItem}
+                      className="px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded"
+                    >
+                      Adauga
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Projection badge */}
           <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
@@ -815,16 +877,21 @@ export default function MapParcelSelector({
                 {allowDraw && <p className="text-xs mt-1">Foloseste butonul ✏️ de pe harta pentru a desena.</p>}
               </div>
             ) : (
-              parcels.map(parcel => (
-                <ParcelItem
-                  key={parcel.id}
-                  parcel={parcel}
-                  isSelected={selectedId === parcel.id}
-                  onView={() => focusParcel(parcel)}
-                  onDelete={() => setDeleteId(parcel.id)}
-                  onSelect={onParcelSelected ? () => focusParcel(parcel) : undefined}
-                />
-              ))
+              parcels.map(parcel => {
+                const legend = getLegendForParcel(parcel.id)
+                return (
+                  <ParcelItem
+                    key={parcel.id}
+                    parcel={parcel}
+                    isSelected={selectedId === parcel.id}
+                    onView={() => focusParcel(parcel)}
+                    onDelete={() => setDeleteId(parcel.id)}
+                    onSelect={onParcelSelected ? () => focusParcel(parcel) : undefined}
+                    legendLabel={legend?.label}
+                    legendColor={legend?.color}
+                  />
+                )
+              })
             )}
           </div>
 
@@ -896,6 +963,18 @@ export default function MapParcelSelector({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
               <CoordBadge ring={drawnRingStereo} />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cultura (culoare)</label>
+                <select
+                  value={saveLegendId}
+                  onChange={e => setSaveLegendId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  {legendItems.map(item => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Judet</label>

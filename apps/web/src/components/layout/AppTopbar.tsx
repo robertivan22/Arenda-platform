@@ -23,6 +23,7 @@ function Breadcrumb() {
     d112: 'D112',
     apia: 'APIA',
     istoric: 'Istoric',
+    harta: 'Hartă Parcele',
     profil: 'Profil',
   }
 
