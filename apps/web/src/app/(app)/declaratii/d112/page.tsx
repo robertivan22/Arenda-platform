@@ -251,7 +251,8 @@ export default function D112Page() {
   xmlns="mfp:anaf:dgti:declaratie_unica:declaratie:v6"
   luna_r="${dataset.periodMonth}"
   an_r="${dataset.periodYear}"
-  d_rec="${cs.d112_tip_rec ?? 0}"${cs.d112_d_rec ? `\n  tip_rec="${cs.d112_d_rec}"` : ''}
+  d_rec="${cs.d112_tip_rec ?? 0}"
+  tip_rec="${cs.d112_d_rec || ((cs.d112_tip_rec ?? 0) === 0 ? '5' : '2')}"
   nume_declar="${escXml(cs.d112_nume_declar ?? 'NEDEFINIT')}"
   prenume_declar="${escXml(cs.d112_prenume_declar ?? 'NEDEFINIT')}"
   functie_declar="${escXml(cs.d112_functie_declar ?? 'Administrator')}">
