@@ -1,13 +1,11 @@
 ﻿'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { Eye, EyeOff, Loader2, Mail, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function LoginPage() {
-  const router = useRouter()
   const { signInWithPassword } = useAuthStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,10 +18,11 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await signInWithPassword(email, password)
-      router.replace('/dashboard')
+      window.location.href = '/dashboard'
     } catch (err: unknown) {
       toast.error((err as Error)?.message || 'Date de autentificare invalide.')
-    } finally { setLoading(false) }
+      setLoading(false)
+    }
   }
 
   return (
