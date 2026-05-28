@@ -4,13 +4,29 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Plus, Trash2, Building2, Package, Upload, X } from 'lucide-react'
+import { Plus, Trash2, Building2, Package, Upload, X, FileSpreadsheet } from 'lucide-react'
+import { VALID_CASA_ANG } from '@/lib/d112Validator'
 
 interface CompanySettings {
   name: string; cif: string; reg_com: string
   address: string; county: string; locality: string
   iban: string; bank_name: string; phone: string; email: string
   invoice_series: string; logo_url?: string
+}
+
+interface D112Settings {
+  d112_caen: string
+  d112_casa_ang: string
+  d112_fax_soc: string
+  d112_adr_fisc: string
+  d112_tel_fisc: string
+  d112_fax_fisc: string
+  d112_mail_fisc: string
+  d112_tip_rec: number
+  d112_d_rec: number
+  d112_nume_declar: string
+  d112_prenume_declar: string
+  d112_functie_declar: string
 }
 
 interface Product {
@@ -22,10 +38,19 @@ const EMPTY_COMPANY: CompanySettings = {
   iban: '', bank_name: '', phone: '', email: '', invoice_series: 'A', logo_url: '',
 }
 
+const EMPTY_D112: D112Settings = {
+  d112_caen: '0111', d112_casa_ang: 'IS', d112_fax_soc: '',
+  d112_adr_fisc: '', d112_tel_fisc: '', d112_fax_fisc: '', d112_mail_fisc: '',
+  d112_tip_rec: 0, d112_d_rec: 0,
+  d112_nume_declar: '', d112_prenume_declar: '', d112_functie_declar: 'Administrator',
+}
+
 export default function SetariPage() {
-  const [tab, setTab] = useState<'company' | 'products'>('company')
+  const [tab, setTab] = useState<'company' | 'products' | 'd112'>('company')
   const [company, setCompany] = useState<CompanySettings>(EMPTY_COMPANY)
   const [savingCompany, setSavingCompany] = useState(false)
+  const [d112, setD112] = useState<D112Settings>(EMPTY_D112)
+  const [savingD112, setSavingD112] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [newProduct, setNewProduct] = useState({ name: '', unit: 'kg' })
   const [savingProduct, setSavingProduct] = useState(false)
@@ -36,7 +61,25 @@ export default function SetariPage() {
   useEffect(() => {
     const db = createClient()
     db.from('company_settings').select('*').single()
-      .then(({ data }) => { if (data) setCompany(data as any) })
+      .then(({ data }) => {
+        if (data) {
+          setCompany(data as any)
+          setD112({
+            d112_caen: (data as any).d112_caen ?? '0111',
+            d112_casa_ang: (data as any).d112_casa_ang ?? 'IS',
+            d112_fax_soc: (data as any).d112_fax_soc ?? '',
+            d112_adr_fisc: (data as any).d112_adr_fisc ?? '',
+            d112_tel_fisc: (data as any).d112_tel_fisc ?? '',
+            d112_fax_fisc: (data as any).d112_fax_fisc ?? '',
+            d112_mail_fisc: (data as any).d112_mail_fisc ?? '',
+            d112_tip_rec: (data as any).d112_tip_rec ?? 0,
+            d112_d_rec: (data as any).d112_d_rec ?? 0,
+            d112_nume_declar: (data as any).d112_nume_declar ?? '',
+            d112_prenume_declar: (data as any).d112_prenume_declar ?? '',
+            d112_functie_declar: (data as any).d112_functie_declar ?? 'Administrator',
+          })
+        }
+      })
     loadProducts(db)
   }, [])
 
@@ -55,6 +98,21 @@ export default function SetariPage() {
     setSavingCompany(false)
     if (error) { toast.error('Eroare: ' + error.message); return }
     toast.success('Setarile firmei au fost salvate.')
+  }
+
+  async function saveD112(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingD112(true)
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) { toast.error('Neautentificat.'); setSavingD112(false); return }
+    const { error } = await db.from('company_settings').upsert(
+      { ...d112, user_id: user.id },
+      { onConflict: 'user_id' },
+    )
+    setSavingD112(false)
+    if (error) { toast.error('Eroare: ' + error.message); return }
+    toast.success('Setarile D112 au fost salvate.')
   }
 
   async function addProduct(e: React.FormEvent) {
@@ -88,7 +146,11 @@ export default function SetariPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
-        {([['company', Building2, 'Date firma'], ['products', Package, 'Produse arenda']] as const).map(([key, Icon, label]) => (
+        {([
+          ['company', Building2, 'Date firma'],
+          ['products', Package, 'Produse arenda'],
+          ['d112', FileSpreadsheet, 'Date Declaratie 112'],
+        ] as const).map(([key, Icon, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -234,6 +296,108 @@ export default function SetariPage() {
             </div>
           </form>
         </div>
+      )}
+
+      {/* D112 Settings Tab */}
+      {tab === 'd112' && (
+        <form onSubmit={saveD112}>
+          <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-5">
+            <p className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-2">
+              Aceste date sunt utilizate automat la generarea si exportul XML/PDF D112. Completeaza toate campurile marcate cu *.
+            </p>
+
+            {/* Section: Declarant */}
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-1 border-b border-gray-100">
+                Reprezentant / Declarant
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Nume declarant *</label>
+                  <input className={inputCls} value={d112.d112_nume_declar} onChange={e => setD112(p => ({...p, d112_nume_declar: e.target.value.toUpperCase()}))} placeholder="ex. POPESCU" required />
+                </div>
+                <div>
+                  <label className={labelCls}>Prenume declarant *</label>
+                  <input className={inputCls} value={d112.d112_prenume_declar} onChange={e => setD112(p => ({...p, d112_prenume_declar: e.target.value.toUpperCase()}))} placeholder="ex. ION" required />
+                </div>
+                <div>
+                  <label className={labelCls}>Functie declarant *</label>
+                  <input className={inputCls} value={d112.d112_functie_declar} onChange={e => setD112(p => ({...p, d112_functie_declar: e.target.value}))} placeholder="ex. Administrator" required />
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Date fiscale D112 */}
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-1 border-b border-gray-100">
+                Date fiscale D112
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Cod CAEN *</label>
+                  <input className={inputCls} value={d112.d112_caen} onChange={e => setD112(p => ({...p, d112_caen: e.target.value}))} placeholder="ex. 0111" maxLength={6} required />
+                </div>
+                <div>
+                  <label className={labelCls}>Casa asig. sanatate angajator *</label>
+                  <select className={inputCls} value={d112.d112_casa_ang} onChange={e => setD112(p => ({...p, d112_casa_ang: e.target.value}))} required>
+                    {[...VALID_CASA_ANG].sort().map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Tip declaratie</label>
+                  <select className={inputCls} value={d112.d112_tip_rec} onChange={e => setD112(p => ({...p, d112_tip_rec: Number(e.target.value), d112_d_rec: Number(e.target.value) === 0 ? 0 : p.d112_d_rec}))}>
+                    <option value={0}>0 - Declaratie normala</option>
+                    <option value={1}>1 - Declaratie rectificativa</option>
+                  </select>
+                </div>
+                {d112.d112_tip_rec === 1 && (
+                  <div>
+                    <label className={labelCls}>Luna declaratiei rectificate</label>
+                    <select className={inputCls} value={d112.d112_d_rec} onChange={e => setD112(p => ({...p, d112_d_rec: Number(e.target.value)}))}>
+                      {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label className={labelCls}>Fax social</label>
+                  <input className={inputCls} value={d112.d112_fax_soc} onChange={e => setD112(p => ({...p, d112_fax_soc: e.target.value}))} placeholder="ex. +40232123456" />
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-gray-400">
+                CIF, denumire, adresa sociala, telefon si email sunt preluate automat din tab-ul Date firma.
+              </p>
+            </div>
+
+            {/* Section: Adresa fiscala */}
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-1 border-b border-gray-100">
+                Adresa fiscala (optional — completeaza doar daca difera de adresa sociala)
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className={labelCls}>Adresa fiscala</label>
+                  <input className={inputCls} value={d112.d112_adr_fisc} onChange={e => setD112(p => ({...p, d112_adr_fisc: e.target.value}))} placeholder="Strada, nr., localitate, judet" />
+                </div>
+                <div>
+                  <label className={labelCls}>Telefon fiscal</label>
+                  <input className={inputCls} value={d112.d112_tel_fisc} onChange={e => setD112(p => ({...p, d112_tel_fisc: e.target.value}))} />
+                </div>
+                <div>
+                  <label className={labelCls}>Fax fiscal</label>
+                  <input className={inputCls} value={d112.d112_fax_fisc} onChange={e => setD112(p => ({...p, d112_fax_fisc: e.target.value}))} />
+                </div>
+                <div>
+                  <label className={labelCls}>Email fiscal</label>
+                  <input className={inputCls} type="email" value={d112.d112_mail_fisc} onChange={e => setD112(p => ({...p, d112_mail_fisc: e.target.value}))} />
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" disabled={savingD112} className="px-5 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50">
+              {savingD112 ? 'Se salveaza...' : 'Salveaza setarile D112'}
+            </button>
+          </div>
+        </form>
       )}
     </div>
   )
