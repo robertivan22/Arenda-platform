@@ -215,11 +215,10 @@ export function validateD112(input: D112ValidInput): VMsg[] {
     if (impozit > netTaxable)
       a('A136', `ATT E3_15 impozit (${impozit}) > E3_14 baza (${netTaxable}) pentru ${label}`, cnp, 'E3_15')
 
-    // Verificare formulă deducere forfetară 40% cf. art.84 CF
-    const expectedNet = brut - Math.round(brut * 0.40)
-    const expectedImpozit = Math.round(expectedNet * 0.10)
+    // Verificare formulă impozit 10% din brut (arenda 2023+: fara deducere forfetara)
+    const expectedImpozit = Math.round(brut * 0.10)
     if (impozit !== expectedImpozit)
-      a('FORMULA', `ATT Formula deducere 40%: impozit calculat=${expectedImpozit} lei, generat=${impozit} lei pentru ${label} (CNP ${cnp})`, cnp, 'E3_15')
+      a('FORMULA', `ATT Impozit 10% din brut=${expectedImpozit} lei, generat=${impozit} lei pentru ${label} (CNP ${cnp})`, cnp, 'E3_15')
 
     // Brut = 0
     if (brut === 0)
