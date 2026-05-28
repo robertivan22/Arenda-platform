@@ -37,6 +37,7 @@ export default function NewTransactionPage() {
     pvNumber: '',
     autoNr: true,
     isPrevizionata: false,
+    impozitAplicat: false,
     notes: '',
   })
 
@@ -86,15 +87,14 @@ export default function NewTransactionPage() {
   const paidKg = paidThisYear[form.productName] ?? 0
   const remainingKg = Math.max(0, dueTotalKg - paidKg)
   const kgBrut = parseFloat(form.kgBrut) || 0
-  const taxRate = level?.tax_rate ?? 10
-  // NET = BRUT - (BRUT * 0.8) * (taxRate/100)   — forfetary deduction formula
+  // Physical kg net (display only — does not affect RON calculation)
   const kgNet = level?.level_type === 'BRUT'
-    ? kgBrut - (kgBrut * 0.8) * (taxRate / 100)
+    ? kgBrut - (kgBrut * 0.8) * ((level?.tax_rate ?? 10) / 100)
     : kgBrut
   const price = parseFloat(form.pricePerUnit) || 0
   const ronBrut = kgBrut * price
-  const ronNet = kgNet * price
-  const taxAmount = ronBrut - ronNet
+  const taxAmount = form.impozitAplicat ? Math.round(ronBrut * 0.10 * 100) / 100 : 0
+  const ronNet = Math.round((ronBrut - taxAmount) * 100) / 100
 
   function fillPercent(pct: number) {
     setField('kgBrut', (remainingKg * pct / 100).toFixed(0))
@@ -129,6 +129,7 @@ export default function NewTransactionPage() {
       payment_type: form.paymentType,
       pv_number: pvNumber || null,
       is_previzionata: form.isPrevizionata,
+      impozit_aplicat: form.impozitAplicat,
       notes: form.notes || null,
     })
     setSaving(false)
@@ -151,11 +152,17 @@ export default function NewTransactionPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
-          {/* Previzionata */}
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={form.isPrevizionata} onChange={e => setField('isPrevizionata', e.target.checked)} className="rounded" />
-            <span className="text-gray-700">Tranzactie Previzionata</span>
-          </label>
+          {/* Flags */}
+          <div className="flex flex-wrap gap-6">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={form.isPrevizionata} onChange={e => setField('isPrevizionata', e.target.checked)} className="rounded" />
+              <span className="text-gray-700">Tranzacție Previzionată</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={form.impozitAplicat} onChange={e => setField('impozitAplicat', e.target.checked)} className="rounded" />
+              <span className="text-gray-700">Aplică impozit 10% la sursă</span>
+            </label>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -209,12 +216,14 @@ export default function NewTransactionPage() {
           {/* Calculated summary */}
           {kgBrut > 0 && (
             <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-              <div className="flex justify-between"><span className="text-gray-500">Kg Net:</span><span className="font-semibold">{kgNet.toFixed(4)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Kg Net (fizic):</span><span className="font-semibold">{kgNet.toFixed(4)}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">RON Brut:</span><span>{ronBrut.toFixed(2)}</span></div>
+              {form.impozitAplicat && (
+                <div className="flex justify-between"><span className="text-gray-500">Impozit (10%):</span><span className="text-orange-600">{taxAmount.toFixed(2)}</span></div>
+              )}
               <div className="flex justify-between"><span className="text-gray-500">RON Net:</span><span className="font-semibold text-green-700">{ronNet.toFixed(2)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Impozit ({taxRate}%):</span><span className="text-orange-600">{taxAmount.toFixed(2)}</span></div>
               <div className="border-t border-gray-200 pt-1 text-xs text-gray-400">
-                NET = BRUT − (BRUT × 80%) × {taxRate}%
+                {form.impozitAplicat ? 'Net = Brut × 90% (impozit 10% reținut la sursă)' : 'Fără impozit reținut — bifă „Aplică impozit” de mai sus'}
               </div>
             </div>
           )}

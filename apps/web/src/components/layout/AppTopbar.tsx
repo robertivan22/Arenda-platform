@@ -15,7 +15,7 @@ function Breadcrumb() {
     arendatori: 'Arendatori',
     contracte: 'Contracte',
     parcele: 'Parcele',
-    plati: 'Plati',
+    plati: 'Tranzacții',
     rapoarte: 'Rapoarte',
     admin: 'Administrare',
     nou: 'Nou',

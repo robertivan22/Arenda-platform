@@ -1,292 +1,160 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { toast } from 'sonner'
-import { Plus, Pencil } from 'lucide-react'
-import { StatusBadge } from '@/components/data-display/StatusBadge'
 
-type PaymentStatus = 'PENDING' | 'PAID' | 'OVERDUE'
-
-interface Payment {
+interface TranzactieRow {
   id: string
-  lessor_id: string
-  lessor_name: string
-  contract_id: string | null
-  contract_number: string | null
-  amount: number
-  due_date: string
-  paid_date: string | null
-  status: PaymentStatus
+  transaction_date: string
+  campaign_year: number
+  product_name: string
+  kg_brut: number
+  kg_net: number
+  price_per_unit: number
+  ron_brut: number
+  ron_net: number
+  tax_amount: number
+  payment_type: string
+  pv_number: string | null
+  is_previzionata: boolean
+  impozit_aplicat: boolean
   notes: string | null
+  lessor_name: string
+  contract_number: string | null
 }
-
-interface LessorOption { id: string; display_name: string }
-interface ContractOption { id: string; lessor_id: string; contract_number: string }
-
-export default function PlatiPage() {
-  const [rows, setRows] = useState<Payment[]>([])
-  const [lessors, setLessors] = useState<LessorOption[]>([])
-  const [contracts, setContracts] = useState<ContractOption[]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ lessorId: '', contractId: '', amount: '', dueDate: '', notes: '' })
-  const [editId, setEditId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ lessorId: '', contractId: '', amount: '', dueDate: '', notes: '', status: 'PENDING' })
-  const [editSaving, setEditSaving] = useState(false)
+export default function TranzactiiPage() {
+  const [rows, setRows] = useState<TranzactieRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [yearFilter, setYearFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'definitiva' | 'previzionata'>('all')
 
   const reload = useCallback(async () => {
+    setLoading(true)
     const db = createClient()
     const { data } = await db
-      .from('payments')
-      .select('id, lessor_id, contract_id, contract_number, amount, due_date, paid_date, status, notes, lessors(first_name, last_name, company_name, type)')
-      .order('due_date', { ascending: false })
+      .from('transactions')
+      .select(`
+        id, transaction_date, campaign_year, product_name,
+        kg_brut, kg_net, price_per_unit, ron_brut, ron_net, tax_amount,
+        payment_type, pv_number, is_previzionata, impozit_aplicat, notes,
+        lessors(first_name, last_name, company_name, type),
+        contracts(contract_number)
+      `)
+      .order('transaction_date', { ascending: false })
     if (data) {
-      setRows((data as any[]).map((p) => ({
-        ...p,
-        lessor_name: p.lessors
-          ? (p.lessors.type === 'LEGAL' ? p.lessors.company_name : `${p.lessors.last_name} ${p.lessors.first_name}`.trim())
-          : 'fara arendator',
+      setRows((data as any[]).map(t => ({
+        ...t,
+        lessor_name: t.lessors
+          ? (t.lessors.type === 'LEGAL'
+              ? t.lessors.company_name
+              : `${t.lessors.last_name} ${t.lessors.first_name}`.trim())
+          : 'â€”',
+        contract_number: t.contracts?.contract_number ?? null,
       })))
     }
+    setLoading(false)
   }, [])
 
-  useEffect(() => {
-    const db = createClient()
-    reload()
-    db.from('lessors').select('id, first_name, last_name, company_name, type').order('last_name')
-      .then(({ data }) => {
-        if (data) setLessors((data as any[]).map((l) => ({
-          id: l.id,
-          display_name: l.type === 'LEGAL' ? l.company_name : `${l.last_name} ${l.first_name}`.trim(),
-        })))
-      })
-    db.from('contracts').select('id, lessor_id, contract_number').order('contract_number')
-      .then(({ data }) => { if (data) setContracts(data as ContractOption[]) })
-  }, [reload])
+  useEffect(() => { reload() }, [reload])
 
-  function setField(field: string, value: string) {
-    setForm(prev => ({ ...prev, [field]: value }))
-  }
+  const years = [...new Set(rows.map(r => String(r.campaign_year)))].sort((a, b) => Number(b) - Number(a))
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    const db = createClient()
-    const { data: { user } } = await db.auth.getUser()
-    const contract = contracts.find(c => c.id === form.contractId)
-    const { error } = await db.from('payments').insert({
-      user_id: user!.id,
-      lessor_id: form.lessorId,
-      contract_id: form.contractId || null,
-      contract_number: contract?.contract_number || null,
-      amount: parseFloat(form.amount),
-      due_date: form.dueDate,
-      notes: form.notes || null,
-      status: 'PENDING',
-    })
-    setSaving(false)
-    if (error) { toast.error('Eroare: ' + error.message); return }
-    toast.success('Plata adaugata.')
-    setShowForm(false)
-    setForm({ lessorId: '', contractId: '', amount: '', dueDate: '', notes: '' })
-    reload()
-  }
+  const filtered = rows.filter(r => {
+    if (yearFilter !== 'all' && String(r.campaign_year) !== yearFilter) return false
+    if (typeFilter === 'definitiva' && r.is_previzionata) return false
+    if (typeFilter === 'previzionata' && !r.is_previzionata) return false
+    return true
+  })
 
-  function startEdit(row: Payment) {
-    setEditId(row.id)
-    setEditForm({
-      lessorId: row.lessor_id,
-      contractId: row.contract_id ?? '',
-      amount: String(row.amount),
-      dueDate: row.due_date,
-      notes: row.notes ?? '',
-      status: row.status,
-    })
-    setShowForm(false)
-  }
+  const totalBrut = filtered.reduce((s, r) => s + Number(r.ron_brut ?? 0), 0)
+  const totalNet = filtered.reduce((s, r) => s + Number(r.ron_net ?? 0), 0)
+  const totalImpozit = filtered.reduce((s, r) => s + Number(r.tax_amount ?? 0), 0)
 
-  async function saveEdit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!editId) return
-    setEditSaving(true)
-    const contract = contracts.find(c => c.id === editForm.contractId)
-    const { error } = await createClient().from('payments').update({
-      lessor_id: editForm.lessorId,
-      contract_id: editForm.contractId || null,
-      contract_number: contract?.contract_number || null,
-      amount: parseFloat(editForm.amount),
-      due_date: editForm.dueDate,
-      notes: editForm.notes || null,
-      status: editForm.status as PaymentStatus,
-      paid_date: editForm.status === 'PAID' ? new Date().toISOString().split('T')[0] : null,
-    }).eq('id', editId)
-    setEditSaving(false)
-    if (error) { toast.error('Eroare: ' + error.message); return }
-    toast.success('Plata actualizata.')
-    setEditId(null)
-    reload()
-  }
-
-  async function markPaid(id: string) {
-    const { error } = await createClient().from('payments').update({
-      status: 'PAID',
-      paid_date: new Date().toISOString().split('T')[0],
-    }).eq('id', id)
-    if (error) { toast.error(error.message); return }
-    toast.success('Marcata ca platita.')
-    reload()
-  }
-
-  const inputCls = 'w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500'
-  const labelCls = 'block text-xs font-medium text-gray-700 mb-1'
-  const neplatite = rows.filter(r => r.status !== 'PAID').length
+  const thCls = 'px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide'
+  const tdCls = 'px-3 py-2 text-sm'
 
   return (
     <div>
       <PageHeader
-        title="Plati"
-        subtitle={`${neplatite} neplatite`}
-        actions={
-          <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded font-medium">
-            <Plus className="w-3.5 h-3.5" /> Adauga plata
-          </button>
-        }
+        title="TranzacÈ›ii"
+        subtitle={`${filtered.length} Ã®nregistrÄƒri Â· ${totalBrut.toFixed(2)} RON brut`}
       />
-      {showForm && (
-        <form onSubmit={handleAdd} className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div>
-              <label className={labelCls}>Arendator *</label>
-              <select className={inputCls} value={form.lessorId} onChange={e => setField('lessorId', e.target.value)} required>
-                <option value="">Selectati</option>
-                {lessors.map(l => <option key={l.id} value={l.id}>{l.display_name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Contract</label>
-              <select className={inputCls} value={form.contractId} onChange={e => setField('contractId', e.target.value)}>
-                <option value="">Selectati</option>
-                {contracts.filter(c => !form.lessorId || c.lessor_id === form.lessorId)
-                  .map(c => <option key={c.id} value={c.id}>{c.contract_number}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Suma (RON) *</label>
-              <input className={inputCls} type="number" min="0.01" step="0.01" value={form.amount} onChange={e => setField('amount', e.target.value)} required />
-            </div>
-            <div>
-              <label className={labelCls}>Scadenta *</label>
-              <input className={inputCls} type="date" value={form.dueDate} onChange={e => setField('dueDate', e.target.value)} required />
-            </div>
-            <div>
-              <label className={labelCls}>Observatii</label>
-              <input className={inputCls} value={form.notes} onChange={e => setField('notes', e.target.value)} />
-            </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        <select
+          value={yearFilter}
+          onChange={e => setYearFilter(e.target.value)}
+          className="px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500"
+        >
+          <option value="all">ToÈ›i anii</option>
+          {years.map(y => <option key={y} value={y}>An {y}</option>)}
+        </select>
+        <select
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value as typeof typeFilter)}
+          className="px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500"
+        >
+          <option value="all">Toate tipurile</option>
+          <option value="definitiva">Definitive</option>
+          <option value="previzionata">Previzionate</option>
+        </select>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {[
+          { label: 'RON Brut', value: totalBrut.toFixed(2) },
+          { label: 'RON Net', value: totalNet.toFixed(2) },
+          { label: 'Impozit reÈ›inut', value: totalImpozit.toFixed(2) },
+        ].map(c => (
+          <div key={c.label} className="bg-white border border-gray-200 rounded-lg p-3">
+            <div className="text-lg font-semibold text-gray-900">{c.value}</div>
+            <div className="text-xs text-gray-500">{c.label}</div>
           </div>
-          <div className="flex gap-2 mt-3">
-            <button type="submit" disabled={saving} className="px-4 py-1.5 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50">
-              {saving ? 'Se salveaza...' : 'Salveaza'}
-            </button>
-            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">Anuleaza</button>
-          </div>
-        </form>
-      )}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        ))}
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              {['Arendator','Contract','Suma (RON)','Scadenta','Data platii','Status','Actiuni'].map(h => (
-                <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">{h}</th>
+              {['DatÄƒ', 'Arendator', 'Contract', 'Produs', 'Kg Brut', 'PreÈ›/unit', 'RON Brut', 'RON Net', 'Impozit', 'Tip platÄƒ', 'Tip'].map(h => (
+                <th key={h} className={thCls}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-gray-400">Nicio plata inregistrata</td></tr>}
-            {rows.map(row => (
+            {loading && (
+              <tr><td colSpan={11} className="px-3 py-8 text-center text-gray-400">Se Ã®ncarcÄƒ...</td></tr>
+            )}
+            {!loading && filtered.length === 0 && (
+              <tr><td colSpan={11} className="px-3 py-8 text-center text-gray-400">Nicio tranzacÈ›ie Ã®nregistratÄƒ</td></tr>
+            )}
+            {filtered.map(row => (
               <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="px-3 py-2 font-medium">{row.lessor_name}</td>
-                <td className="px-3 py-2">{row.contract_number ?? 'fara contract'}</td>
-                <td className="px-3 py-2 font-semibold">{Number(row.amount).toFixed(2)}</td>
-                <td className="px-3 py-2">{row.due_date}</td>
-                <td className="px-3 py-2">{row.paid_date ?? 'neplatita'}</td>
-                <td className="px-3 py-2"><StatusBadge status={row.status} /></td>
-                <td className="px-3 py-2">
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => startEdit(row)}
-                      className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                      title="Editeaza"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    {row.status !== 'PAID' && (
-                      <button onClick={() => markPaid(row.id)} className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 border border-green-300">
-                        Platit
-                      </button>
-                    )}
-                  </div>
+                <td className={tdCls}>{row.transaction_date}</td>
+                <td className={`${tdCls} font-medium`}>{row.lessor_name}</td>
+                <td className={tdCls}>{row.contract_number ?? 'â€”'}</td>
+                <td className={tdCls}>{row.product_name}</td>
+                <td className={`${tdCls} text-right`}>{Number(row.kg_brut).toFixed(2)}</td>
+                <td className={`${tdCls} text-right`}>{Number(row.price_per_unit).toFixed(4)}</td>
+                <td className={`${tdCls} text-right font-medium`}>{Number(row.ron_brut).toFixed(2)}</td>
+                <td className={`${tdCls} text-right text-green-700 font-medium`}>{Number(row.ron_net).toFixed(2)}</td>
+                <td className={`${tdCls} text-right text-orange-600`}>{Number(row.tax_amount).toFixed(2)}</td>
+                <td className={tdCls}>{row.payment_type}{row.pv_number ? ` #${row.pv_number}` : ''}</td>
+                <td className={tdCls}>
+                  {row.is_previzionata
+                    ? <span className="px-1.5 py-0.5 text-xs rounded bg-yellow-100 text-yellow-700">Previz.</span>
+                    : <span className="px-1.5 py-0.5 text-xs rounded bg-green-100 text-green-700">Definitiv</span>
+                  }
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
-      {/* Inline edit panel */}
-      {editId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Editeaza plata</h3>
-            <form onSubmit={saveEdit}>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Arendator *</label>
-                  <select className={inputCls} value={editForm.lessorId} onChange={e => setEditForm(p => ({ ...p, lessorId: e.target.value }))} required>
-                    <option value="">Selectati</option>
-                    {lessors.map(l => <option key={l.id} value={l.id}>{l.display_name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelCls}>Contract</label>
-                  <select className={inputCls} value={editForm.contractId} onChange={e => setEditForm(p => ({ ...p, contractId: e.target.value }))}>
-                    <option value="">Selectati</option>
-                    {contracts.filter(c => !editForm.lessorId || c.lessor_id === editForm.lessorId)
-                      .map(c => <option key={c.id} value={c.id}>{c.contract_number}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelCls}>Suma (RON) *</label>
-                  <input className={inputCls} type="number" min="0.01" step="0.01" value={editForm.amount} onChange={e => setEditForm(p => ({ ...p, amount: e.target.value }))} required />
-                </div>
-                <div>
-                  <label className={labelCls}>Scadenta *</label>
-                  <input className={inputCls} type="date" value={editForm.dueDate} onChange={e => setEditForm(p => ({ ...p, dueDate: e.target.value }))} required />
-                </div>
-                <div>
-                  <label className={labelCls}>Status</label>
-                  <select className={inputCls} value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}>
-                    <option value="PENDING">In asteptare</option>
-                    <option value="PAID">Platit</option>
-                    <option value="OVERDUE">Restanta</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelCls}>Observatii</label>
-                  <input className={inputCls} value={editForm.notes} onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))} />
-                </div>
-              </div>
-              <div className="flex gap-2 mt-4">
-                <button type="submit" disabled={editSaving} className="px-4 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50">
-                  {editSaving ? 'Se salveaza...' : 'Salveaza'}
-                </button>
-                <button type="button" onClick={() => setEditId(null)} className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">Anuleaza</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

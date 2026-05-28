@@ -43,7 +43,7 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { label: 'Hartă Parcele', href: '/parcele/harta', icon: MapPin, permKey: 'can_parcele' },
-  { label: 'Plăți',    href: '/plati',    icon: CreditCard,    permKey: 'can_facturi' },
+  { label: 'Tranzacții', href: '/plati', icon: CreditCard, permKey: 'can_facturi' },
   { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3,      permKey: 'can_rapoarte' },
   {
     label: 'Declarații', icon: FileSpreadsheet, permKey: 'can_declaratii',
