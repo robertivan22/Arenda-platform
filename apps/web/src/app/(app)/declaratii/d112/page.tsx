@@ -189,8 +189,8 @@ export default function D112Page() {
   function downloadXml() {
     if (!dataset || !cs) { toast.error('Date firma lipsa. Configureaza in Setari.'); return }
     const NZC = daysInMonth(dataset.periodYear, dataset.periodMonth)
-    const firstDay = `1.${pad2(dataset.periodMonth)}.${dataset.periodYear}`
-    const lastDay = `${NZC}.${pad2(dataset.periodMonth)}.${dataset.periodYear}`
+    const firstDay = `${pad2(1)}.${pad2(dataset.periodMonth)}.${dataset.periodYear}`
+    const lastDay = `${pad2(NZC)}.${pad2(dataset.periodMonth)}.${dataset.periodYear}`
 
     // Aggregate per CNP (multiple payments → sum)
     const byLessor = new Map<string, { last: string; first: string; brut: number; netTax: number; impozit: number }>()
@@ -240,9 +240,9 @@ export default function D112Page() {
       E3_4="P"
       E3_8="${brut}"
       E3_9="0"
-      E3_14="${netTax}"
+      E3_14="${brut}"
       E3_15="${impozit}"
-      E3_16="${brut}"/>
+      E3_16="${Math.round(d.brut - d.impozit)}"/>
   </asigurat>`
     }).join('\n')
 
@@ -251,8 +251,7 @@ export default function D112Page() {
   xmlns="mfp:anaf:dgti:declaratie_unica:declaratie:v6"
   luna_r="${dataset.periodMonth}"
   an_r="${dataset.periodYear}"
-  d_rec="${cs.d112_tip_rec ?? 0}"
-  tip_rec="${cs.d112_d_rec ?? 0}"
+  d_rec="${cs.d112_tip_rec ?? 0}"${cs.d112_d_rec ? `\n  tip_rec="${cs.d112_d_rec}"` : ''}
   nume_declar="${escXml(cs.d112_nume_declar ?? 'NEDEFINIT')}"
   prenume_declar="${escXml(cs.d112_prenume_declar ?? 'NEDEFINIT')}"
   functie_declar="${escXml(cs.d112_functie_declar ?? 'Administrator')}">
