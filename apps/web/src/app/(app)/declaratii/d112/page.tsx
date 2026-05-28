@@ -42,12 +42,13 @@ function buildPayer(cs: CS): PayerInfo {
 }
 
 const MISSING_REQUIRED: { key: keyof CS; label: string }[] = [
-  { key: 'cif', label: 'CIF firma (Date firma)' },
-  { key: 'name', label: 'Denumire firma (Date firma)' },
-  { key: 'd112_caen', label: 'Cod CAEN (Date Declaratie 112)' },
-  { key: 'd112_casa_ang', label: 'Casa asig. sanatate (Date Declaratie 112)' },
-  { key: 'd112_nume_declar', label: 'Nume declarant (Date Declaratie 112)' },
-  { key: 'd112_prenume_declar', label: 'Prenume declarant (Date Declaratie 112)' },
+  { key: 'cif',                label: 'CIF firmă (tab Date firmă în Setări)' },
+  { key: 'name',               label: 'Denumire firmă (tab Date firmă în Setări)' },
+  { key: 'address',            label: 'Adresă sediu (tab Date firmă în Setări)' },
+  { key: 'd112_caen',          label: 'Cod CAEN (tab Date Declarație 112)' },
+  { key: 'd112_casa_ang',      label: 'Casa asig. sănătate (tab Date Declarație 112)' },
+  { key: 'd112_nume_declar',   label: 'Nume declarant (tab Date Declarație 112)' },
+  { key: 'd112_prenume_declar',label: 'Prenume declarant (tab Date Declarație 112)' },
 ]
 
 const MONTHS = [
@@ -371,7 +372,9 @@ ${asigurati}
             </button>
             <button
               onClick={downloadXml}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-blue-400 text-blue-700 hover:bg-blue-50 rounded font-medium"
+              disabled={settingsMissing.length > 0}
+              title={settingsMissing.length > 0 ? 'Completează datele firmei în Setări înainte de export' : undefined}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-blue-400 text-blue-700 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed rounded font-medium"
             >
               <FileCode className="w-4 h-4" />
               Export XML (ANAF D112)
@@ -379,7 +382,7 @@ ${asigurati}
 
             <button
               onClick={runValidation}
-              disabled={validating}
+              disabled={validating || settingsMissing.length > 0}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-green-500 text-green-700 hover:bg-green-50 disabled:opacity-50 rounded font-medium"
             >
               {validating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}

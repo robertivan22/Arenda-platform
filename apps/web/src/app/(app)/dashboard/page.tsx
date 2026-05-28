@@ -90,9 +90,17 @@ export default function DashboardPage() {
       </div>
 
       {/* Hero banner */}
-      <div className="rounded-2xl mb-6 overflow-hidden relative" style={{ background: 'linear-gradient(135deg, #1e3a22 0%, #2d6a4f 100%)' }}>
-        <div className="px-8 py-7 flex items-center justify-between">
-          <div className="relative z-10">
+      <div className="rounded-2xl mb-6 overflow-hidden relative" style={{ minHeight: '200px' }}>
+        {/* Background photo */}
+        <img
+          src="https://images.unsplash.com/photo-1717702576954-c07131c54169?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwzfHxhZ3JpY3VsdHVyYWwlMjB0cmFjdG9yJTIwZmllbGQlMjBnb2xkZW58ZW58MXx8fHwxNzc5OTY0ODI2fDA&ixlib=rb-4.1.0&q=80&w=1080"
+          alt="Tractor pe câmp la apus"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        {/* Dark gradient overlay — text readable on left, fades right */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(100deg, rgba(15,34,16,0.92) 0%, rgba(22,51,32,0.80) 50%, rgba(0,0,0,0.25) 100%)' }} />
+        <div className="px-8 py-7 flex items-center relative z-10">
+          <div>
             <p className="text-amber-400 text-xs font-semibold uppercase tracking-wider mb-2">Bun venit înapoi</p>
             <h2 className="text-2xl font-bold text-white mb-2">Platforma ta agricolă</h2>
             <p className="text-[#74c69d] text-sm mb-5 max-w-xs">
@@ -106,48 +114,7 @@ export default function DashboardPage() {
               Adaugă arendator
             </button>
           </div>
-          {/* Tractor illustration */}
-          <div className="hidden sm:block flex-shrink-0 mr-4 opacity-90">
-            <svg viewBox="0 0 260 160" className="w-56 h-auto" xmlns="http://www.w3.org/2000/svg">
-              <rect x="60" y="68" width="110" height="55" rx="7" fill="#2d6a4f"/>
-              <rect x="128" y="42" width="62" height="46" rx="6" fill="#1b4332"/>
-              <rect x="135" y="50" width="46" height="28" rx="3" fill="#52b788" opacity="0.45"/>
-              <rect x="60" y="76" width="72" height="32" rx="4" fill="#1b4332"/>
-              <rect x="106" y="28" width="8" height="22" rx="4" fill="#333"/>
-              <circle cx="110" cy="25" r="5" fill="#555" opacity="0.55"/>
-              <circle cx="114" cy="20" r="3.5" fill="#555" opacity="0.35"/>
-              <circle cx="92" cy="128" r="33" fill="#b45309"/>
-              <circle cx="92" cy="128" r="26" fill="#f59e0b"/>
-              <circle cx="92" cy="128" r="17" fill="#b45309"/>
-              <circle cx="92" cy="128" r="7" fill="#fbbf24"/>
-              {[0,60,120,180,240,300].map((a,i) => (
-                <line key={i} x1="92" y1="128"
-                  x2={92 + 21*Math.cos(a*Math.PI/180)}
-                  y2={128 + 21*Math.sin(a*Math.PI/180)}
-                  stroke="#92400e" strokeWidth="3"/>
-              ))}
-              <circle cx="190" cy="135" r="19" fill="#b45309"/>
-              <circle cx="190" cy="135" r="14" fill="#f59e0b"/>
-              <circle cx="190" cy="135" r="8" fill="#b45309"/>
-              <circle cx="190" cy="135" r="4" fill="#fbbf24"/>
-              {[0,90,180,270].map((a,i) => (
-                <line key={i} x1="190" y1="135"
-                  x2={190 + 10*Math.cos(a*Math.PI/180)}
-                  y2={135 + 10*Math.sin(a*Math.PI/180)}
-                  stroke="#92400e" strokeWidth="2"/>
-              ))}
-              <line x1="20" y1="161" x2="240" y2="161" stroke="#2d6a4f" strokeWidth="2" opacity="0.5"/>
-              {[20,33,215,228].map((x,i) => (
-                <g key={i}>
-                  <line x1={x} y1="161" x2={x} y2="142" stroke="#52b788" strokeWidth="1.5"/>
-                  <ellipse cx={x} cy="138" rx="4" ry="7" fill="#52b788" opacity="0.75"/>
-                </g>
-              ))}
-            </svg>
-          </div>
         </div>
-        {/* Decorative circles */}
-        <div className="absolute top-0 right-0 w-48 h-48 rounded-full opacity-10 pointer-events-none" style={{ background: '#74c69d', transform: 'translate(30%, -30%)' }}/>
       </div>
 
       {/* KPI cards */}

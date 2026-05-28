@@ -77,8 +77,8 @@ export default function TranzactiiPage() {
   return (
     <div>
       <PageHeader
-        title="TranzacÈ›ii"
-        subtitle={`${filtered.length} Ã®nregistrÄƒri Â· ${totalBrut.toFixed(2)} RON brut`}
+        title="Tranzacții"
+        subtitle={`${filtered.length} înregistrări · ${totalBrut.toFixed(2)} RON brut`}
       />
 
       {/* Filters */}
@@ -88,7 +88,7 @@ export default function TranzactiiPage() {
           onChange={e => setYearFilter(e.target.value)}
           className="px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500"
         >
-          <option value="all">ToÈ›i anii</option>
+          <option value="all">Toți anii</option>
           {years.map(y => <option key={y} value={y}>An {y}</option>)}
         </select>
         <select
@@ -107,7 +107,7 @@ export default function TranzactiiPage() {
         {[
           { label: 'RON Brut', value: totalBrut.toFixed(2) },
           { label: 'RON Net', value: totalNet.toFixed(2) },
-          { label: 'Impozit reÈ›inut', value: totalImpozit.toFixed(2) },
+          { label: 'Impozit reținut', value: totalImpozit.toFixed(2) },
         ].map(c => (
           <div key={c.label} className="bg-white border border-gray-200 rounded-lg p-3">
             <div className="text-lg font-semibold text-gray-900">{c.value}</div>
@@ -120,23 +120,23 @@ export default function TranzactiiPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              {['DatÄƒ', 'Arendator', 'Contract', 'Produs', 'Kg Brut', 'PreÈ›/unit', 'RON Brut', 'RON Net', 'Impozit', 'Tip platÄƒ', 'Tip'].map(h => (
+              {['Dată', 'Arendator', 'Contract', 'Produs', 'Kg Brut', 'Preț/unit', 'RON Brut', 'RON Net', 'Impozit', 'Tip plată', 'Tip'].map(h => (
                 <th key={h} className={thCls}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={11} className="px-3 py-8 text-center text-gray-400">Se Ã®ncarcÄƒ...</td></tr>
+              <tr><td colSpan={11} className="px-3 py-8 text-center text-gray-400">Se încarcă...</td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={11} className="px-3 py-8 text-center text-gray-400">Nicio tranzacÈ›ie Ã®nregistratÄƒ</td></tr>
+              <tr><td colSpan={11} className="px-3 py-8 text-center text-gray-400">Nicio tranzacție înregistrată</td></tr>
             )}
             {filtered.map(row => (
               <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className={tdCls}>{row.transaction_date}</td>
                 <td className={`${tdCls} font-medium`}>{row.lessor_name}</td>
-                <td className={tdCls}>{row.contract_number ?? 'â€”'}</td>
+                <td className={tdCls}>{row.contract_number ?? '—'}</td>
                 <td className={tdCls}>{row.product_name}</td>
                 <td className={`${tdCls} text-right`}>{Number(row.kg_brut).toFixed(2)}</td>
                 <td className={`${tdCls} text-right`}>{Number(row.price_per_unit).toFixed(4)}</td>

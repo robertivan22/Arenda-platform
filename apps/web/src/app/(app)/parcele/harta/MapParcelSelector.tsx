@@ -63,7 +63,7 @@ const WMS_LAYER_DEFS: WmsLayerDef[] = [
   {
     id: 'apia_lpis_2024',
     label: 'LPIS APIA',
-    sublabel: 'Referinta parcele 2024',
+    sublabel: 'APIA INSPIRE',
     color: 'green',
     // APIA INSPIRE ArcGIS MapServer — 2024 dataset (most current)
     url: 'https://inspire.apia.org.ro/network/rest/services/INSPIRE/LPIS_referinta_2024/MapServer',
@@ -286,6 +286,8 @@ export default function MapParcelSelector({
   const [saveAdresa, setSaveAdresa] = useState('')
   const [saveNote, setSaveNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saveLinkedParcelId, setSaveLinkedParcelId] = useState<string>('')
+  const [linkedParcelOptions, setLinkedParcelOptions] = useState<{ id: string; label: string }[]>([])
 
   // Delete
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -443,6 +445,24 @@ export default function MapParcelSelector({
         } catch { /* non-blocking */ }
         setSaveName('')
         setSaveNote('')
+        setSaveLinkedParcelId('')
+        // Load linkable parcels from parcels table
+        createClient()
+          .from('parcels')
+          .select('id, bloc_fizic, tarla_nr, parcel_nr, lessors(first_name, last_name, company_name, type)')
+          .order('created_at', { ascending: false })
+          .limit(200)
+          .then(({ data }) => {
+            if (data) {
+              setLinkedParcelOptions((data as any[]).map(p => {
+                const ref = [p.bloc_fizic, p.tarla_nr, p.parcel_nr].filter(Boolean).join('/')
+                const lessor = p.lessors
+                  ? (p.lessors.type === 'LEGAL' ? p.lessors.company_name : `${p.lessors.last_name} ${p.lessors.first_name}`.trim())
+                  : ''
+                return { id: p.id, label: [ref, lessor].filter(Boolean).join(' — ') || p.id.slice(0, 8) }
+              }))
+            }
+          })
         setShowSaveModal(true)
       })
     }
@@ -613,6 +633,7 @@ export default function MapParcelSelector({
         centru_lat: centruLat,
         centru_lng: centruLng,
         note: saveNote || null,
+        ...(saveLinkedParcelId ? { parcela_id: saveLinkedParcelId } : {}),
       }])
       .select()
       .single()
@@ -632,6 +653,7 @@ export default function MapParcelSelector({
   function closeSaveModal() {
     setShowSaveModal(false)
     setSaveName(''); setSaveLocalitate(''); setSaveJudet(''); setSaveAdresa(''); setSaveNote('')
+    setSaveLinkedParcelId('')
     setDrawnRingStereo(null)
     drawnItemsRef.current?.clearLayers()
   }
@@ -957,7 +979,22 @@ export default function MapParcelSelector({
             <div className="px-6 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nume parcela <span className="text-red-500">*</span>
+                  Leagă de parcelă din registru <span className="text-gray-400 font-normal">(opțional)</span>
+                </label>
+                <select
+                  value={saveLinkedParcelId}
+                  onChange={e => setSaveLinkedParcelId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                >
+                  <option value="">— Fără legătură —</option>
+                  {linkedParcelOptions.map(p => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nume parcelă <span className="text-red-500">*</span>
                 </label>
                 <input type="text" value={saveName} onChange={e => setSaveName(e.target.value)}
                   placeholder="ex: Teren Campie Nord" autoFocus maxLength={100}

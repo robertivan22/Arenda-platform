@@ -29,7 +29,15 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* ── Left panel ─────────────────────────────────────────────────── */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#1e3a22] flex-col relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 flex-col relative overflow-hidden">
+        {/* Background photo */}
+        <img
+          src="https://images.unsplash.com/photo-1717702576954-c07131c54169?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwzfHxhZ3JpY3VsdHVyYWwlMjB0cmFjdG9yJTIwZmllbGQlMjBnb2xkZW58ZW58MXx8fHwxNzc5OTY0ODI2fDA&ixlib=rb-4.1.0&q=80&w=1080"
+          alt="Tractor pe câmp la apus"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        {/* Dark green overlay */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, rgba(22,42,22,0.93) 0%, rgba(26,51,32,0.82) 45%, rgba(15,34,16,0.72) 100%)' }} />
         {/* Logo */}
         <div className="px-10 pt-10 flex items-center gap-3 relative z-10">
           <div className="w-9 h-9 rounded-lg bg-amber-500 flex items-center justify-center flex-shrink-0">
@@ -40,50 +48,12 @@ export default function LoginPage() {
           <span className="text-xl font-bold text-white">Arenda<span className="text-amber-400">Pro</span></span>
         </div>
 
-        {/* Center illustration */}
+        {/* Center content */}
         <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-10">
-          {/* Tractor SVG illustration */}
-          <svg viewBox="0 0 320 200" className="w-72 mb-8 drop-shadow-2xl" xmlns="http://www.w3.org/2000/svg">
-            <rect x="80" y="82" width="130" height="68" rx="8" fill="#2d6a4f"/>
-            <rect x="155" y="50" width="75" height="50" rx="6" fill="#1b4332"/>
-            <rect x="163" y="58" width="55" height="30" rx="3" fill="#52b788" opacity="0.45"/>
-            <rect x="80" y="92" width="80" height="38" rx="4" fill="#1b4332"/>
-            <rect x="128" y="36" width="9" height="26" rx="4" fill="#333"/>
-            <circle cx="132" cy="33" r="6" fill="#555" opacity="0.55"/>
-            <circle cx="137" cy="27" r="4" fill="#555" opacity="0.35"/>
-            <circle cx="115" cy="158" r="42" fill="#b45309"/>
-            <circle cx="115" cy="158" r="33" fill="#f59e0b"/>
-            <circle cx="115" cy="158" r="22" fill="#b45309"/>
-            <circle cx="115" cy="158" r="9" fill="#fbbf24"/>
-            {[0,60,120,180,240,300].map((a,i) => (
-              <line key={i} x1="115" y1="158"
-                x2={115 + 27*Math.cos(a*Math.PI/180)}
-                y2={158 + 27*Math.sin(a*Math.PI/180)}
-                stroke="#92400e" strokeWidth="4"/>
-            ))}
-            <circle cx="230" cy="166" r="25" fill="#b45309"/>
-            <circle cx="230" cy="166" r="19" fill="#f59e0b"/>
-            <circle cx="230" cy="166" r="12" fill="#b45309"/>
-            <circle cx="230" cy="166" r="5" fill="#fbbf24"/>
-            {[0,90,180,270].map((a,i) => (
-              <line key={i} x1="230" y1="166"
-                x2={230 + 15*Math.cos(a*Math.PI/180)}
-                y2={166 + 15*Math.sin(a*Math.PI/180)}
-                stroke="#92400e" strokeWidth="3"/>
-            ))}
-            <line x1="50" y1="197" x2="290" y2="197" stroke="#2d6a4f" strokeWidth="2" opacity="0.6"/>
-            {[40,55,270,285].map((x,i) => (
-              <g key={i}>
-                <line x1={x} y1="197" x2={x} y2="170" stroke="#52b788" strokeWidth="2"/>
-                <ellipse cx={x} cy="166" rx="5" ry="9" fill="#52b788" opacity="0.8"/>
-              </g>
-            ))}
-          </svg>
-
-          <h2 className="text-3xl font-bold text-white text-center mb-3 leading-tight">
+          <h2 className="text-3xl font-bold text-white text-center mb-3 leading-tight drop-shadow-lg">
             Platforma ta de<br />management agricol
           </h2>
-          <p className="text-[#74c69d] text-center text-sm leading-relaxed max-w-xs">
+          <p className="text-[#74c69d] text-center text-sm leading-relaxed max-w-xs drop-shadow">
             Gestionează arendatorii, contractele și parcelele din un singur loc, rapid și eficient.
           </p>
         </div>
@@ -100,9 +70,6 @@ export default function LoginPage() {
           © 2026 ArendaPro — Toate drepturile rezervate
         </div>
 
-        {/* BG circles */}
-        <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-[#2d6a4f] opacity-30 pointer-events-none"/>
-        <div className="absolute -bottom-16 -left-16 w-56 h-56 rounded-full bg-[#1b4332] opacity-50 pointer-events-none"/>
       </div>
 
       {/* ── Right panel ────────────────────────────────────────────────── */}
