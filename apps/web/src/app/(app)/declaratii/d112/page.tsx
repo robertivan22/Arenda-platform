@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { AlertTriangle, FileSpreadsheet, Download, Check, FileCode, ShieldCheck, ShieldAlert, XCircle, Loader2, FileText, Settings } from 'lucide-react'
+import { AlertTriangle, FileSpreadsheet, Download, Check, FileCode, ShieldCheck, ShieldAlert, XCircle, Loader2, Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { validateD112, buildD112ValidationInput, type VMsg } from '@/lib/d112Validator'
-import { generateD112Pdf, buildD112PdfInput } from '@/lib/d112Pdf'
+
 
 interface PayerInfo {
   cif: string; den: string; caen: string; casaAng: string
@@ -227,14 +227,14 @@ export default function D112Page() {
     asigSO="2"
     Timp_E3="${impozit}">
     <asiguratC
-      C_1="43"
+      C_1="26"
       C_2="${NZC}"
       C_19="${brut}"
-      C_8="${brut}"
-      C_9="${impozit}"/>
+      C_8="0"
+      C_9="0"/>
     <asiguratE3
       E3_1="C"
-      E3_2="43"
+      E3_2="26"
       E3_3="3"
       E3_4="P"
       E3_8="${brut}"
@@ -250,8 +250,8 @@ export default function D112Page() {
   xmlns="mfp:anaf:dgti:declaratie_unica:declaratie:v6"
   luna_r="${dataset.periodMonth}"
   an_r="${dataset.periodYear}"
-  d_rec="${cs.d112_d_rec ?? 0}"
-  tip_rec="${cs.d112_tip_rec ?? 0}"
+  d_rec="${cs.d112_tip_rec ?? 0}"
+  tip_rec="${cs.d112_d_rec ?? 0}"
   nume_declar="${escXml(cs.d112_nume_declar ?? 'NEDEFINIT')}"
   prenume_declar="${escXml(cs.d112_prenume_declar ?? 'NEDEFINIT')}"
   functie_declar="${escXml(cs.d112_functie_declar ?? 'Administrator')}">
@@ -274,7 +274,7 @@ export default function D112Page() {
     totalPlata_A="${totalImpozit}">
     <angajatorA
       A_codBugetar="5503110"
-      A_codOblig="43"
+      A_codOblig="619"
       A_datorat="${totalImpozit}"
       A_deductibil="0"
       A_scutit="0"
@@ -376,13 +376,7 @@ ${asigurati}
               <FileCode className="w-4 h-4" />
               Export XML (ANAF D112)
             </button>
-            <button
-              onClick={() => { if (dataset && cs) generateD112Pdf(buildD112PdfInput(dataset, buildPayer(cs))) }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-400 text-red-700 hover:bg-red-50 rounded font-medium"
-            >
-              <FileText className="w-4 h-4" />
-              Export PDF
-            </button>
+
             <button
               onClick={runValidation}
               disabled={validating}

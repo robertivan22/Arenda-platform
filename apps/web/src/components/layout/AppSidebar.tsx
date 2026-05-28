@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, UserCircle, Settings, Leaf,
+  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -15,60 +15,80 @@ interface NavItem {
   label: string
   href?: string
   icon: React.ElementType
-  permKey?: string // maps to user_permissions column
+  permKey?: string
   children?: { label: string; href: string }[]
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',   href: '/dashboard',  icon: LayoutDashboard, permKey: 'can_dashboard' },
+const SECTIONS: { label: string; items: NavItem[] }[] = [
   {
-    label: 'Arendatori', icon: Users, permKey: 'can_arendasi',
-    children: [
-      { label: 'Lista arendatori', href: '/arendatori' },
-      { label: 'Adaugă arendator', href: '/arendatori/nou' },
+    label: 'GENERAL',
+    items: [
+      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permKey: 'can_dashboard' },
+      { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3, permKey: 'can_rapoarte' },
     ],
   },
   {
-    label: 'Contracte', icon: FileText, permKey: 'can_contracte',
-    children: [
-      { label: 'Lista contracte', href: '/contracte' },
-      { label: 'Contract nou', href: '/contracte/nou' },
+    label: 'GESTIUNE',
+    items: [
+      {
+        label: 'Arendatori', icon: Users, permKey: 'can_arendasi',
+        children: [
+          { label: 'Lista arendatori', href: '/arendatori' },
+          { label: 'Adaugă arendator', href: '/arendatori/nou' },
+        ],
+      },
+      {
+        label: 'Contracte', icon: FileText, permKey: 'can_contracte',
+        children: [
+          { label: 'Lista contracte', href: '/contracte' },
+          { label: 'Contract nou', href: '/contracte/nou' },
+        ],
+      },
+      {
+        label: 'Parcele', icon: MapPin, permKey: 'can_parcele',
+        children: [
+          { label: 'Lista parcele', href: '/parcele' },
+          { label: 'Parcelă nouă', href: '/parcele/nou' },
+        ],
+      },
+      { label: 'Hartă Parcele', href: '/parcele/harta', icon: MapPin, permKey: 'can_parcele' },
     ],
   },
   {
-    label: 'Parcele', icon: MapPin, permKey: 'can_parcele',
-    children: [
-      { label: 'Lista parcele', href: '/parcele' },
-      { label: 'Parcelă nouă', href: '/parcele/nou' },
+    label: 'FINANCIAR',
+    items: [
+      { label: 'Tranzacții', href: '/plati', icon: CreditCard, permKey: 'can_facturi' },
     ],
   },
-  { label: 'Hartă Parcele', href: '/parcele/harta', icon: MapPin, permKey: 'can_parcele' },
-  { label: 'Tranzacții', href: '/plati', icon: CreditCard, permKey: 'can_facturi' },
-  { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3,      permKey: 'can_rapoarte' },
   {
-    label: 'Declarații', icon: FileSpreadsheet, permKey: 'can_declaratii',
-    children: [
-      { label: 'Dashboard fiscal',    href: '/declaratii' },
-      { label: 'D112 - Impozit arendă', href: '/declaratii/d112' },
-      { label: 'Export APIA',         href: '/declaratii/apia' },
-      { label: 'Istoric declarații',  href: '/declaratii/istoric' },
+    label: 'DOCUMENTE',
+    items: [
+      {
+        label: 'Declarații', icon: FileSpreadsheet, permKey: 'can_declaratii',
+        children: [
+          { label: 'Dashboard fiscal', href: '/declaratii' },
+          { label: 'D112 - Impozit arendă', href: '/declaratii/d112' },
+          { label: 'Export APIA', href: '/declaratii/apia' },
+          { label: 'Istoric declarații', href: '/declaratii/istoric' },
+        ],
+      },
+      { label: 'Registru Fitosanitar', href: '/fitosanitar', icon: Leaf, permKey: 'can_fitosanitar' },
     ],
   },
-  { label: 'Registru Fitosanitar', href: '/fitosanitar', icon: Leaf, permKey: 'can_fitosanitar' },
-  { label: 'Setari', href: '/setari', icon: Settings, permKey: 'can_setari' },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
   const { open, close } = useSidebarStore()
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
-  // Fetched from user_permissions; empty = all allowed (no row = all true)
   const [perms, setPerms] = useState<Record<string, boolean> | null>(null)
+  const [userEmail, setUserEmail] = useState<string>('')
 
   useEffect(() => {
     const db = createClient()
     db.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
+      setUserEmail(user.email ?? '')
       const { data } = await db
         .from('user_permissions')
         .select('*')
@@ -78,9 +98,8 @@ export function AppSidebar() {
     })
   }, [])
 
-  // Returns true if the nav item should be visible
   function canShow(item: NavItem): boolean {
-    if (!item.permKey || perms === null) return true // no row = all allowed
+    if (!item.permKey || perms === null) return true
     return perms[item.permKey] !== false
   }
 
@@ -93,122 +112,179 @@ export function AppSidebar() {
     return item.children?.some(c => pathname === c.href || pathname.startsWith(c.href + '/')) ?? false
   }
 
-  return (
-    <nav className={clsx(
-      'w-56 flex flex-col h-full select-none flex-shrink-0 z-30',
-      'fixed md:relative inset-y-0 left-0 transition-transform duration-200',
-      open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-    )} style={{ backgroundColor: '#1e3a22' }}>
-      {/* Logo */}
-      <div className="px-4 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center flex-shrink-0">
-            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C8.5 2 6 4.5 6 4.5S3 7 3 10.5c0 2.8 1.8 5.2 4 6.5V20h2v-2h6v2h2v-3c2.2-1.3 4-3.7 4-6.5C21 7 18 2 12 2zm-2 14H8v-1.5C6.8 13.6 6 12.1 6 10.5 6 8 7.8 5.5 10 4.3V16zm6 0h-2V4.3c2.2 1.2 4 3.7 4 6.2 0 1.6-.8 3.1-2 4V16z"/>
-            </svg>
-          </div>
-          <span className="font-bold text-sm text-white tracking-wide">
-            Arenda<span className="text-amber-400">Pro</span>
-          </span>
-        </div>
-        <button
+  function renderItem(item: NavItem) {
+    if (!canShow(item)) return null
+
+    if (!item.children) {
+      const active = pathname === item.href || (!!item.href && item.href !== '/' && pathname.startsWith(item.href + '/'))
+      return (
+        <Link
+          key={item.label}
+          href={item.href!}
           onClick={close}
-          className="md:hidden p-1 rounded text-white/40 hover:text-white transition-colors"
+          className={clsx(
+            'relative flex items-center gap-3 mx-2 px-3 py-2 rounded-lg text-sm transition-all duration-150',
+            active
+              ? 'bg-white/10 text-white font-medium'
+              : 'text-white/55 hover:text-white/90 hover:bg-white/5',
+          )}
         >
+          {active && (
+            <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-emerald-400" />
+          )}
+          <item.icon className={clsx('w-4 h-4 flex-shrink-0', active ? 'text-emerald-400' : 'text-white/40')} />
+          <span>{item.label}</span>
+        </Link>
+      )
+    }
+
+    const groupActive = isGroupActive(item)
+    const isOpen = collapsed[item.label] !== undefined
+      ? !collapsed[item.label]
+      : groupActive
+
+    return (
+      <div key={item.label}>
+        <button
+          onClick={() => toggleGroup(item.label)}
+          className={clsx(
+            'relative w-full flex items-center gap-3 mx-2 px-3 py-2 rounded-lg text-sm transition-all duration-150',
+            groupActive
+              ? 'bg-white/10 text-white font-medium'
+              : 'text-white/55 hover:text-white/90 hover:bg-white/5',
+          )}
+          style={{ width: 'calc(100% - 1rem)' }}
+        >
+          {groupActive && (
+            <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-emerald-400" />
+          )}
+          <item.icon className={clsx('w-4 h-4 flex-shrink-0', groupActive ? 'text-emerald-400' : 'text-white/40')} />
+          <span className="flex-1 text-left">{item.label}</span>
+          <ChevronDown className={clsx('w-3 h-3 transition-transform text-white/30', isOpen && 'rotate-180')} />
+        </button>
+
+        {isOpen && (
+          <div className="mt-0.5 mb-1">
+            {item.children!.map(child => {
+              const childActive = pathname === child.href || pathname.startsWith(child.href + '/')
+              return (
+                <Link
+                  key={child.href}
+                  href={child.href}
+                  onClick={close}
+                  className={clsx(
+                    'flex items-center gap-2 pl-11 pr-4 py-1.5 text-xs transition-colors',
+                    childActive ? 'text-emerald-300 font-medium' : 'text-white/40 hover:text-white/75',
+                  )}
+                >
+                  <span className={clsx('w-1 h-1 rounded-full flex-shrink-0', childActive ? 'bg-emerald-400' : 'bg-white/30')} />
+                  {child.label}
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const settingsActive = pathname.startsWith('/setari')
+
+  return (
+    <nav
+      className={clsx(
+        'w-56 flex flex-col h-full select-none flex-shrink-0 z-30',
+        'fixed md:relative inset-y-0 left-0 transition-transform duration-200',
+        open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+      )}
+      style={{ background: 'linear-gradient(180deg, #162a16 0%, #1a3320 60%, #1f3d24 100%)' }}
+    >
+      {/* ── Logo ─────────────────────────── */}
+      <div className="px-4 py-4 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="relative w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0">
+            <div className="absolute inset-0 rounded-xl" style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)' }} />
+            <Leaf className="relative z-10 w-4 h-4 text-white" />
+          </div>
+          <div className="flex flex-col leading-none">
+            <span className="font-bold text-sm text-white tracking-wide">Arenda<span className="text-amber-400">Pro</span></span>
+            <span className="text-[9px] text-white/35 tracking-wider mt-0.5">Platformă agricolă</span>
+          </div>
+        </div>
+        <button onClick={close} className="md:hidden p-1 rounded text-white/40 hover:text-white transition-colors">
           <X className="w-4 h-4" />
         </button>
       </div>
+      <div className="mx-4 h-px bg-white/8 flex-shrink-0" />
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto py-2">
-        {NAV_ITEMS.filter(canShow).map(item => {
-          if (!item.children) {
-            const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
-            return (
-              <Link
-                key={item.label}
-                href={item.href!}
-                onClick={close}
-                className={clsx(
-                  'flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors',
-                  active
-                    ? 'text-white font-medium'
-                    : 'text-white/60 hover:text-white hover:bg-white/5',
-                )}
-                style={active ? { backgroundColor: 'rgba(255,255,255,0.08)' } : {}}
-              >
-                <item.icon className="w-4 h-4 flex-shrink-0" />
-                <span>{item.label}</span>
-              </Link>
-            )
-          }
-
-          const groupActive = isGroupActive(item)
-          const isOpen = collapsed[item.label] !== undefined
-            ? !collapsed[item.label]
-            : groupActive
-
+      {/* ── Navigation ───────────────────── */}
+      <div className="flex-1 overflow-y-auto py-2 space-y-0.5">
+        {SECTIONS.map(section => {
+          const visibleItems = section.items.filter(canShow)
+          if (visibleItems.length === 0) return null
           return (
-            <div key={item.label}>
-              <button
-                onClick={() => toggleGroup(item.label)}
-                className={clsx(
-                  'w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors',
-                  groupActive
-                    ? 'text-white font-medium'
-                    : 'text-white/60 hover:text-white hover:bg-white/5',
-                )}
-              >
-                <item.icon className="w-4 h-4 flex-shrink-0" />
-                <span className="flex-1 text-left">{item.label}</span>
-                <ChevronDown className={clsx('w-3.5 h-3.5 transition-transform text-white/30', isOpen && 'rotate-180')} />
-              </button>
-
-              {isOpen && (
-                <div>
-                  {item.children.map(child => {
-                    const childActive = pathname === child.href || pathname.startsWith(child.href + '/')
-                    return (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        onClick={close}
-                        className={clsx(
-                          'flex items-center gap-2 pl-10 pr-4 py-2 text-xs transition-colors',
-                          childActive
-                            ? 'text-white font-medium'
-                            : 'text-white/45 hover:text-white/80 hover:bg-white/5',
-                        )}
-                      >
-                        <span className="w-1 h-1 rounded-full bg-current flex-shrink-0" />
-                        {child.label}
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
+            <div key={section.label} className="mb-1">
+              <p className="px-5 py-1.5 text-[9px] font-semibold tracking-widest text-white/25 uppercase">
+                {section.label}
+              </p>
+              {visibleItems.map(renderItem)}
             </div>
           )
         })}
       </div>
 
-      {/* Profil */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+      {/* ── Wheat illustration ────────────── */}
+      <div className="px-4 pt-1 flex-shrink-0 opacity-20 pointer-events-none select-none">
+        <svg viewBox="0 0 160 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
+          {[20,40,60,80,100,120,140].map((x, i) => (
+            <g key={i}>
+              <line x1={x} y1="46" x2={x + (i % 2 === 0 ? -4 : 4)} y2="14" stroke="#86efac" strokeWidth="1.2"/>
+              {[38, 28, 20].map((y, j) => (
+                <ellipse key={j}
+                  cx={x + (i % 2 === 0 ? -4 : 4) + (j % 2 === 0 ? -4 : 4)}
+                  cy={y}
+                  rx="5" ry="3"
+                  fill="#86efac"
+                  transform={`rotate(${i % 2 === 0 ? -20 : 20}, ${x}, ${y})`}
+                />
+              ))}
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      {/* ── Settings + Profile ────────────── */}
+      <div className="flex-shrink-0">
+        <div className="mx-4 h-px bg-white/8" />
         <Link
-          href="/profil"
+          href="/setari"
           onClick={close}
           className={clsx(
-            'flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors',
-            pathname.startsWith('/profil') ? 'text-white font-medium' : 'text-white/60 hover:text-white hover:bg-white/5',
+            'relative flex items-center gap-3 mx-2 my-1 px-3 py-2 rounded-lg text-sm transition-all duration-150',
+            settingsActive ? 'bg-white/10 text-white font-medium' : 'text-white/55 hover:text-white/90 hover:bg-white/5',
           )}
         >
-          <UserCircle className="w-4 h-4 flex-shrink-0" />
-          <span>Profil</span>
+          {settingsActive && (
+            <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-emerald-400" />
+          )}
+          <Settings className={clsx('w-4 h-4 flex-shrink-0', settingsActive ? 'text-emerald-400' : 'text-white/40')} />
+          <span>Setări</span>
         </Link>
-      </div>
-      <div className="px-4 py-2.5 text-[10px] text-white/25" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        v0.1.0 — Arenda Platform
+        <div className="mx-4 h-px bg-white/8" />
+        <div className="flex items-center gap-2.5 px-4 py-3">
+          <div className="relative flex-shrink-0">
+            <div className="w-7 h-7 rounded-full bg-emerald-700 flex items-center justify-center text-[11px] font-bold text-white">
+              AP
+            </div>
+            <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 ring-1 ring-[#1a3320]" />
+          </div>
+          <div className="flex flex-col leading-none min-w-0">
+            <span className="text-[11px] font-medium text-white/80 truncate">{userEmail || 'admin@arenda.ro'}</span>
+            <span className="text-[9px] text-white/35 mt-0.5">Administrator</span>
+          </div>
+        </div>
       </div>
     </nav>
   )
 }
+
