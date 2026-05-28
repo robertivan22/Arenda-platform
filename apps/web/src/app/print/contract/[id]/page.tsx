@@ -59,12 +59,14 @@ export default function ContractPrintPage() {
 
   useEffect(() => {
     const db = createClient()
-    Promise.all([
-      db.from('contracts').select('*, lessors(*)').eq('id', id).single(),
-      db.from('company_settings').select('*').single(),
-      db.from('contract_rent_levels').select('*').eq('contract_id', id).order('sort_order'),
-      db.from('parcels').select('*').eq('contract_id', id),
-    ]).then(async ([{ data: c }, { data: cs }, { data: levels }, { data: ps }]) => {
+    db.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const [{ data: c }, { data: cs }, { data: levels }, { data: ps }] = await Promise.all([
+        db.from('contracts').select('*, lessors(*)').eq('id', id).eq('user_id', user.id).maybeSingle(),
+        db.from('company_settings').select('*').eq('user_id', user.id).maybeSingle(),
+        db.from('contract_rent_levels').select('*').eq('contract_id', id).order('sort_order'),
+        db.from('parcels').select('*').eq('contract_id', id),
+      ])
       if (c) {
         const l = Array.isArray((c as any).lessors) ? (c as any).lessors[0] : (c as any).lessors
         setContract(c as any)
@@ -73,9 +75,7 @@ export default function ContractPrintPage() {
       if (cs) setCompany(cs as any)
       setRentLevels((levels ?? []) as RentLevel[])
       setParcels((ps ?? []) as Parcel[])
-      // Load text config
-      const { data: { user } } = await db.auth.getUser()
-      const textCfg = await fetchTextConfig(db, user?.id ?? '', 'CONTRACT')
+      const textCfg = await fetchTextConfig(db, user.id, 'CONTRACT')
       setCfg(textCfg ?? getDefaults('CONTRACT'))
       setLoading(false)
     })

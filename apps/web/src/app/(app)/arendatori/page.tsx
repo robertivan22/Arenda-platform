@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, Pencil } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/data-display/StatusBadge'
+import { toast } from 'sonner'
 
 interface Lessor {
   id: string; code: string; type: 'NATURAL' | 'LEGAL' | 'PFA'
@@ -27,7 +28,11 @@ export default function LessorsListPage() {
       .from('lessors')
       .select('id, code, type, first_name, last_name, company_name, cnp, county, locality, status')
       .order('last_name')
-      .then(({ data }) => { if (data) setRows(data as Lessor[]) })
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error) { toast.error('Eroare la încărcarea arendatorilor.'); return }
+        if (data) setRows(data as Lessor[])
+      })
   }, [])
 
   const filtered = rows.filter(r => {

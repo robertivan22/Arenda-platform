@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, Pencil, Eye } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/data-display/StatusBadge'
+import { toast } from 'sonner'
 
 interface Contract {
   id: string; contract_number: string; contract_type: string
@@ -24,7 +25,9 @@ export default function ContractesListPage() {
       .from('contracts')
       .select('id, contract_number, contract_type, lessor_id, zone, sign_date, start_date, end_date, annual_rent, status, lessors(first_name, last_name, company_name, type)')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error) { toast.error('Eroare la încărcarea contractelor.'); return }
         if (data) setRows((data as any[]).map(c => ({
           ...c,
           lessor_name: c.lessors

@@ -41,27 +41,22 @@ export default function PrintFacturaPage() {
 
   useEffect(() => {
     const db = createClient()
-    db.from('invoices').select('*').eq('id', id).single().then(async ({ data: inv }) => {
+    db.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: inv } = await db.from('invoices').select('*').eq('id', id).eq('user_id', user.id).maybeSingle()
       if (!inv) return
       setInvoice(inv as Invoice)
-      const { data: { user } } = await db.auth.getUser()
       const [{ data: cs }, { data: les }, { data: txns }] = await Promise.all([
-        db.from('company_settings').select('*').single(),
+        db.from('company_settings').select('*').eq('user_id', user.id).maybeSingle(),
         db.from('lessors').select('*').eq('id', inv.lessor_id).single(),
         db.from('transactions').select('*, contracts(contract_number, sign_date)').eq('invoice_id', id),
       ])
       if (cs) setCompany(cs as Company)
       if (les) setLessor(les as Lessor)
       setTransactions((txns ?? []) as Transaction[])
-      // Load text config
-      if (user) {
-        const docType = inv.doc_type === 'AVIZ' ? 'AVIZ' : 'FACTURA'
-        const textCfg = await fetchTextConfig(db, user.id, docType)
-        setCfg(textCfg ?? getDefaults(docType))
-      } else {
-        const docType = inv.doc_type === 'AVIZ' ? 'AVIZ' : 'FACTURA'
-        setCfg(getDefaults(docType))
-      }
+      const docType = inv.doc_type === 'AVIZ' ? 'AVIZ' : 'FACTURA'
+      const textCfg = await fetchTextConfig(db, user.id, docType)
+      setCfg(textCfg ?? getDefaults(docType))
       setLoading(false)
     })
   }, [id])

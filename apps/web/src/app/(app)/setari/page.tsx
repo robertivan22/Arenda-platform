@@ -60,26 +60,28 @@ export default function SetariPage() {
 
   useEffect(() => {
     const db = createClient()
-    db.from('company_settings').select('*').single()
-      .then(({ data }) => {
-        if (data) {
-          setCompany(data as any)
-          setD112({
-            d112_caen: (data as any).d112_caen ?? '0111',
-            d112_casa_ang: (data as any).d112_casa_ang ?? 'IS',
-            d112_fax_soc: (data as any).d112_fax_soc ?? '',
-            d112_adr_fisc: (data as any).d112_adr_fisc ?? '',
-            d112_tel_fisc: (data as any).d112_tel_fisc ?? '',
-            d112_fax_fisc: (data as any).d112_fax_fisc ?? '',
-            d112_mail_fisc: (data as any).d112_mail_fisc ?? '',
-            d112_tip_rec: (data as any).d112_tip_rec ?? 0,
-            d112_d_rec: (data as any).d112_d_rec ?? 0,
-            d112_nume_declar: (data as any).d112_nume_declar ?? '',
-            d112_prenume_declar: (data as any).d112_prenume_declar ?? '',
-            d112_functie_declar: (data as any).d112_functie_declar ?? 'Administrator',
-          })
-        }
-      })
+    db.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data, error } = await db.from('company_settings').select('*').eq('user_id', user.id).maybeSingle()
+      if (error) { toast.error('Eroare la încărcarea setărilor.'); return }
+      if (data) {
+        setCompany(data as any)
+        setD112({
+          d112_caen: (data as any).d112_caen ?? '0111',
+          d112_casa_ang: (data as any).d112_casa_ang ?? 'IS',
+          d112_fax_soc: (data as any).d112_fax_soc ?? '',
+          d112_adr_fisc: (data as any).d112_adr_fisc ?? '',
+          d112_tel_fisc: (data as any).d112_tel_fisc ?? '',
+          d112_fax_fisc: (data as any).d112_fax_fisc ?? '',
+          d112_mail_fisc: (data as any).d112_mail_fisc ?? '',
+          d112_tip_rec: (data as any).d112_tip_rec ?? 0,
+          d112_d_rec: (data as any).d112_d_rec ?? 0,
+          d112_nume_declar: (data as any).d112_nume_declar ?? '',
+          d112_prenume_declar: (data as any).d112_prenume_declar ?? '',
+          d112_functie_declar: (data as any).d112_functie_declar ?? 'Administrator',
+        })
+      }
+    })
     loadProducts(db)
   }, [])
 

@@ -10,6 +10,7 @@ import {
 } from 'recharts'
 import * as XLSX from 'xlsx'
 import { Download, ChevronDown, ChevronRight } from 'lucide-react'
+import { toast } from 'sonner'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Lessor {
@@ -87,20 +88,21 @@ export default function RapoartePage() {
   useEffect(() => {
     const db = createClient()
     Promise.all([
-      db.from('lessors').select('*').order('last_name'),
+      db.from('lessors').select('*').order('last_name').limit(500),
       db.from('contracts')
         .select('id, contract_number, status, start_date, end_date, lessor_id, localities, lessors(id, first_name, last_name, company_name, type, status)')
-        .order('sign_date', { ascending: false }),
+        .order('sign_date', { ascending: false }).limit(500),
       db.from('transactions')
         .select('id, contract_id, lessor_id, product_name, kg_net, ron_net, campaign_year, transaction_date, invoice_id, contracts(contract_number, lessors(id, first_name, last_name, company_name, type, status))')
-        .order('transaction_date', { ascending: false }),
+        .order('transaction_date', { ascending: false }).limit(1000),
       db.from('invoices')
         .select('id, invoice_number, invoice_date, total_ron, doc_type, status, lessor_id, lessors(id, first_name, last_name, company_name, type, status)')
-        .order('invoice_date', { ascending: false }),
+        .order('invoice_date', { ascending: false }).limit(500),
       db.from('parcels')
         .select('id, parcel_nr, tarla_nr, surface, contract_id, contracts(contract_number, lessors(id, first_name, last_name, company_name, type, status))')
-        .order('parcel_nr'),
-    ]).then(([{ data: ls }, { data: cs }, { data: ts }, { data: is }, { data: ps }]) => {
+        .order('parcel_nr').limit(1000),
+    ]).then(([{ data: ls, error: e1 }, { data: cs, error: e2 }, { data: ts, error: e3 }, { data: is, error: e4 }, { data: ps, error: e5 }]) => {
+      if (e1 || e2 || e3 || e4 || e5) { toast.error('Eroare la încărcarea datelor.'); setLoading(false); return }
       setLessors((ls ?? []) as Lessor[])
       setContracts((cs ?? []) as unknown as Contract[])
       setTransactions((ts ?? []) as unknown as Transaction[])

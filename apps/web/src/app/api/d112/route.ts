@@ -23,10 +23,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
   }
 
-  const body = await req.json() as { year: number; month: number }
-  const { year, month } = body
-  if (!year || !month || month < 1 || month > 12) {
-    return NextResponse.json({ error: 'Parametrii lipsa: year, month (1-12)' }, { status: 400 })
+  let rawBody: unknown
+  try { rawBody = await req.json() } catch {
+    return NextResponse.json({ error: 'Body JSON invalid' }, { status: 400 })
+  }
+  const year  = Number((rawBody as any)?.year)
+  const month = Number((rawBody as any)?.month)
+  if (!Number.isInteger(year) || year < 2000 || year > 2100 ||
+      !Number.isInteger(month) || month < 1 || month > 12) {
+    return NextResponse.json({ error: 'Parametrii invalizi: year (2000-2100), month (1-12)' }, { status: 400 })
   }
 
   const periodFrom = `${year}-${String(month).padStart(2, '0')}-01`

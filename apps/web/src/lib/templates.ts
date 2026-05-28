@@ -71,9 +71,7 @@ export async function fetchTemplate(
     .eq('is_active', true)
     .maybeSingle()
 
-  if (userTmpl?.html_content && !userTmpl.html_content.includes('System default')) {
-    return userTmpl as TemplateRow
-  }
+  if (userTmpl?.html_content) return userTmpl as TemplateRow
 
   // Fall back to system default (user_id IS NULL)
   const { data: sysTmpl } = await db
@@ -84,9 +82,7 @@ export async function fetchTemplate(
     .eq('is_active', true)
     .maybeSingle()
 
-  if (sysTmpl?.html_content && !sysTmpl.html_content.includes('System default')) {
-    return sysTmpl as TemplateRow
-  }
+  if (sysTmpl?.html_content) return sysTmpl as TemplateRow
 
   // No custom template — caller should use built-in JSX template
   return null

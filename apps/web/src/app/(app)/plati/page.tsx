@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { toast } from 'sonner'
 
 interface TranzactieRow {
   id: string
@@ -32,7 +33,7 @@ export default function TranzactiiPage() {
   const reload = useCallback(async () => {
     setLoading(true)
     const db = createClient()
-    const { data } = await db
+    const { data, error } = await db
       .from('transactions')
       .select(`
         id, transaction_date, campaign_year, product_name,
@@ -42,6 +43,8 @@ export default function TranzactiiPage() {
         contracts(contract_number)
       `)
       .order('transaction_date', { ascending: false })
+      .limit(1000)
+    if (error) { toast.error('Eroare la încărcarea tranzacțiilor.'); setLoading(false); return }
     if (data) {
       setRows((data as any[]).map(t => ({
         ...t,

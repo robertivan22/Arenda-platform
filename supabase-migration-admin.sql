@@ -141,6 +141,23 @@ SET is_admin = TRUE
 WHERE email = 'robert.ivan@lseg.com'; -- ← CHANGE THIS TO YOUR EMAIL
 
 -- ============================================================
+-- 4b. ADMIN RECOVERY HELPER
+-- If admin access is ever lost, run in Supabase SQL editor:
+--   SELECT grant_admin('your-email@example.com');
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.grant_admin(target_email TEXT)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  UPDATE public.profiles SET is_admin = TRUE WHERE email = target_email;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No profile found for email: %', target_email;
+  END IF;
+END;
+$$;
+-- Revoke public execute — call this only from the Supabase SQL editor
+REVOKE EXECUTE ON FUNCTION public.grant_admin(TEXT) FROM PUBLIC, anon, authenticated;
+
+-- ============================================================
 -- 5. INSERT SYSTEM DEFAULT TEMPLATE PLACEHOLDERS
 -- These are reference rows; actual HTML is managed via Admin UI.
 -- ============================================================
