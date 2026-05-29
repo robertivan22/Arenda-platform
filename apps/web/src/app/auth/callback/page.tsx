@@ -30,6 +30,17 @@ function AuthCallbackInner() {
     const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard'
 
     async function handle() {
+      // ── token_hash flow: forward to /auth/confirm ────────────────────
+      const tokenHash = searchParams.get('token_hash')
+      const type = searchParams.get('type')
+      if (tokenHash && type) {
+        const params = new URLSearchParams({ token_hash: tokenHash, type })
+        const rawNext = searchParams.get('next')
+        if (rawNext) params.set('next', rawNext)
+        window.location.replace(`/auth/confirm?${params.toString()}`)
+        return
+      }
+
       // ── PKCE flow: ?code= in query string ───────────────────────────
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code)
