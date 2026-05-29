@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
 import { ArrowLeft } from 'lucide-react'
+import SirutaLookup from '@/components/SirutaLookup'
 
 interface LessorOption { id: string; display_name: string }
 interface ContractOption { id: string; lessor_id: string; contract_number: string }
@@ -26,6 +27,7 @@ export default function EditParcelPage() {
     county: '', locality: '', landUseCategory: 'Arabil',
     surface: '', surfaceRented: '',
     lessorId: '', contractId: '', status: 'ACTIVE',
+    sirutaCode: '', sirutaName: '',
   })
 
   useEffect(() => {
@@ -54,6 +56,8 @@ export default function EditParcelPage() {
           lessorId: data.lessor_id ?? '',
           contractId: data.contract_id ?? '',
           status: data.status ?? 'ACTIVE',
+          sirutaCode: data.siruta_code ?? '',
+          sirutaName: '',
         })
         setLoading(false)
       })
@@ -77,6 +81,7 @@ export default function EditParcelPage() {
         surface_rented: form.surfaceRented ? parseFloat(form.surfaceRented) : null,
         lessor_id: form.lessorId || null,
         contract_id: form.contractId || null,
+        siruta_code: form.sirutaCode || null,
         status: form.status,
       })
       .eq('id', id)
@@ -113,6 +118,16 @@ export default function EditParcelPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div><label className={labelCls}>Judet *</label><input className={inputCls} value={form.county} onChange={e => set('county', e.target.value)} required /></div>
             <div><label className={labelCls}>Localitate *</label><input className={inputCls} value={form.locality} onChange={e => set('locality', e.target.value)} required /></div>
+            <div className="md:col-span-3">
+              <label className={labelCls}>Cod SIRUTA</label>
+              <SirutaLookup
+                county={form.county}
+                locality={form.locality}
+                value={form.sirutaCode}
+                onChange={(code, name) => setForm(prev => ({ ...prev, sirutaCode: code, sirutaName: name }))}
+                inputClassName={inputCls}
+              />
+            </div>
             <div>
               <label className={labelCls}>Categorie folosinta</label>
               <select className={inputCls} value={form.landUseCategory} onChange={e => set('landUseCategory', e.target.value)}>

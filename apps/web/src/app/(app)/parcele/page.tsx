@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 interface Parcel {
   id: string; bloc_fizic: string | null; tarla_nr: string | null; parcel_nr: string | null
   county: string; locality: string; surface: number; status: string
-  lessor_name: string
+  lessor_name: string; siruta_code: string | null
 }
 
 export default function ParceleListPage() {
@@ -65,18 +65,19 @@ export default function ParceleListPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              {['Bloc Fizic','Tarla','Nr. parcela','Judet','Localitate','Suprafata (ha)','Arendator','Status',''].map(h => (
+              {['Bloc Fizic','Tarla','Nr. parcela','SIRUTA','Judet','Localitate','Suprafata (ha)','Arendator','Status',''].map(h => (
                 <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-400">Nicio parcela inregistrata</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={10} className="px-3 py-8 text-center text-gray-400">Nicio parcela inregistrata</td></tr>}
             {filtered.map(row => (
               <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="px-3 py-2 font-mono text-xs">{row.bloc_fizic ?? '-'}</td>
                 <td className="px-3 py-2">{row.tarla_nr ?? '-'}</td>
                 <td className="px-3 py-2">{row.parcel_nr ?? '-'}</td>
+                <td className="px-3 py-2 font-mono text-xs">{row.siruta_code ?? <span className="text-gray-300">—</span>}</td>
                 <td className="px-3 py-2">{row.county}</td>
                 <td className="px-3 py-2">{row.locality}</td>
                 <td className="px-3 py-2 font-medium">{Number(Number(row.surface).toFixed(4))}</td>

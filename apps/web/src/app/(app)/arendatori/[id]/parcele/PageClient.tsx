@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 interface ParcelRow {
   id: string; parcel_code: string | null; tarla_nr: string | null; parcel_nr: string | null
   county: string; locality: string; land_use_category: string | null
-  surface: number; surface_rented: number | null
+  surface: number; surface_rented: number | null; siruta_code: string | null
 }
 
 export default function LessorParceleTabClient() {
@@ -19,7 +19,7 @@ export default function LessorParceleTabClient() {
     if (!id) return
     createClient()
       .from('parcels')
-      .select('id, parcel_code, tarla_nr, parcel_nr, county, locality, land_use_category, surface, surface_rented')
+      .select('id, parcel_code, tarla_nr, parcel_nr, county, locality, land_use_category, surface, surface_rented, siruta_code')
       .eq('lessor_id', id)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -36,7 +36,7 @@ export default function LessorParceleTabClient() {
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
-            {['Cod parcelă', 'Tarla', 'Parcelă', 'Județ', 'Localitate', 'Cat. folosință', 'Suprafață (ha)', 'Suprafață arendată (ha)'].map(h => (
+            {['Cod parcelă', 'Tarla', 'Parcelă', 'SIRUTA', 'Județ', 'Localitate', 'Cat. folosință', 'Suprafață (ha)', 'Suprafață arendată (ha)'].map(h => (
               <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">{h}</th>
             ))}
           </tr>
@@ -47,6 +47,7 @@ export default function LessorParceleTabClient() {
               <td className="px-3 py-2 font-mono text-xs">{row.parcel_code ?? '—'}</td>
               <td className="px-3 py-2">{row.tarla_nr ?? '—'}</td>
               <td className="px-3 py-2">{row.parcel_nr ?? '—'}</td>
+              <td className="px-3 py-2 font-mono text-xs">{row.siruta_code ?? '—'}</td>
               <td className="px-3 py-2">{row.county}</td>
               <td className="px-3 py-2">{row.locality}</td>
               <td className="px-3 py-2">{row.land_use_category ?? '—'}</td>
