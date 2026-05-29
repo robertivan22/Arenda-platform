@@ -72,8 +72,9 @@ export default function FitosanitarPage() {
     if (filterFrom) q = q.gte('data_tratament', filterFrom)
     if (filterTo) q = q.lte('data_tratament', filterTo)
     if (search.trim()) {
+      const safe = search.trim().replace(/[%_\\]/g, '\\$&').replace(/[,()`'"]/g, '')
       q = q.or(
-        `denumire_produs.ilike.%${search.trim()}%,agent_daunare.ilike.%${search.trim()}%,locul_terenului.ilike.%${search.trim()}%`
+        `denumire_produs.ilike.%${safe}%,agent_daunare.ilike.%${safe}%,locul_terenului.ilike.%${safe}%`
       )
     }
 

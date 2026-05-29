@@ -109,18 +109,21 @@ export default function D112Page() {
 
   // Load company settings from DB
   useEffect(() => {
-    createClient().from('company_settings').select('*').single()
-      .then(({ data }) => {
-        if (data) {
-          setCs(data as CS)
-          const missing = MISSING_REQUIRED
-            .filter(({ key }) => !((data as any)[key]?.toString().trim()))
-            .map(({ label }) => label)
-          setSettingsMissing(missing)
-        } else {
-          setSettingsMissing(['Completeaza Date firma si Date Declaratie 112 in Setari'])
-        }
-      })
+    const db = createClient()
+    db.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data, error } = await db.from('company_settings').select('*').eq('user_id', user.id).maybeSingle()
+      if (error) { toast.error('Eroare la încărcarea setărilor.'); return }
+      if (data) {
+        setCs(data as CS)
+        const missing = MISSING_REQUIRED
+          .filter(({ key }) => !((data as any)[key]?.toString().trim()))
+          .map(({ label }) => label)
+        setSettingsMissing(missing)
+      } else {
+        setSettingsMissing(['Completează Date firmă și Date Declarație 112 în Setări'])
+      }
+    })
   }, [])
 
   async function generate() {

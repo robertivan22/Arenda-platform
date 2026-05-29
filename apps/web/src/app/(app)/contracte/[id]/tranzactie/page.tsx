@@ -48,7 +48,8 @@ export default function NewTransactionPage() {
       db.from('products').select('id, name, unit').eq('is_active', true).order('sort_order'),
       db.from('contract_rent_levels').select('*').eq('contract_id', id).order('sort_order'),
       db.from('parcels').select('surface').eq('contract_id', id),
-    ]).then(([{ data: c }, { data: prods }, { data: levels }, { data: ps }]) => {
+    ]).then(([{ data: c, error: e1 }, { data: prods, error: e2 }, { data: levels, error: e3 }, { data: ps, error: e4 }]) => {
+      if (e1 || e2 || e3 || e4) { toast.error('Eroare la încărcarea datelor contractului.'); return }
       if (c) {
         const lessor = Array.isArray((c as any).lessors) ? (c as any).lessors[0] : (c as any).lessors
         setContract({ ...c as any, lessor_name: lessor ? (lessor.type === 'LEGAL' ? lessor.company_name : `${lessor.last_name} ${lessor.first_name}`.trim()) : '—' })

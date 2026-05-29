@@ -21,10 +21,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
   }
 
-  const body = await req.json() as { campaignYear: number }
-  const { campaignYear } = body
-  if (!campaignYear) {
-    return NextResponse.json({ error: 'Parametru lipsă: campaignYear' }, { status: 400 })
+  let rawBody: unknown
+  try { rawBody = await req.json() } catch {
+    return NextResponse.json({ error: 'Body JSON invalid' }, { status: 400 })
+  }
+  const campaignYear = Number((rawBody as any)?.campaignYear)
+  if (!Number.isInteger(campaignYear) || campaignYear < 2000 || campaignYear > 2100) {
+    return NextResponse.json({ error: 'Parametru invalid: campaignYear (2000-2100)' }, { status: 400 })
   }
 
   // Fetch parcels with lessor and contract for this user

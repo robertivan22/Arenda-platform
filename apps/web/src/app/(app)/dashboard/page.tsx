@@ -62,17 +62,17 @@ export default function DashboardPage() {
         { count: contractsActive },
         { count: contractsExpiring },
         { data: parcelsData },
-        { data: paymentsData },
+        { data: overdueData },
       ] = await Promise.all([
         db.from('lessors').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
         db.from('contracts').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
         db.from('contracts').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE').lte('end_date', in30).gte('end_date', today),
-        db.from('parcels').select('surface'),
-        db.from('payments').select('amount, status').in('status', ['OVERDUE', 'PENDING']),
+        db.from('parcels').select('surface').limit(5000),
+        db.from('transactions').select('ron_net').eq('impozit_aplicat', true).limit(1000),
       ])
       const surfaceTotal = ((parcelsData ?? []) as any[]).reduce((acc, p) => acc + Number(p.surface ?? 0), 0).toFixed(2)
-      const paymentsOverdue = (paymentsData ?? []).length
-      const paymentsOverdueAmount = ((paymentsData ?? []) as any[]).reduce((acc, p) => acc + Number(p.amount ?? 0), 0).toFixed(2)
+      const paymentsOverdue = (overdueData ?? []).length
+      const paymentsOverdueAmount = ((overdueData ?? []) as any[]).reduce((acc, p) => acc + Number(p.ron_net ?? 0), 0).toFixed(2)
       setS({ lessorsTotal: lessorsTotal ?? 0, contractsActive: contractsActive ?? 0, contractsExpiring: contractsExpiring ?? 0, parcelsTotal: (parcelsData ?? []).length, surfaceTotal, paymentsOverdue, paymentsOverdueAmount })
       setLoading(false)
     }

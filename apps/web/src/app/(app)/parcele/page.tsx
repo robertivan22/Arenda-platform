@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, Pencil } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { toast } from 'sonner'
 
 interface Parcel {
   id: string; bloc_fizic: string | null; tarla_nr: string | null; parcel_nr: string | null
@@ -22,7 +23,9 @@ export default function ParceleListPage() {
       .from('parcels')
       .select('*, lessors(first_name, last_name, company_name, type)')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
+      .limit(1000)
+      .then(({ data, error }) => {
+        if (error) { toast.error('Eroare la încărcarea parcelelor.'); return }
         if (data) setRows((data as any[]).map(p => ({
           ...p,
           lessor_name: p.lessors

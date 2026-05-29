@@ -52,7 +52,7 @@ export default function TranzactiiPage() {
           ? (t.lessors.type === 'LEGAL'
               ? t.lessors.company_name
               : `${t.lessors.last_name} ${t.lessors.first_name}`.trim())
-          : 'â€”',
+          : '—',
         contract_number: t.contracts?.contract_number ?? null,
       })))
     }

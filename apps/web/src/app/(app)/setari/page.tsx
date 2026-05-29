@@ -86,7 +86,8 @@ export default function SetariPage() {
   }, [])
 
   async function loadProducts(db = createClient()) {
-    const { data } = await db.from('products').select('*').order('sort_order').order('name')
+    const { data, error } = await db.from('products').select('*').order('sort_order').order('name')
+    if (error) { toast.error('Eroare la încărcarea produselor.'); return }
     if (data) setProducts(data as Product[])
   }
 

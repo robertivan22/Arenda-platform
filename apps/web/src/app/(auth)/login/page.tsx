@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth.store'
+import { createClient } from '@/lib/supabase/client'
 import { Eye, EyeOff, Loader2, Mail, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -23,6 +24,15 @@ export default function LoginPage() {
       toast.error((err as Error)?.message || 'Date de autentificare invalide.')
       setLoading(false)
     }
+  }
+
+  async function handleForgotPassword() {
+    if (!email) { toast.error('Introduceți email-ul mai întâi.'); return }
+    const { error } = await createClient().auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/profil`,
+    })
+    if (error) toast.error(error.message)
+    else toast.success('Email de resetare trimis. Verificați căsuța poștală.')
   }
 
   return (
@@ -109,7 +119,7 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-sm font-medium text-gray-700">Parolă</label>
-                <button type="button" className="text-xs text-[#2d6a4f] hover:underline font-medium">Ai uitat parola?</button>
+                <button type="button" className="text-xs text-[#2d6a4f] hover:underline font-medium" onClick={handleForgotPassword}>Ai uitat parola?</button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

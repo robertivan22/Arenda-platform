@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>QA &amp; Security Report — ArendaPro (2026-05-28)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; color: #1e293b; background: #f8fafc; line-height: 1.6; }
+  .wrapper { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  /* Header */
+  .report-header { background: linear-gradient(135deg, #1e3a22 0%, #2d6a4f 100%); color: white; border-radius: 16px; padding: 36px 40px; margin-bottom: 32px; }
+  .report-header h1 { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+  .report-header .meta { opacity: .75; font-size: 13px; display: flex; gap: 24px; flex-wrap: wrap; margin-top: 12px; }
+  .report-header .meta span::before { content: '• '; }
+  /* Score card */
+  .score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .score-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; text-align: center; }
+  .score-card .num { font-size: 40px; font-weight: 800; line-height: 1; }
+  .score-card .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: #64748b; margin-top: 6px; }
+  .score-green { color: #16a34a; }
+  .score-red { color: #dc2626; }
+  .score-orange { color: #d97706; }
+  .score-blue { color: #2563eb; }
+  .score-gray { color: #64748b; }
+  /* Summary table */
+  .section-title { font-size: 18px; font-weight: 700; color: #1e293b; margin: 32px 0 14px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+  table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 28px; }
+  thead tr { background: #f1f5f9; }
+  th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #64748b; }
+  td { padding: 10px 14px; border-top: 1px solid #f1f5f9; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 99px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .badge-critical { background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; }
+  .badge-high { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; }
+  .badge-medium { background: #fefce8; color: #92400e; border: 1px solid #fde68a; }
+  .badge-low { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+  .badge-ok { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
+  .badge-fixed { background: #ecfdf5; color: #059669; border: 1px solid #6ee7b7; }
+  .badge-new { background: #fff1f2; color: #be123c; border: 1px solid #fda4af; }
+  .badge-info { background: #f0f9ff; color: #0369a1; border: 1px solid #7dd3fc; }
+  /* Issue cards */
+  .issue-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 20px; overflow: hidden; }
+  .issue-card-header { display: flex; align-items: flex-start; gap: 14px; padding: 16px 20px; border-bottom: 1px solid #f1f5f9; }
+  .issue-id { font-size: 12px; font-weight: 800; font-family: monospace; color: #64748b; min-width: 72px; }
+  .issue-title { font-weight: 700; font-size: 15px; color: #0f172a; flex: 1; }
+  .issue-body { padding: 16px 20px; }
+  .issue-body p { margin-bottom: 8px; color: #334155; }
+  .issue-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: .5px; margin-bottom: 4px; margin-top: 12px; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; font-size: 12px; overflow-x: auto; line-height: 1.55; margin: 8px 0; white-space: pre; }
+  pre .bad { color: #f87171; }
+  pre .good { color: #86efac; }
+  pre .comment { color: #94a3b8; }
+  pre .key { color: #7dd3fc; }
+  .file-path { font-family: monospace; font-size: 12px; background: #f1f5f9; color: #334155; padding: 3px 8px; border-radius: 5px; display: inline-block; }
+  /* Separator */
+  hr.section { border: none; border-top: 1px solid #e2e8f0; margin: 36px 0; }
+  /* Prior fixes */
+  .prior-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .prior-item { display: flex; align-items: center; gap: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 9px 14px; font-size: 13px; }
+  .prior-item .check { color: #16a34a; font-size: 16px; }
+  .prior-item strong { color: #0f172a; }
+  .prior-item span { color: #64748b; font-size: 12px; }
+  /* Footer */
+  .footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Header -->
+  <div class="report-header">
+    <h1>QA &amp; Security Report — ArendaPro</h1>
+    <p style="opacity:.8;margin-top:4px">Comprehensive code review: security, correctness, data integrity</p>
+    <div class="meta">
+      <span>Date: 2026-05-28</span>
+      <span>Repository: robertivan22/Arenda-platform</span>
+      <span>Branch: main</span>
+      <span>Last commit: 7d250f6</span>
+      <span>Framework: Next.js 15 · Supabase · Cloudflare Pages</span>
+    </div>
+  </div>
+
+  <!-- Score cards -->
+  <div class="score-grid">
+    <div class="score-card">
+      <div class="num score-orange">7.2</div>
+      <div class="lbl">Overall Score</div>
+    </div>
+    <div class="score-card">
+      <div class="num score-red">0</div>
+      <div class="lbl">Critical (new)</div>
+    </div>
+    <div class="score-card">
+      <div class="num score-orange">2</div>
+      <div class="lbl">High (new)</div>
+    </div>
+    <div class="score-card">
+      <div class="num score-orange">6</div>
+      <div class="lbl">Medium (new)</div>
+    </div>
+    <div class="score-card">
+      <div class="num score-blue">2</div>
+      <div class="lbl">Low (new)</div>
+    </div>
+    <div class="score-card">
+      <div class="num score-green">9</div>
+      <div class="lbl">Issues Fixed (prev.)</div>
+    </div>
+  </div>
+
+  <!-- Context note -->
+  <p style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;font-size:13px;color:#1d4ed8;margin-bottom:28px;">
+    <strong>Context:</strong> Previous session fixed all 9 issues from the original QA report (C-1, C-2, H-1, H-2, H-3, H-4, M-1, M-2, M-3). This report covers the remaining codebase — 10 new issues identified across files not covered in the prior pass.
+  </p>
+
+  <!-- Summary table -->
+  <div class="section-title">Issue Summary</div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Severity</th><th>File</th><th>Issue</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>N-H1</code></td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td><span class="file-path">parcele/page.tsx</span></td>
+        <td>No <code>.limit()</code>, no error handling, no toast import — same pattern as H-1/H-2 (skipped in prior pass)</td>
+        <td><span class="badge badge-new">NEW</span></td>
+      </tr>
+      <tr>
+        <td><code>N-H2</code></td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td><span class="file-path">api/apia/route.ts</span></td>
+        <td>Unguarded <code>req.json()</code> — malformed body crashes edge function (same as old C-2, skipped in prior pass)</td>
+        <td><span class="badge badge-new">NEW</span></td>
+      </tr>
+      <tr>
+        <td><code>N-M1</code></td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td><span class="file-path">plati/page.tsx</span></td>
+        <td>Encoding bug: <code>'â€"'</code> (UTF-8 mojibake) instead of <code>'—'</code> — garbled UI text</td>
+        <td><span class="badge badge-new">NEW</span></td>
+      </tr>
+      <tr>
+        <td><code>N-M2</code></td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td><span class="file-path">declaratii/d112/page.tsx</span></td>
+        <td><code>company_settings</code> loaded without <code>user_id</code> filter and <code>.single()</code> — same M-2 pattern, skipped in prior pass</td>
+        <td><span class="badge badge-new">NEW</span></td>
+      </tr>
+      <tr>
+        <td><code>N-M3</code></td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td><span class="file-path">contracte/[id]/tranzactie/page.tsx</span></td>
+        <td><code>Promise.all</code> loads contract/products/levels/parcels with no error destructuring or toast on failure</td>
+        <td><span class="badge badge-new">NEW</span></td>
+      </tr>
+      <tr>
+        <td><code>N-M4</code></td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td><span class="file-path">setari/page.tsx</span></td>
+        <td><code>loadProducts()</code> silently swallows DB errors — no error check or toast</td>
+        <td><span class="badge badge-new">NEW</span></td>
+      </tr>
+      <tr>
+        <td><code>N-M5</code></td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td><span class="file-path">fitosanitar/page.tsx</span></td>
+        <td>User search input interpolated directly into PostgREST <code>.or()</code> filter string — potential filter injection</td>
+        <td><span class="badge badge-new">NEW</span></td>
+      </tr>
+      <tr>
+        <td><code>N-M6</code></td>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td><span class="file-path">dashboard/page.tsx</span></td>
+        <td>Queries non-existent <code>payments</code> table; <code>parcelsData</code>/<code>paymentsData</code> have no <code>.limit()</code> or error handling</td>
+        <td><span class="badge badge-new">NEW</span></td>
+      </tr>
+      <tr>
+        <td><code>N-L1</code></td>
+        <td><span class="badge badge-low">LOW</span></td>
+        <td><span class="file-path">auth/callback/route.ts</span></td>
+        <td>Unvalidated <code>next</code> query parameter used in redirect — potential open redirect</td>
+        <td><span class="badge badge-new">NEW</span></td>
+      </tr>
+      <tr>
+        <td><code>N-L2</code></td>
+        <td><span class="badge badge-low">LOW</span></td>
+        <td><span class="file-path">login/page.tsx</span></td>
+        <td>"Ai uitat parola?" button has no <code>onClick</code> handler — dead UI element</td>
+        <td><span class="badge badge-new">NEW</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr class="section" />
+
+  <!-- HIGH issues -->
+  <div class="section-title">⚠ High Severity</div>
+
+  <!-- N-H1 -->
+  <div class="issue-card">
+    <div class="issue-card-header">
+      <span class="issue-id">N-H1</span>
+      <span class="issue-title">parcele/page.tsx — missing .limit(), error handling, and toast import</span>
+      <span class="badge badge-high" style="margin-left:auto">HIGH</span>
+    </div>
+    <div class="issue-body">
+      <p>The parcels list page was not included in the prior H-1/H-2 fix pass. It has the same three defects: unbounded query (no <code>.limit()</code>), the error result is destructured but not used, and <code>toast</code> is not imported.</p>
+
+      <div class="issue-label">Current Code — apps/web/src/app/(app)/parcele/page.tsx</div>
+<pre>
+useEffect(() =&gt; {
+  createClient()
+    .from('parcels')
+    .select('*, lessors(first_name, last_name, company_name, type)')
+    .order('created_at', { ascending: false })
+<span class="bad">    // ← no .limit() — could return thousands of rows</span>
+<span class="bad">    .then(({ data }) =&gt; {          // ← error is NOT destructured</span>
+<span class="bad">      if (data) setRows(...)        // ← silently ignores DB errors</span>
+    })
+}, [])
+</pre>
+
+      <div class="issue-label">Fix</div>
+<pre>
+<span class="good">import { toast } from 'sonner'   // ← add import</span>
+
+useEffect(() =&gt; {
+  createClient()
+    .from('parcels')
+    .select('*, lessors(first_name, last_name, company_name, type)')
+    .order('created_at', { ascending: false })
+<span class="good">    .limit(1000)                   // ← bound the query</span>
+<span class="good">    .then(({ data, error }) =&gt; {  // ← destructure error</span>
+<span class="good">      if (error) { toast.error('Eroare la încărcarea parcelelor.'); return }</span>
+      if (data) setRows(...)
+    })
+}, [])
+</pre>
+      <div class="issue-label">Impact</div>
+      <p>Without a limit, a user with thousands of parcels causes a heavy query. Silently swallowed errors leave the list stuck empty with no feedback.</p>
+    </div>
+  </div>
+
+  <!-- N-H2 -->
+  <div class="issue-card">
+    <div class="issue-card-header">
+      <span class="issue-id">N-H2</span>
+      <span class="issue-title">api/apia/route.ts — unguarded req.json() crashes edge function on malformed body</span>
+      <span class="badge badge-high" style="margin-left:auto">HIGH</span>
+    </div>
+    <div class="issue-body">
+      <p>The APIA export API endpoint calls <code>req.json()</code> without a try/catch. If the caller sends a malformed (non-JSON) body, the edge function throws an unhandled exception and returns a 500 error instead of a clean 400 validation response. This is the same issue as old C-2 (fixed in <code>api/d112/route.ts</code>) but was missed for this endpoint.</p>
+
+      <div class="issue-label">Current Code — apps/web/src/app/api/apia/route.ts</div>
+<pre>
+<span class="bad">const body = await req.json() as { campaignYear: number }  // ← throws if body is not valid JSON</span>
+<span class="bad">const { campaignYear } = body</span>
+if (!campaignYear) {
+  return NextResponse.json({ error: 'Parametru lipsă: campaignYear' }, { status: 400 })
+}
+</pre>
+
+      <div class="issue-label">Fix (mirror d112/route.ts pattern)</div>
+<pre>
+<span class="good">let rawBody: unknown</span>
+<span class="good">try { rawBody = await req.json() } catch {</span>
+<span class="good">  return NextResponse.json({ error: 'Body JSON invalid' }, { status: 400 })</span>
+<span class="good">}</span>
+<span class="good">const campaignYear = Number((rawBody as any)?.campaignYear)</span>
+<span class="good">if (!Number.isInteger(campaignYear) || campaignYear &lt; 2000 || campaignYear &gt; 2100) {</span>
+<span class="good">  return NextResponse.json({ error: 'Parametru invalid: campaignYear (2000-2100)' }, { status: 400 })</span>
+<span class="good">}</span>
+</pre>
+    </div>
+  </div>
+
+  <hr class="section" />
+
+  <!-- MEDIUM issues -->
+  <div class="section-title">⚡ Medium Severity</div>
+
+  <!-- N-M1 -->
+  <div class="issue-card">
+    <div class="issue-card-header">
+      <span class="issue-id">N-M1</span>
+      <span class="issue-title">plati/page.tsx — UTF-8 mojibake em-dash renders as garbled text</span>
+      <span class="badge badge-medium" style="margin-left:auto">MEDIUM</span>
+    </div>
+    <div class="issue-body">
+      <p>The transaction row mapping fallback for <code>lessor_name</code> contains a UTF-8 mojibake string <code>'â€"'</code> instead of the correct em-dash <code>'—'</code>. This is a classic Windows-1252-as-UTF-8 misinterpretation that will display as <strong>â€"</strong> in the UI instead of a dash.</p>
+
+      <div class="issue-label">Current Code — apps/web/src/app/(app)/plati/page.tsx</div>
+<pre>
+lessor_name: t.lessors
+  ? (t.lessors.type === 'LEGAL' ? t.lessors.company_name : `${t.lessors.last_name} ${t.lessors.first_name}`.trim())
+<span class="bad">  : 'â€"',  // ← UTF-8 mojibake — renders as garbled characters</span>
+</pre>
+
+      <div class="issue-label">Fix</div>
+<pre>
+lessor_name: t.lessors
+  ? (t.lessors.type === 'LEGAL' ? t.lessors.company_name : `${t.lessors.last_name} ${t.lessors.first_name}`.trim())
+<span class="good">  : '—',   // ← correct em-dash character</span>
+</pre>
+    </div>
+  </div>
+
+  <!-- N-M2 -->
+  <div class="issue-card">
+    <div class="issue-card-header">
+      <span class="issue-id">N-M2</span>
+      <span class="issue-title">declaratii/d112/page.tsx — company_settings loaded without user_id filter, uses .single()</span>
+      <span class="badge badge-medium" style="margin-left:auto">MEDIUM</span>
+    </div>
+    <div class="issue-body">
+      <p>The D112 declaration page loads company settings using the same unfiltered pattern as the old M-2 issue (which was fixed in <code>setari/page.tsx</code> and the print pages). It uses <code>.single()</code> without a <code>user_id</code> filter, and has no error handling.</p>
+
+      <div class="issue-label">Current Code — apps/web/src/app/(app)/declaratii/d112/page.tsx (~line 185)</div>
+<pre>
+useEffect(() =&gt; {
+<span class="bad">  createClient().from('company_settings').select('*').single()  // ← no user_id filter</span>
+    .then(({ data }) =&gt; {
+      if (data) { setCs(data as CS); ... }
+<span class="bad">      // ← no error handling</span>
+    })
+}, [])
+</pre>
+
+      <div class="issue-label">Fix (mirror setari/page.tsx pattern)</div>
+<pre>
+useEffect(() =&gt; {
+  const db = createClient()
+<span class="good">  db.auth.getUser().then(async ({ data: { user } }) =&gt; {</span>
+<span class="good">    if (!user) return</span>
+<span class="good">    const { data, error } = await db.from('company_settings')</span>
+<span class="good">      .select('*').eq('user_id', user.id).maybeSingle()</span>
+<span class="good">    if (error) { toast.error('Eroare la încărcarea setărilor.'); return }</span>
+    if (data) { setCs(data as CS); ... }
+<span class="good">    else { setSettingsMissing(['Completează Date firmă și Date Declarație 112 în Setări']) }</span>
+<span class="good">  })</span>
+}, [])
+</pre>
+    </div>
+  </div>
+
+  <!-- N-M3 -->
+  <div class="issue-card">
+    <div class="issue-card-header">
+      <span class="issue-id">N-M3</span>
+      <span class="issue-title">contracte/[id]/tranzactie/page.tsx — Promise.all data loads have no error handling</span>
+      <span class="badge badge-medium" style="margin-left:auto">MEDIUM</span>
+    </div>
+    <div class="issue-body">
+      <p>The new-transaction page loads contract, products, rent levels, and parcels in a <code>Promise.all</code> but does not destructure error results. If any query fails, the form silently stays blank with no feedback to the user.</p>
+
+      <div class="issue-label">Current Code — apps/web/src/app/(app)/contracte/[id]/tranzactie/page.tsx</div>
+<pre>
+Promise.all([
+  db.from('contracts').select('...').eq('id', id).single(),
+  db.from('products').select('...').eq('is_active', true).order('sort_order'),
+  db.from('contract_rent_levels').select('*').eq('contract_id', id).order('sort_order'),
+  db.from('parcels').select('surface').eq('contract_id', id),
+<span class="bad">]).then(([{ data: c }, { data: prods }, { data: levels }, { data: ps }]) =&gt; {</span>
+<span class="bad">  // ← no error destructuring — failures silently ignored</span>
+</pre>
+
+      <div class="issue-label">Fix</div>
+<pre>
+]).then(([{ data: c, error: e1 }, { data: prods, error: e2 },
+          { data: levels, error: e3 }, { data: ps, error: e4 }]) =&gt; {
+<span class="good">  if (e1 || e2 || e3 || e4) { toast.error('Eroare la încărcarea datelor contractului.'); return }</span>
+</pre>
+    </div>
+  </div>
+
+  <!-- N-M4 -->
+  <div class="issue-card">
+    <div class="issue-card-header">
+      <span class="issue-id">N-M4</span>
+      <span class="issue-title">setari/page.tsx — loadProducts() silently swallows DB errors</span>
+      <span class="badge badge-medium" style="margin-left:auto">MEDIUM</span>
+    </div>
+    <div class="issue-body">
+      <p>The <code>loadProducts()</code> helper only reads the <code>data</code> result and ignores <code>error</code>. If the query fails (network issue, permission denied), the products list silently stays empty and the user cannot add transactions.</p>
+
+      <div class="issue-label">Current Code — apps/web/src/app/(app)/setari/page.tsx</div>
+<pre>
+async function loadProducts(db = createClient()) {
+<span class="bad">  const { data } = await db.from('products').select('*').order('sort_order').order('name')</span>
+<span class="bad">  // ← error silently discarded</span>
+  if (data) setProducts(data as Product[])
+}
+</pre>
+
+      <div class="issue-label">Fix</div>
+<pre>
+async function loadProducts(db = createClient()) {
+<span class="good">  const { data, error } = await db.from('products').select('*').order('sort_order').order('name')</span>
+<span class="good">  if (error) { toast.error('Eroare la încărcarea produselor.'); return }</span>
+  if (data) setProducts(data as Product[])
+}
+</pre>
+    </div>
+  </div>
+
+  <!-- N-M5 -->
+  <div class="issue-card">
+    <div class="issue-card-header">
+      <span class="issue-id">N-M5</span>
+      <span class="issue-title">fitosanitar/page.tsx — user search string interpolated into PostgREST filter expression</span>
+      <span class="badge badge-medium" style="margin-left:auto">MEDIUM</span>
+    </div>
+    <div class="issue-body">
+      <p>The full-text search on the fitosanitar registry page interpolates the user's raw <code>search</code> input directly into a PostgREST <code>.or()</code> filter string. PostgREST treats this as a query expression, so special characters like <code>.</code>, <code>(</code>, <code>)</code>, or commas can break the filter syntax or cause unexpected filter behaviour. While this is not a traditional SQL injection (PostgREST parameterises values), it does allow filter injection that can bypass intended query constraints.</p>
+
+      <div class="issue-label">Current Code — apps/web/src/app/(app)/fitosanitar/page.tsx</div>
+<pre>
+if (search.trim()) {
+  q = q.or(
+<span class="bad">    `denumire_produs.ilike.%${search.trim()}%,agent_daunare.ilike.%${search.trim()}%,locul_terenului.ilike.%${search.trim()}%`</span>
+<span class="bad">    // ← user input directly in filter expression — commas/dots could break or inject</span>
+  )
+}
+</pre>
+
+      <div class="issue-label">Fix — sanitize before interpolating into PostgREST filter</div>
+<pre>
+if (search.trim()) {
+<span class="good">  // Escape % and _ for ILIKE; strip PostgREST metacharacters (, . ( ) )</span>
+<span class="good">  const safe = search.trim()</span>
+<span class="good">    .replace(/[%_\\]/g, '\\$&amp;')   // escape ILIKE wildcards</span>
+<span class="good">    .replace(/[,()`'"]/g, '')      // remove PostgREST expression metacharacters</span>
+  q = q.or(
+<span class="good">    `denumire_produs.ilike.%${safe}%,agent_daunare.ilike.%${safe}%,locul_terenului.ilike.%${safe}%`</span>
+  )
+}
+</pre>
+    </div>
+  </div>
+
+  <!-- N-M6 -->
+  <div class="issue-card">
+    <div class="issue-card-header">
+      <span class="issue-id">N-M6</span>
+      <span class="issue-title">dashboard/page.tsx — queries non-existent 'payments' table; missing limits + error handling</span>
+      <span class="badge badge-medium" style="margin-left:auto">MEDIUM</span>
+    </div>
+    <div class="issue-body">
+      <p>The dashboard stats loader queries a <code>payments</code> table that does not appear in the application schema (payment data lives in <code>transactions</code>). This silently returns empty data for the "overdue payments" stats cards. Additionally, the <code>parcels</code> <code>SELECT surface</code> query has no <code>.limit()</code>, and no error handling exists on the entire <code>Promise.all</code>.</p>
+
+      <div class="issue-label">Current Code — apps/web/src/app/(app)/dashboard/page.tsx</div>
+<pre>
+const [
+  { count: lessorsTotal },
+  { count: contractsActive },
+  { count: contractsExpiring },
+  { data: parcelsData },    <span class="comment">// ← no .limit()</span>
+<span class="bad">  { data: paymentsData },   // ← queries 'payments' table which does not exist in schema</span>
+] = await Promise.all([
+  db.from('lessors').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+  db.from('contracts').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+  db.from('contracts').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE').lte('end_date', in30).gte('end_date', today),
+  db.from('parcels').select('surface'),
+<span class="bad">  db.from('payments').select('amount, status').in('status', ['OVERDUE', 'PENDING']),</span>
+<span class="bad">  // ← 'payments' table not in schema; should use 'transactions' or be removed</span>
+])
+</pre>
+
+      <div class="issue-label">Recommendation</div>
+      <p>Either add a <code>payments</code> table to the schema, or replace the query with one from <code>transactions</code> that checks for overdue amounts. Also add <code>.limit()</code> to the parcels query and wrap the entire <code>Promise.all</code> in a try/catch.</p>
+    </div>
+  </div>
+
+  <hr class="section" />
+
+  <!-- LOW issues -->
+  <div class="section-title">ℹ Low Severity</div>
+
+  <!-- N-L1 -->
+  <div class="issue-card">
+    <div class="issue-card-header">
+      <span class="issue-id">N-L1</span>
+      <span class="issue-title">auth/callback/route.ts — unvalidated 'next' parameter used in redirect</span>
+      <span class="badge badge-low" style="margin-left:auto">LOW</span>
+    </div>
+    <div class="issue-body">
+      <p>The OAuth/magic-link callback handler reads the <code>next</code> query parameter and uses it directly in a redirect. If an attacker crafts a link like <code>/auth/callback?code=valid&amp;next=//evil.com</code>, the response would be <code>NextResponse.redirect('https://arenda.pro//evil.com')</code>. Modern browsers will typically resolve <code>//evil.com</code> as a protocol-relative URL before the host concatenation takes effect, making exploitation difficult — but it is still best practice to validate the parameter.</p>
+
+      <div class="issue-label">Current Code — apps/web/src/app/auth/callback/route.ts</div>
+<pre>
+<span class="bad">const next = searchParams.get('next') ?? '/dashboard'  // ← unvalidated</span>
+<span class="comment">// ...</span>
+<span class="bad">return NextResponse.redirect(`${origin}${next}`)        // ← open redirect risk</span>
+</pre>
+
+      <div class="issue-label">Fix</div>
+<pre>
+<span class="good">const rawNext = searchParams.get('next') ?? '/dashboard'</span>
+<span class="good">// Ensure next is a valid relative path (starts with / but not //)</span>
+<span class="good">const next = rawNext.startsWith('/') &amp;&amp; !rawNext.startsWith('//') ? rawNext : '/dashboard'</span>
+return NextResponse.redirect(`${origin}${next}`)
+</pre>
+    </div>
+  </div>
+
+  <!-- N-L2 -->
+  <div class="issue-card">
+    <div class="issue-card-header">
+      <span class="issue-id">N-L2</span>
+      <span class="issue-title">login/page.tsx — "Ai uitat parola?" button has no onClick handler</span>
+      <span class="badge badge-low" style="margin-left:auto">LOW</span>
+    </div>
+    <div class="issue-body">
+      <p>The forgot-password link is rendered as a <code>&lt;button type="button"&gt;</code> with only a hover style but no <code>onClick</code> handler. Clicking it does nothing, which is confusing to users.</p>
+
+      <div class="issue-label">Current Code — apps/web/src/app/(auth)/login/page.tsx</div>
+<pre>
+<span class="bad">&lt;button type="button" className="text-xs text-[#2d6a4f] hover:underline font-medium"&gt;</span>
+<span class="bad">  Ai uitat parola?</span>
+<span class="bad">&lt;/button&gt;   {/* ← no onClick — clicking does nothing */}</span>
+</pre>
+
+      <div class="issue-label">Recommendation</div>
+      <p>Either implement password reset via <code>supabase.auth.resetPasswordForEmail(email)</code>, or replace with a <code>&lt;Link href="/reset-password"&gt;</code> leading to a reset page. At minimum, show a toast guiding the user.</p>
+    </div>
+  </div>
+
+  <hr class="section" />
+
+  <!-- Prior fixes confirmed clean -->
+  <div class="section-title">✅ Previous Issues — Confirmed Fixed</div>
+  <p style="color:#64748b;font-size:13px;margin-bottom:16px;">All 9 issues from the prior QA pass were verified in the current codebase (commit 7d250f6).</p>
+  <div class="prior-grid">
+    <div class="prior-item">
+      <span class="check">✓</span>
+      <div><strong>C-1</strong> <span>— /admin-cp, /setari, /print in middleware isAppPage</span></div>
+    </div>
+    <div class="prior-item">
+      <span class="check">✓</span>
+      <div><strong>C-2</strong> <span>— D112 API body parsing guarded + year/month range validation</span></div>
+    </div>
+    <div class="prior-item">
+      <span class="check">✓</span>
+      <div><strong>H-1</strong> <span>— .limit(500/1000) on arendatori, contracte, plati, rapoarte</span></div>
+    </div>
+    <div class="prior-item">
+      <span class="check">✓</span>
+      <div><strong>H-2</strong> <span>— toast.error() + early return on list query failures</span></div>
+    </div>
+    <div class="prior-item">
+      <span class="check">✓</span>
+      <div><strong>H-3</strong> <span>— Print pages: getUser() hoisted, user_id filter on contracts + company_settings + invoices</span></div>
+    </div>
+    <div class="prior-item">
+      <span class="check">✓</span>
+      <div><strong>H-4</strong> <span>— templates.ts: removed includes('System default') check</span></div>
+    </div>
+    <div class="prior-item">
+      <span class="check">✓</span>
+      <div><strong>M-1</strong> <span>— Dead code PLACEHOLDERS + STARTER_HTML (~240 lines) deleted from admin-cp</span></div>
+    </div>
+    <div class="prior-item">
+      <span class="check">✓</span>
+      <div><strong>M-2</strong> <span>— setari + print pages: .eq('user_id', user.id) + .maybeSingle() on company_settings</span></div>
+    </div>
+    <div class="prior-item">
+      <span class="check">✓</span>
+      <div><strong>M-3</strong> <span>— supabase-migration-admin.sql: grant_admin() recovery function added</span></div>
+    </div>
+  </div>
+
+  <hr class="section" />
+
+  <!-- Scoring breakdown -->
+  <div class="section-title">Scoring Breakdown</div>
+  <table>
+    <thead>
+      <tr><th>Category</th><th>Score</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Authentication &amp; Session Management</td><td><strong>9/10</strong></td><td>Middleware uses getUser() correctly. Login redirect fixed. Auth callback sound. Minor: callback open redirect (N-L1).</td></tr>
+      <tr><td>Authorization / Data Ownership</td><td><strong>7/10</strong></td><td>Print pages, setari fixed. Parceles and D112 page missing user_id filter (N-H1/N-M2). RLS is a safety net but not a replacement.</td></tr>
+      <tr><td>Input Validation</td><td><strong>7/10</strong></td><td>D112 API now validates. APIA API still unguarded (N-H2). Fitosanitar search filter injection (N-M5).</td></tr>
+      <tr><td>Error Handling</td><td><strong>6/10</strong></td><td>Main list pages fixed. Parceles, transaction form, loadProducts(), dashboard still missing error handling (N-H1, N-M3, N-M4, N-M6).</td></tr>
+      <tr><td>Data Integrity</td><td><strong>7/10</strong></td><td>Limits added to key pages. Parceles still unbounded. Dashboard queries wrong table (N-M6). Mojibake bug (N-M1).</td></tr>
+      <tr><td>Code Quality</td><td><strong>8/10</strong></td><td>Dead code removed (M-1). Small residuals: dead button (N-L2), minor encoding bug (N-M1).</td></tr>
+      <tr><td>SQL / Database Security</td><td><strong>8/10</strong></td><td>RLS policies in place. Admin grant function added. Filter injection risk low but present (N-M5).</td></tr>
+      <tr style="font-weight:700;background:#f8fafc"><td>Overall</td><td><strong>7.2 / 10</strong></td><td>Significant improvement from 5.5 → 7.2 after prior fixes. 10 new issues found; fixing all would bring to ~8.5/10.</td></tr>
+    </tbody>
+  </table>
+
+  <hr class="section" />
+
+  <!-- Fix priority -->
+  <div class="section-title">Recommended Fix Priority</div>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Issue</th><th>Effort</th><th>Impact</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td><span class="badge badge-high">N-H2</span> APIA route unguarded req.json()</td><td>5 min</td><td>Prevents 500 crash on bad input</td></tr>
+      <tr><td>2</td><td><span class="badge badge-medium">N-M2</span> D112 page company_settings user filter</td><td>10 min</td><td>Data isolation, mirrors existing fix in setari</td></tr>
+      <tr><td>3</td><td><span class="badge badge-high">N-H1</span> Parcele page .limit() + error handling</td><td>5 min</td><td>Performance + UX</td></tr>
+      <tr><td>4</td><td><span class="badge badge-medium">N-M1</span> Mojibake em-dash in plati/page.tsx</td><td>1 min</td><td>UI correctness</td></tr>
+      <tr><td>5</td><td><span class="badge badge-medium">N-M6</span> Dashboard payments table + limits</td><td>20 min</td><td>Fixes broken stat card</td></tr>
+      <tr><td>6</td><td><span class="badge badge-medium">N-M3</span> Transaction form Promise.all error handling</td><td>5 min</td><td>UX feedback on load failure</td></tr>
+      <tr><td>7</td><td><span class="badge badge-medium">N-M4</span> loadProducts() error handling</td><td>3 min</td><td>Silent failure fix</td></tr>
+      <tr><td>8</td><td><span class="badge badge-medium">N-M5</span> Fitosanitar filter injection</td><td>10 min</td><td>Security hardening</td></tr>
+      <tr><td>9</td><td><span class="badge badge-low">N-L1</span> Auth callback open redirect</td><td>5 min</td><td>OWASP best practice</td></tr>
+      <tr><td>10</td><td><span class="badge badge-low">N-L2</span> Forgot password dead button</td><td>30 min</td><td>UX improvement (requires password reset flow)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Generated 2026-05-28 · ArendaPro QA Audit · Next.js 15 · Supabase · Cloudflare Pages
+  </div>
+</div>
+</body>
+</html>
