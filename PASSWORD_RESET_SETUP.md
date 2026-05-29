@@ -1,156 +1,118 @@
-# Password Reset Flow Setup Guide
+# Password Reset — Setup Guide for arendapro.com
 
-## Current Flow
+## How the flow works (end to end)
 
-1. User clicks "Ai uitat parola?" → triggers `handleForgotPassword()`
-2. Supabase sends reset email via Resend to user's email
-3. Email contains link: `YOUR_APP_URL/auth/callback?code=XXX&next=/reset-password`
-4. User clicks link → `/auth/callback` exchanges code for session → redirects to `/reset-password`
-5. User enters new password → `updateUser({ password })` → success page → redirect to dashboard
+```
+User enters email → clicks "Ai uitat parola?"
+  → app calls Supabase resetPasswordForEmail()
+    → Supabase/Resend sends email with a one-time link
+      → user clicks link in email
+        → browser hits: https://arendapro.com/auth/callback?code=XXX&next=/reset-password
+          → /auth/callback exchanges the code for a session
+            → redirects to: https://arendapro.com/reset-password
+              → user enters new password → done
+```
 
-## ⚠️ Issue: "Nothing happens when I click the reset link"
-
-**Possible causes:**
-- ❌ Resend not configured in Supabase
-- ❌ Email is not being sent at all
-- ❌ Redirect URL in email template is pointing to wrong domain
-- ❌ Session exchange failing silently
+No manual URL changes needed in the code — it's already wired correctly.
+You only need to configure **3 places in Supabase Dashboard**.
 
 ---
 
-## Setup Steps (Required)
+## Step 1 — Set the Site URL
 
-### Step 1: Verify Resend is configured in Supabase
+**Supabase Dashboard → Project Settings → Authentication → URL Configuration**
 
-**Go to:** Supabase Dashboard → Project → Authentication → Email Templates
-
-**Check:**
-- Provider should be "Custom SMTP" or "Resend"
-- If using "Custom SMTP", you should have:
-  - SMTP Host: `smtp.resend.dev` (for Resend)
-  - SMTP Port: `587`
-  - SMTP User: `resend` (or your Resend API key)
-  - SMTP Pass: Your Resend API key
-
-**If not configured:**
-1. Get your Resend API key from https://resend.com/api-keys
-2. Set up Custom SMTP with Resend details in Supabase
-
-### Step 2: Check Email Template Configuration
-
-**In Supabase → Authentication → Email Templates → "Reset Password" template:**
-
-**Verify the "Redirect URL" is set to:**
+Set **Site URL** to:
 ```
-https://YOUR_DOMAIN/auth/callback
-```
-
-(Do NOT include `?code=` or `&next=` — Supabase adds these automatically)
-
-### Step 3: Test the Reset Flow
-
-1. Go to `https://YOUR_DOMAIN/login`
-2. Click "Ai uitat parola?"
-3. Enter an email address
-4. Check the email (including spam folder)
-5. Click the reset link in the email
-6. You should be redirected to `/reset-password` page
-
-**If you don't get an email:**
-- Check Supabase Logs: Authentication → Logs
-- Look for `ResetPasswordForEmail` entries
-- Check error messages
-
-**If you get an error on the reset page:**
-- Open browser DevTools → Console tab
-- Look for error messages
-- Check the Network tab to see if the auth callback succeeded
-
----
-
-## Debug Checklist
-
-### ✅ Email is being sent but reset not working
-```
-Issue: Email arrives, but clicking link shows error or redirects to login
-Solution: Check Session Exchange
-- The /auth/callback route handles code exchange
-- Make sure redirectTo parameter in resetPasswordForEmail matches your domain
-```
-
-### ✅ No email arrives
-```
-Issue: User doesn't receive reset email
-Solution: Check SMTP config
-1. Verify Resend API key is correct in Supabase
-2. Check Supabase logs for errors
-3. Test with a different email address
-4. Check email spam folder
-```
-
-### ✅ Reset page loads but submit fails
-```
-Issue: Can set password but get error on submit
-Solution: 
-- Check browser console for auth errors
-- Verify session was successfully created by auth callback
-- Make sure user is authenticated before calling updateUser()
+https://arendapro.com
 ```
 
 ---
 
-## Code Reference
+## Step 2 — Add the Redirect URL to the Allowlist
 
-**In `apps/web/src/app/(auth)/login/page.tsx`:**
-```typescript
-async function handleForgotPassword() {
-  if (!email) { toast.error('Introduceți email-ul mai întâi.'); return }
-  const { error } = await createClient().auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
-  })
-  // ^ This URL must match your actual domain
-  if (error) toast.error(error.message)
-  else toast.success('Email de resetare trimis! Verificați căsuța poștală și urmați linkul.')
-}
+**Same page → Redirect URLs section → Add URL**
+
+Add this exact URL:
+```
+https://arendapro.com/auth/callback
 ```
 
-**In `apps/web/src/app/auth/callback/route.ts`:**
-```typescript
-// Already handles code exchange and redirects to /reset-password
-// No changes needed here
-```
-
-**In `apps/web/src/app/(auth)/reset-password/page.tsx`:**
-```typescript
-async function handleSubmit(e: React.FormEvent) {
-  // ... validation ...
-  const { error } = await createClient().auth.updateUser({ password })
-  if (error) { toast.error('Eroare: ' + error.message); return }
-  setDone(true)
-  // Auto-redirect after 2.5s
-}
-```
+> Without this, Supabase will block the redirect and the reset link won't work.
 
 ---
 
-## Quick Test
+## Step 3 — Configure Email Sending via Resend
 
-Run this in browser console while logged out:
-```javascript
-const email = 'your-email@example.com';
-// Check if Supabase is initialized
-console.log(supabase);
-// Try to trigger reset
-// (You'll need access to Supabase client from the page)
-```
+**Supabase Dashboard → Project Settings → Authentication → SMTP Settings**
+
+Enable "Custom SMTP" and fill in:
+
+| Field | Value |
+|---|---|
+| Host | `smtp.resend.dev` |
+| Port | `587` |
+| Username | `resend` |
+| Password | your Resend API key (from https://resend.com/api-keys) |
+| Sender name | `ArendaPro` |
+| Sender email | `noreply@arendapro.com` (must be a verified domain in Resend) |
+
+> If you haven't verified `arendapro.com` in Resend yet:
+> 1. Go to https://resend.com/domains
+> 2. Add `arendapro.com`
+> 3. Add the DNS records they give you (TXT/MX records) to your domain registrar
+> 4. Click "Verify" in Resend after adding DNS records
 
 ---
 
-## Production Checklist
+## Step 4 — Verify the Email Template (optional but recommended)
 
-Before deploying to production:
-- ✅ Resend API key configured in Supabase
-- ✅ Email template redirect URL set to production domain
-- ✅ Test reset flow on staging environment
-- ✅ Verify emails arrive from `noreply@resend.dev` or your Resend sender domain
-- ✅ Check that callback redirects work on your deployed domain
+**Supabase Dashboard → Authentication → Email Templates → Reset Password**
+
+The template already contains a reset link placeholder. You don't need to change it.
+
+Just confirm the template has `{{ .ConfirmationURL }}` somewhere — that's the link Supabase generates, which will point to:
+```
+https://arendapro.com/auth/callback?code=XXX&next=/reset-password
+```
+
+> The `redirectTo` is passed from the code automatically — you don't add `?next=` manually in the template.
+
+---
+
+## Test the flow
+
+1. Go to **https://arendapro.com/login**
+2. Enter a real email address in the field
+3. Click **"Ai uitat parola?"** (do NOT click Login)
+4. You should see a green toast: _"Email de resetare trimis!"_
+5. Check your inbox (and spam folder)
+6. Click the link in the email
+7. You should land on **https://arendapro.com/reset-password** with the password form
+8. Enter new password → click Salvează → success screen → redirects to dashboard
+
+---
+
+## Troubleshooting
+
+**Toast says error / nothing happens after clicking "Ai uitat parola?"**
+- Supabase SMTP not configured → do Step 3 above
+- Check: Supabase Dashboard → Logs → Auth for error details
+
+**Email arrives but clicking the link shows "Invalid link" or redirects to login**
+- Redirect URL not in allowlist → do Step 2 above
+- Check that Site URL in Step 1 matches exactly (no trailing slash)
+
+**Reset page loads but shows "Se încarcă sesiunea..." forever**
+- The `?code=` was not exchanged successfully
+- Check: Supabase Logs → Auth → look for `exchangeCodeForSession` errors
+- Most common cause: Redirect URL not in allowlist (Step 2)
+
+**Reset page form appears but submit gives "Auth session missing" error**
+- Same root cause — session was not created from the code exchange
+- Fix: Step 2 (add callback URL to allowlist)
+
+**Email never arrives even after SMTP is configured**
+- Sender domain `arendapro.com` not verified in Resend → do domain verification (Step 3)
+- Resend free tier: can only send to verified email addresses — upgrade or verify domain
+- Check Resend dashboard → Logs for delivery status
