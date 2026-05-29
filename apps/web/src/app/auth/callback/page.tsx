@@ -58,8 +58,8 @@ function AuthCallbackInner() {
             setError('Sesiune invalidă. Solicitați un nou link de resetare.')
             return
           }
-          // For recovery type, always go to reset-password regardless of `next`
-          const destination = type === 'recovery' ? '/reset-password' : next
+          // Route by type
+          const destination = type === 'recovery' ? '/reset-password' : type === 'invite' ? '/set-password' : next
           window.location.replace(destination)
           return
         }

@@ -41,8 +41,8 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 flex-col relative overflow-hidden" style={{ background: '#0d2010' }}>
         {/* Background photo */}
         <img
-          src="https://images.unsplash.com/photo-1574943320219-553eb213f72d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=1080"
-          alt="Câmp agricol"
+          src="https://plus.unsplash.com/premium_photo-1661963674367-2be0751cce72?q=80&w=1535&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+          alt="Combina pe câmp"
           className="absolute inset-0 w-full h-full object-cover object-center"
           style={{ opacity: 0.45 }}
         />
@@ -197,7 +197,7 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-gray-400 mt-6">
             Nu ai cont?{' '}
-            <a href="mailto:admin@arenda.ro" className="text-[#16a34a] hover:underline font-semibold">Contactează administratorul</a>
+            <a href="mailto:Admin@ArendaPro.com" className="text-[#16a34a] hover:underline font-semibold">Contactează-ne pe email la Admin@ArendaPro.com pentru ofertă detaliată</a>
           </p>
         </div>
 
