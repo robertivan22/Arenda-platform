@@ -614,6 +614,14 @@ export default function MapParcelSelector({
     setShowLegendAdd(false)
   }
 
+  function deleteLegendItem(id: string) {
+    setLegendItems(prev => {
+      const updated = prev.filter(item => item.id !== id)
+      localStorage.setItem('map_legend_items', JSON.stringify(updated))
+      return updated
+    })
+  }
+
   function getLegendForParcel(parcelId: string) {
     const legendId = parcelLegendMap[parcelId]
     return legendItems.find(item => item.id === legendId)
@@ -888,9 +896,16 @@ export default function MapParcelSelector({
             </div>
             <div className="p-3 space-y-2 bg-white">
               {legendItems.map(item => (
-                <div key={item.id} className="flex items-center gap-2 text-sm text-gray-700">
-                  <span className="inline-block w-3 h-3 rounded-full border border-gray-200" style={{ backgroundColor: item.color }} />
-                  <span>{item.label}</span>
+                <div key={item.id} className="flex items-center gap-2 text-sm text-gray-700 group">
+                  <span className="inline-block w-3 h-3 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: item.color }} />
+                  <span className="flex-1">{item.label}</span>
+                  <button
+                    onClick={() => deleteLegendItem(item.id)}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                    title="Șterge"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </div>
               ))}
               {showLegendAdd && (

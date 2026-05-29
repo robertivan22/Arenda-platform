@@ -38,77 +38,107 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* ── Left panel ─────────────────────────────────────────────────── */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 flex-col relative overflow-hidden" style={{ background: '#0d2010' }}>
         {/* Background photo */}
         <img
-          src="https://images.unsplash.com/photo-1717702576954-c07131c54169?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwzfHxhZ3JpY3VsdHVyYWwlMjB0cmFjdG9yJTIwZmllbGQlMjBnb2xkZW58ZW58MXx8fHwxNzc5OTY0ODI2fDA&ixlib=rb-4.1.0&q=80&w=1080"
-          alt="Tractor pe câmp la apus"
+          src="https://images.unsplash.com/photo-1574943320219-553eb213f72d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=1080"
+          alt="Câmp agricol"
           className="absolute inset-0 w-full h-full object-cover object-center"
+          style={{ opacity: 0.45 }}
         />
-        {/* Dark green overlay */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, rgba(22,42,22,0.93) 0%, rgba(26,51,32,0.82) 45%, rgba(15,34,16,0.72) 100%)' }} />
-        {/* Logo */}
+        {/* Dark overlay */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(8,24,10,0.55) 0%, rgba(10,28,12,0.7) 60%, rgba(6,18,8,0.92) 100%)' }} />
+
+        {/* Logo top-left */}
         <div className="px-10 pt-10 flex items-center gap-3 relative z-10">
-          <div className="w-9 h-9 rounded-lg bg-amber-500 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)' }}>
             <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C8.5 2 6 4.5 6 4.5S3 7 3 10.5c0 2.8 1.8 5.2 4 6.5V20h2v-2h6v2h2v-3c2.2-1.3 4-3.7 4-6.5C21 7 18 2 12 2zm-2 14H8v-1.5C6.8 13.6 6 12.1 6 10.5 6 8 7.8 5.5 10 4.3V16zm6 0h-2V4.3c2.2 1.2 4 3.7 4 6.2 0 1.6-.8 3.1-2 4V16z"/>
+              <path d="M17,8C8,10,5.9,16.17,3.82,21.34L5.71,22l1-2.3A4.49,4.49,0,0,0,8,20C19,20,22,3,22,3,21,5,14,5.25,9,6.25S2,11.5,2,13.5a6.22,6.22,0,0,0,.05,1A10.66,10.66,0,0,1,8.26,9.4C8.26,9.4,4,11,4,13h0c0-2,7-4.9,13-5C17,8,17,8,17,8Z"/>
             </svg>
           </div>
-          <span className="text-xl font-bold text-white">Arenda<span className="text-amber-400">Pro</span></span>
+          <div className="flex flex-col leading-none">
+            <span className="text-xl font-extrabold text-white tracking-wide">ArendaPro</span>
+            <span className="text-[10px] font-semibold text-amber-400/80 tracking-[0.2em] uppercase mt-0.5">Platformă agricolă</span>
+          </div>
         </div>
 
-        {/* Center content */}
-        <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-10">
-          <h2 className="text-3xl font-bold text-white text-center mb-3 leading-tight drop-shadow-lg">
-            Platforma ta de<br />management agricol
+        {/* Center hero */}
+        <div className="flex-1 flex flex-col justify-center relative z-10 px-10">
+          <div className="inline-block mb-5">
+            <span className="px-3 py-1.5 rounded-full border border-amber-500/40 text-amber-400 text-xs font-semibold tracking-wider uppercase">
+              Platformă dedicată arendatorilor
+            </span>
+          </div>
+          <h2 className="text-4xl font-extrabold text-white leading-tight mb-4">
+            Gestionează<br />
+            <span style={{ color: '#4ade80' }}>terenurile agricole</span><br />
+            cu ușurință
           </h2>
-          <p className="text-[#74c69d] text-center text-sm leading-relaxed max-w-xs drop-shadow">
-            Gestionează arendatorii, contractele și parcelele din un singur loc, rapid și eficient.
+          <p className="text-white/55 text-sm leading-relaxed max-w-xs mb-8">
+            Contracte, arendatori, parcele și plăți — totul centralizat într-o singură platformă modernă.
           </p>
+          {/* Feature pills */}
+          <div className="flex flex-wrap gap-2">
+            {['Contracte digitale', 'Hartă parcele', 'Plăți restante', 'Rapoarte'].map(t => (
+              <span key={t} className="px-3 py-1.5 rounded-full border border-white/20 text-white/70 text-xs font-medium">
+                {t}
+              </span>
+            ))}
+          </div>
         </div>
 
-        {/* Feature pills */}
-        <div className="px-10 pb-10 flex flex-wrap gap-2 relative z-10">
-          {['Contracte digitale', 'Declarații', 'Plăți automate', 'Rapoarte'].map(t => (
-            <span key={t} className="px-3 py-1 rounded-full border border-[#2d6a4f] text-[#74c69d] text-xs font-medium">{t}</span>
-          ))}
+        {/* Wheat illustration at bottom */}
+        <div className="relative z-10 pointer-events-none select-none" style={{ height: 90 }}>
+          <svg viewBox="0 0 700 90" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="90" preserveAspectRatio="xMidYMax meet">
+            <rect x="0" y="72" width="700" height="18" fill="#061208"/>
+            {[35,90,145,200,255,310,365,420,475,530,585,640].map((x, i) => {
+              const h = 12 + (i % 3) * 8
+              const top = 72 - h
+              return (
+                <g key={x}>
+                  <line x1={x} y1="72" x2={x} y2={top + 4} stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
+                  <ellipse cx={x - 5} cy={top + 7} rx="4" ry="2.5" fill="#e8b84b" transform={`rotate(-30 ${x - 5} ${top + 7})`}/>
+                  <ellipse cx={x + 5} cy={top + 7} rx="4" ry="2.5" fill="#e8b84b" transform={`rotate(30 ${x + 5} ${top + 7})`}/>
+                  <ellipse cx={x - 5} cy={top + 17} rx="4" ry="2.5" fill="#d4a035" transform={`rotate(-30 ${x - 5} ${top + 17})`}/>
+                  <ellipse cx={x + 5} cy={top + 17} rx="4" ry="2.5" fill="#d4a035" transform={`rotate(30 ${x + 5} ${top + 17})`}/>
+                  <line x1={x} y1={top + 4} x2={x + 2} y2={top - 8} stroke="#c8a020" strokeWidth="1" strokeLinecap="round"/>
+                </g>
+              )
+            })}
+          </svg>
         </div>
-
-        {/* Footer */}
-        <div className="px-10 pb-4 text-[#52b788] text-xs relative z-10">
-          © 2026 ArendaPro — Toate drepturile rezervate
-        </div>
-
       </div>
 
       {/* ── Right panel ────────────────────────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-[#faf7f2]">
-        <div className="w-full max-w-sm">
+      <div className="flex-1 flex flex-col items-center justify-between p-8 bg-white min-h-screen">
+        <div className="w-full max-w-sm flex-1 flex flex-col justify-center">
           {/* Mobile logo */}
           <div className="flex justify-center mb-8 lg:hidden">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><path d="M12 2C8.5 2 6 4.5 6 4.5S3 7 3 10.5c0 2.8 1.8 5.2 4 6.5V20h2v-2h6v2h2v-3c2.2-1.3 4-3.7 4-6.5C21 7 18 2 12 2zm-2 14H8v-1.5C6.8 13.6 6 12.1 6 10.5 6 8 7.8 5.5 10 4.3V16zm6 0h-2V4.3c2.2 1.2 4 3.7 4 6.2 0 1.6-.8 3.1-2 4V16z"/></svg>
+              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)' }}>
+                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><path d="M17,8C8,10,5.9,16.17,3.82,21.34L5.71,22l1-2.3A4.49,4.49,0,0,0,8,20C19,20,22,3,22,3,21,5,14,5.25,9,6.25S2,11.5,2,13.5a6.22,6.22,0,0,0,.05,1A10.66,10.66,0,0,1,8.26,9.4C8.26,9.4,4,11,4,13h0c0-2,7-4.9,13-5C17,8,17,8,17,8Z"/></svg>
               </div>
-              <span className="text-xl font-bold text-[#1e3a22]">Arenda<span className="text-amber-500">Pro</span></span>
+              <div>
+                <span className="text-lg font-extrabold text-gray-900">ArendaPro</span>
+              </div>
             </div>
           </div>
 
           <h1 className="text-3xl font-bold text-gray-900 mb-1">Bun venit înapoi</h1>
-          <p className="text-sm text-gray-500 mb-8">Intră în contul tău pentru a continua</p>
+          <p className="text-sm text-gray-400 mb-8">Autentifică-te în contul tău ArendaPro</p>
 
           <form onSubmit={handleLogin} className="space-y-5">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Adresă de email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Adresă email</label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="exemplu@arenda.ro"
-                  className="w-full pl-10 pr-4 py-3 text-sm rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent transition placeholder:text-gray-300"
+                  placeholder="adresa ta de email"
+                  className="w-full pl-10 pr-4 py-3 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent transition placeholder:text-gray-300"
                   required
                   autoComplete="email"
                 />
@@ -119,7 +149,7 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-sm font-medium text-gray-700">Parolă</label>
-                <button type="button" className="text-xs text-[#2d6a4f] hover:underline font-medium" onClick={handleForgotPassword}>Ai uitat parola?</button>
+                <button type="button" className="text-xs text-[#16a34a] hover:underline font-medium" onClick={handleForgotPassword}>Ai uitat parola?</button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -128,7 +158,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-11 py-3 text-sm rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent transition"
+                  className="w-full pl-10 pr-11 py-3 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] focus:border-transparent transition"
                   required
                   autoComplete="current-password"
                 />
@@ -148,26 +178,33 @@ export default function LoginPage() {
                 type="checkbox"
                 checked={remember}
                 onChange={e => setRemember(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-[#2d6a4f] focus:ring-[#2d6a4f]"
+                className="w-4 h-4 rounded border-gray-300 text-[#16a34a] focus:ring-[#16a34a]"
               />
-              <span className="text-sm text-gray-600">Ține-mă minte</span>
+              <span className="text-sm text-gray-600">Ține-mă conectat</span>
             </label>
 
             {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center gap-2 bg-[#1e3a22] hover:bg-[#2d6a4f] text-white font-semibold py-3 rounded-xl text-sm transition-colors disabled:opacity-60"
+              className="w-full flex justify-center items-center gap-2 text-white font-semibold py-3 rounded-lg text-sm transition-colors disabled:opacity-60"
+              style={{ background: loading ? '#2d5a1b' : '#1a3a0e' }}
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading ? 'Se procesează...' : 'Conectează-te →'}
+              {loading ? 'Se procesează...' : 'Autentificare →'}
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-6">
+          <p className="text-center text-sm text-gray-400 mt-6">
             Nu ai cont?{' '}
-            <a href="mailto:admin@arenda.ro" className="text-[#2d6a4f] hover:underline font-medium">Contactează administratorul</a>
+            <a href="mailto:admin@arenda.ro" className="text-[#16a34a] hover:underline font-semibold">Contactează administratorul</a>
           </p>
+        </div>
+
+        {/* Footer */}
+        <div className="w-full flex items-center justify-between pt-6 border-t border-gray-100">
+          <p className="text-xs text-gray-400">© 2026 ArendaPro · Toate drepturile rezervate</p>
+          <button className="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xs font-bold">?</button>
         </div>
       </div>
     </div>

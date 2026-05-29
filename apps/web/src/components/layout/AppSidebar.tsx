@@ -216,7 +216,6 @@ export function AppSidebar() {
           <X className="w-4 h-4" />
         </button>
       </div>
-      <div className="mx-4 h-px bg-white/8 flex-shrink-0" />
 
       {/* ── Navigation ───────────────────── */}
       <div className="flex-1 overflow-y-auto py-2 space-y-0.5">
@@ -237,8 +236,6 @@ export function AppSidebar() {
       {/* ── Wheat illustration ────────────── */}
       <div className="px-0 pt-2 pb-2 flex-shrink-0 pointer-events-none select-none">
         <svg viewBox="0 0 400 120" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%">
-          {/* Ground */}
-          <rect x="0" y="95" width="400" height="25" fill="#0f1f0f" rx="2" />
           {/* Stalk 1 */}
           <line x1="18" y1="95" x2="18" y2="19" stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
           <ellipse cx="13" cy="22" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(-30 13 22)"/>
