@@ -13,12 +13,12 @@
  * This page must be client-side because hash fragments are never sent to the server.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
 
-export default function AuthCallbackPage() {
+function AuthCallbackInner() {
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
 
@@ -95,5 +95,22 @@ export default function AuthCallbackPage() {
         <p className="text-white/60 text-sm">Se autentifică...</p>
       </div>
     </div>
+  )
+}
+
+const Spinner = () => (
+  <div className="min-h-screen flex items-center justify-center bg-[#0f1f10]">
+    <div className="flex flex-col items-center gap-3">
+      <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+      <p className="text-white/60 text-sm">Se autentifică...</p>
+    </div>
+  </div>
+)
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <AuthCallbackInner />
+    </Suspense>
   )
 }
