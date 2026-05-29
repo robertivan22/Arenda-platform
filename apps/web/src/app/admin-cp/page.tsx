@@ -5,7 +5,7 @@ export const runtime = 'edge'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Save, ChevronDown, ChevronRight, Shield, FileText, Users, Leaf } from 'lucide-react'
+import { Save, ChevronDown, ChevronRight, Shield, FileText, Users, Leaf, MessageSquare } from 'lucide-react'
 import { CONFIG_FIELDS, getDefaults, DocConfig } from '@/lib/doc-config-fields'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -28,6 +28,17 @@ interface Permissions {
   can_declaratii: boolean
   can_fitosanitar: boolean
   can_setari: boolean
+}
+
+interface ContactMessage {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  company: string | null
+  message: string
+  is_read: boolean
+  created_at: string
 }
 
 interface Template {
@@ -72,7 +83,7 @@ const tdCls = 'px-3 py-2 text-sm text-gray-800'
 export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [tab, setTab] = useState<'users' | 'templates' | 'fitosanitar'>('users')
+  const [tab, setTab] = useState<'users' | 'templates' | 'fitosanitar' | 'messages'>('users')
 
   // Users
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -86,6 +97,9 @@ export default function AdminPage() {
   const [templates, setTemplates] = useState<Record<string, Record<DocType, Template | null>>>({})
   const [editingConfig, setEditingConfig] = useState<DocConfig>({})
   const [savingTemplate, setSavingTemplate] = useState(false)
+
+  // Messages
+  const [messages, setMessages] = useState<ContactMessage[]>([])
 
   // Fitosanitar
   interface FitoRow {
@@ -112,10 +126,11 @@ export default function AdminPage() {
   }, [])
 
   const loadAll = useCallback(async (db: ReturnType<typeof createClient>) => {
-    const [{ data: profs }, { data: perms }, { data: tmpls }] = await Promise.all([
+    const [{ data: profs }, { data: perms }, { data: tmpls }, { data: msgs }] = await Promise.all([
       db.from('profiles').select('id, email, display_name, is_admin').order('email'),
       db.from('user_permissions').select('*'),
       db.from('document_templates').select('*'),
+      db.from('contact_messages').select('*').order('created_at', { ascending: false }).limit(200),
     ])
 
     setProfiles((profs ?? []) as Profile[])
@@ -133,6 +148,7 @@ export default function AdminPage() {
       tmplMap[key][t.doc_type] = t
     })
     setTemplates(tmplMap)
+    setMessages((msgs ?? []) as ContactMessage[])
   }, [])
 
   // ── Load config into editor when user/docType changes ──────────────────────────
@@ -163,6 +179,11 @@ export default function AdminPage() {
     const current = permissions[userId] ?? { user_id: userId, ...DEFAULT_PERMS }
     const updated = { ...current, [field]: !current[field] }
     setPermissions(prev => ({ ...prev, [userId]: updated }))
+  }
+
+  async function markAsRead(id: string) {
+    const { error } = await createClient().from('contact_messages').update({ is_read: true }).eq('id', id)
+    if (!error) setMessages(prev => prev.map(m => m.id === id ? { ...m, is_read: true } : m))
   }
 
   const loadFitosanitar = useCallback(async () => {
@@ -278,6 +299,19 @@ export default function AdminPage() {
               }`}
             >{l}</button>
           ))}
+          <button
+            onClick={() => setTab('messages')}
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+              tab === 'messages' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Mesaje Contact
+            {messages.filter(m => !m.is_read).length > 0 && (
+              <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full leading-none">
+                {messages.filter(m => !m.is_read).length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -613,6 +647,68 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+        {/* ══ MESSAGES TAB ═══════════════════════════════════════════════════ */}
+        {tab === 'messages' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <MessageSquare className="w-4 h-4 text-gray-500" />
+              <h2 className="font-semibold text-gray-800">
+                Mesaje Contact ({messages.length})
+              </h2>
+              {messages.filter(m => !m.is_read).length > 0 && (
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-semibold">
+                  {messages.filter(m => !m.is_read).length} necitite
+                </span>
+              )}
+            </div>
+
+            {messages.length === 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-12 text-center text-sm text-gray-400">
+                Niciun mesaj primit încă.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {messages.map(msg => (
+                  <div
+                    key={msg.id}
+                    className={`bg-white rounded-lg border p-4 transition-colors ${
+                      !msg.is_read ? 'border-amber-300 bg-amber-50' : 'border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          {!msg.is_read && <span className="w-2 h-2 bg-amber-500 rounded-full flex-shrink-0" />}
+                          <span className="font-semibold text-gray-800 text-sm">{msg.name}</span>
+                          {msg.company && <span className="text-xs text-gray-500">· {msg.company}</span>}
+                          <span className="text-xs text-gray-400 ml-auto">
+                            {new Date(msg.created_at).toLocaleString('ro-RO')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+                          <span>✉ {msg.email}</span>
+                          {msg.phone && <span>📱 {msg.phone}</span>}
+                        </div>
+                        <p className="text-sm text-gray-700 bg-white rounded-lg p-3 border border-gray-100 leading-relaxed">
+                          {msg.message}
+                        </p>
+                      </div>
+                      {!msg.is_read && (
+                        <button
+                          onClick={() => markAsRead(msg.id)}
+                          className="flex-shrink-0 px-3 py-1.5 text-xs bg-[#1e3a22] text-white rounded-lg hover:bg-[#2d6a4f] transition-colors font-medium whitespace-nowrap"
+                        >
+                          Marchează citit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   )

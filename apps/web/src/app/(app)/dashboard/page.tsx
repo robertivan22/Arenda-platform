@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Users, FileText, MapPin, CreditCard, AlertTriangle, Clock, Plus, BarChart3 } from 'lucide-react'
+import { Users, FileText, MapPin, CreditCard, AlertTriangle, Clock, Plus, BarChart3, MessageSquare } from 'lucide-react'
 
 export const runtime = 'edge'
 
@@ -50,6 +50,8 @@ export default function DashboardPage() {
   const router = useRouter()
   const [s, setS] = useState<Stats>(EMPTY)
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [unreadMessages, setUnreadMessages] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -75,6 +77,16 @@ export default function DashboardPage() {
       const paymentsOverdueAmount = ((overdueData ?? []) as any[]).reduce((acc, p) => acc + Number(p.ron_net ?? 0), 0).toFixed(2)
       setS({ lessorsTotal: lessorsTotal ?? 0, contractsActive: contractsActive ?? 0, contractsExpiring: contractsExpiring ?? 0, parcelsTotal: (parcelsData ?? []).length, surfaceTotal, paymentsOverdue, paymentsOverdueAmount })
       setLoading(false)
+      // Admin: check for unread contact messages
+      const { data: { user } } = await db.auth.getUser()
+      if (user) {
+        const { data: profile } = await db.from('profiles').select('is_admin').eq('id', user.id).single()
+        if (profile?.is_admin) {
+          setIsAdmin(true)
+          const { count } = await db.from('contact_messages').select('id', { count: 'exact', head: true }).eq('is_read', false)
+          setUnreadMessages(count ?? 0)
+        }
+      }
     }
     load()
   }, [])
@@ -88,6 +100,28 @@ export default function DashboardPage() {
         <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-0.5">Vizualizare generală platformă</p>
       </div>
+
+      {/* Notification: unread contact messages (admin only) */}
+      {isAdmin && unreadMessages > 0 && (
+        <a
+          href="/admin-cp"
+          className="block mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 hover:bg-amber-100 transition-colors"
+          onClick={() => sessionStorage.setItem('admin_tab', 'messages')}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <MessageSquare className="w-5 h-5 text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-amber-800">
+                {unreadMessages} mesaj{unreadMessages > 1 ? 'e' : ''} nou{unreadMessages > 1 ? 'ă' : ''} de contact
+              </div>
+              <div className="text-xs text-amber-600 mt-0.5">Deschide Admin Panel → Mesaje Contact pentru a le vizualiza</div>
+            </div>
+            <span className="text-xs font-semibold text-amber-700 border border-amber-300 px-3 py-1.5 rounded-lg">Vezi →</span>
+          </div>
+        </a>
+      )}
 
       {/* Hero banner */}
       <div className="rounded-2xl mb-6 overflow-hidden relative" style={{ minHeight: '200px' }}>

@@ -195,10 +195,18 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-400 mt-6">
-            Nu ai cont?{' '}
-            <a href="mailto:Admin@ArendaPro.com" className="text-[#16a34a] hover:underline font-semibold">Contactează-ne pe email la Admin@ArendaPro.com pentru ofertă detaliată</a>
-          </p>
+          <div className="text-center mt-6 space-y-2">
+            <p className="text-sm text-gray-400">Nu ai cont?</p>
+            <a
+              href="/contact"
+              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all hover:text-white"
+              style={{ borderColor: '#1a3a0e', color: '#1a3a0e' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#1a3a0e' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+            >
+              Contactează-ne
+            </a>
+          </div>
         </div>
 
         {/* Footer */}
