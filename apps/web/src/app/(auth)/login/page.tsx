@@ -29,10 +29,10 @@ export default function LoginPage() {
   async function handleForgotPassword() {
     if (!email) { toast.error('Introduceți email-ul mai întâi.'); return }
     const { error } = await createClient().auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/profil`,
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
     })
     if (error) toast.error(error.message)
-    else toast.success('Email de resetare trimis. Verificați căsuța poștală.')
+    else toast.success('Email de resetare trimis! Verificați căsuța poștală și urmați linkul.')
   }
 
   return (
@@ -43,7 +43,7 @@ export default function LoginPage() {
         <img
           src="https://images.unsplash.com/photo-1717702576954-c07131c54169?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwzfHxhZ3JpY3VsdHVyYWwlMjB0cmFjdG9yJTIwZmllbGQlMjBnb2xkZW58ZW58MXx8fHwxNzc5OTY0ODI2fDA&ixlib=rb-4.1.0&q=80&w=1080"
           alt="Tractor pe câmp la apus"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover object-center"
         />
         {/* Dark green overlay */}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, rgba(22,42,22,0.93) 0%, rgba(26,51,32,0.82) 45%, rgba(15,34,16,0.72) 100%)' }} />

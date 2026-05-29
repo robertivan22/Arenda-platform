@@ -95,16 +95,16 @@ export default function DashboardPage() {
         <img
           src="https://images.unsplash.com/photo-1717702576954-c07131c54169?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwzfHxhZ3JpY3VsdHVyYWwlMjB0cmFjdG9yJTIwZmllbGQlMjBnb2xkZW58ZW58MXx8fHwxNzc5OTY0ODI2fDA&ixlib=rb-4.1.0&q=80&w=1080"
           alt="Tractor pe câmp la apus"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover object-center"
         />
         {/* Dark gradient overlay — text readable on left, fades right */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(100deg, rgba(15,34,16,0.92) 0%, rgba(22,51,32,0.80) 50%, rgba(0,0,0,0.25) 100%)' }} />
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(100deg, rgba(15,34,16,0.92) 0%, rgba(22,51,32,0.80) 50%, rgba(0,0,0,0.20) 100%)' }} />
         <div className="px-8 py-7 flex items-center relative z-10">
           <div>
             <p className="text-amber-400 text-xs font-semibold uppercase tracking-wider mb-2">Bun venit înapoi</p>
             <h2 className="text-2xl font-bold text-white mb-2">Platforma ta agricolă</h2>
             <p className="text-[#74c69d] text-sm mb-5 max-w-xs">
-              Gestionează arendatorii, contractele și parcelele din un singur loc.
+              Gestionează arendatorii, contractele, parcelele dintr-un singur loc.
             </p>
             <button
               onClick={() => router.push('/arendatori/nou')}
