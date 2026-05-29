@@ -14,19 +14,42 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false)
   const [sessionReady, setSessionReady] = useState(false)
 
-  // Supabase sets the session in the browser after the callback redirect.
-  // We wait for onAuthStateChange to fire with SIGNED_IN or PASSWORD_RECOVERY.
   useEffect(() => {
     const db = createClient()
-    db.auth.getUser().then(({ data: { user } }) => {
-      if (user) setSessionReady(true)
-    })
-    const { data: { subscription } } = db.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
-        setSessionReady(true)
+
+    async function init() {
+      // ── 1. Hash-based implicit flow (supabase.co/auth/v1/verify redirect) ──
+      // Supabase appends #access_token=...&refresh_token=...&type=recovery
+      const hash = window.location.hash.substring(1)
+      if (hash) {
+        const params = new URLSearchParams(hash)
+        const accessToken = params.get('access_token')
+        const refreshToken = params.get('refresh_token')
+        if (accessToken && refreshToken) {
+          const { error } = await db.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          if (!error) {
+            // Clean the hash from the URL bar without triggering a reload
+            window.history.replaceState(null, '', window.location.pathname)
+            setSessionReady(true)
+            return
+          }
+        }
       }
-    })
-    return () => subscription.unsubscribe()
+
+      // ── 2. PKCE flow — session already in cookies after callback ──
+      const { data: { user } } = await db.auth.getUser()
+      if (user) { setSessionReady(true); return }
+
+      // ── 3. Wait for onAuthStateChange (PASSWORD_RECOVERY event) ──
+      const { data: { subscription } } = db.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+          setSessionReady(true)
+        }
+      })
+      return () => subscription.unsubscribe()
+    }
+
+    init()
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {

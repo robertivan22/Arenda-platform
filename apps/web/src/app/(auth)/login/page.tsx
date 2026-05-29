@@ -29,7 +29,7 @@ export default function LoginPage() {
   async function handleForgotPassword() {
     if (!email) { toast.error('Introduceți email-ul mai întâi.'); return }
     const { error } = await createClient().auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      redirectTo: `${window.location.origin}/reset-password`,
     })
     if (error) toast.error(error.message)
     else toast.success('Email de resetare trimis! Verificați căsuța poștală și urmați linkul.')
