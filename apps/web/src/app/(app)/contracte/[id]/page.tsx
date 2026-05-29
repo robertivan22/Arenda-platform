@@ -200,7 +200,7 @@ export default function ContractDashboardPage() {
           <div className="flex items-center gap-2">
             <div className="text-right mr-2">
               <div className="text-xs text-gray-400">Suprafata totala</div>
-              <div className="text-xl font-bold text-brand-700">{totalHa.toFixed(4)} ha</div>
+              <div className="text-xl font-bold text-brand-700">{Number(totalHa.toFixed(4))} ha</div>
             </div>
             <button onClick={() => window.open(`/print/contract/${id}`, '_blank')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-brand-300 text-brand-700 bg-brand-50 rounded hover:bg-brand-100">
               <FileText className="w-3.5 h-3.5" /> Contract PDF
@@ -217,7 +217,7 @@ export default function ContractDashboardPage() {
           {rentLevels.map((r, i) => (
             <div key={i} className="text-xs text-green-300">{r.level_per_ha} {r.product_name}/ha {r.level_type}</div>
           ))}
-          {totalHa > 0 && <div className="text-sm font-bold mt-1">{totalHa.toFixed(4)} ha</div>}
+          {totalHa > 0 && <div className="text-sm font-bold mt-1">{Number(totalHa.toFixed(4))} ha</div>}
         </div>
       </div>
 
@@ -236,7 +236,7 @@ export default function ContractDashboardPage() {
                 <td className={tdCls}>{lc.id === id ? rentLevels.map((r, i) => <div key={i} className="text-xs">{r.level_per_ha} {r.product_name}/ha {r.level_type}</div>) : null}</td>
                 <td className={tdCls}>{lc.id === id ? (parcels.map(p => p.tarla_nr).filter(Boolean).join(', ') || '—') : '—'}</td>
                 <td className={tdCls}>{lc.id === id ? (parcels.map(p => p.parcel_nr).filter(Boolean).join(', ') || '—') : '—'}</td>
-                <td className={tdCls + ' font-semibold'}>{lc.id === id ? totalHa.toFixed(4) : ''}</td>
+                <td className={tdCls + ' font-semibold'}>{lc.id === id ? Number(totalHa.toFixed(4)) : ''}</td>
                 <td className={tdCls}><span className={`text-xs px-1.5 py-0.5 rounded ${lc.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{lc.status}</span></td>
               </tr>
             ))}

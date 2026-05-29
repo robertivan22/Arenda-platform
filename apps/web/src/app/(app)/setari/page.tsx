@@ -30,12 +30,24 @@ interface D112Settings {
 }
 
 interface AsiguratorSettings {
-  asig_denumire_cas: string       // Denumire completă CAS (ex: Casa Județeană de Asigurări PH)
-  asig_nr_contract_cas: string    // Nr. contract cu CAS
-  asig_data_contract_cas: string  // Data contract CAS
-  asig_cont_plata: string         // Cont IBAN plată contribuții CASS
-  asig_banca_plata: string        // Banca cont plată contribuții
-  asig_cod_unic: string           // Cod unic înregistrare la CAS
+  // Identificare
+  asig_cnp: string
+  asig_cnp_anterior: string
+  asig_nume: string
+  asig_prenume: string
+  asig_nume_anterior: string
+  asig_prenume_anterior: string
+  // Date asigurare
+  asig_data_ang: string       // dataAng — Dată intrare în categ. asigurat
+  asig_data_sf: string        // dataSf — Dată iesire din categ. asigurat
+  asig_cis: string            // cisAsig — Cod unic CIS
+  asig_casa_sn: string        // casaSn — Casa de asigurări a asiguratului
+  // Statut asigurare
+  asig_ci: string             // asigCI — 1-asigurat / 2-neasigurat concedii
+  asig_so: string             // asigSO — 1-asigurat / 2-neasigurat somaj
+  asig_scu: string            // asigScu — PF scutita plata impozit venit
+  asig_exc: string            // asigExc — exceptat CAS+CASS salariu minim
+  asig_motiv_exc: string      // motivExc — motiv exceptare
 }
 
 interface Product {
@@ -61,8 +73,13 @@ export default function SetariPage() {
   const [d112, setD112] = useState<D112Settings>(EMPTY_D112)
   const [savingD112, setSavingD112] = useState(false)
   const [asigurator, setAsigurator] = useState<AsiguratorSettings>({
-    asig_denumire_cas: '', asig_nr_contract_cas: '', asig_data_contract_cas: '',
-    asig_cont_plata: '', asig_banca_plata: '', asig_cod_unic: '',
+    asig_cnp: '', asig_cnp_anterior: '',
+    asig_nume: '', asig_prenume: '',
+    asig_nume_anterior: '', asig_prenume_anterior: '',
+    asig_data_ang: '', asig_data_sf: '',
+    asig_cis: '', asig_casa_sn: '',
+    asig_ci: '1', asig_so: '1',
+    asig_scu: '', asig_exc: '0', asig_motiv_exc: '',
   })
   const [savingAsig, setSavingAsig] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
@@ -95,12 +112,21 @@ export default function SetariPage() {
           d112_functie_declar: (data as any).d112_functie_declar ?? 'Administrator',
         })
         setAsigurator({
-          asig_denumire_cas: (data as any).asig_denumire_cas ?? '',
-          asig_nr_contract_cas: (data as any).asig_nr_contract_cas ?? '',
-          asig_data_contract_cas: (data as any).asig_data_contract_cas ?? '',
-          asig_cont_plata: (data as any).asig_cont_plata ?? '',
-          asig_banca_plata: (data as any).asig_banca_plata ?? '',
-          asig_cod_unic: (data as any).asig_cod_unic ?? '',
+          asig_cnp: (data as any).asig_cnp ?? '',
+          asig_cnp_anterior: (data as any).asig_cnp_anterior ?? '',
+          asig_nume: (data as any).asig_nume ?? '',
+          asig_prenume: (data as any).asig_prenume ?? '',
+          asig_nume_anterior: (data as any).asig_nume_anterior ?? '',
+          asig_prenume_anterior: (data as any).asig_prenume_anterior ?? '',
+          asig_data_ang: (data as any).asig_data_ang ?? '',
+          asig_data_sf: (data as any).asig_data_sf ?? '',
+          asig_cis: (data as any).asig_cis ?? '',
+          asig_casa_sn: (data as any).asig_casa_sn ?? '',
+          asig_ci: (data as any).asig_ci ?? '1',
+          asig_so: (data as any).asig_so ?? '1',
+          asig_scu: (data as any).asig_scu ?? '',
+          asig_exc: (data as any).asig_exc ?? '0',
+          asig_motiv_exc: (data as any).asig_motiv_exc ?? '',
         })
       }
     })
@@ -445,85 +471,146 @@ export default function SetariPage() {
       {tab === 'asigurator' && (
         <form onSubmit={saveAsigurator}>
           <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-5">
-            <p className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-3 space-y-1">
-              <strong className="block">Date asigurător — mapate în XML D112</strong>
-              Aceste date descriu <strong>Casa de Asigurări de Sănătate (CAS)</strong> la care este înregistrat angajatorul.
-              În XML D112, câmpurile se regăsesc în secțiunea <code>Angajator › CasaAngajatorCod</code> și
-              în blocul de contribuții. Codul CAS (<em>d112_casa_ang</em>) este deja configurat în tab-ul
-              <em> Date Declarație 112</em> — acest tab completează datele suplimentare necesare pentru contractul de asigurare.
-            </p>
 
+            {/* Section: DATE DE IDENTIFICARE ASIGURAT */}
             <div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-1 border-b border-gray-100">
-                Identificare CAS / Asigurător
+                DATE DE IDENTIFICARE ASIGURAT — Anexa 1.2 D112
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className={labelCls}>Denumire CAS angajator <span className="text-gray-400">(XML: <code>NumeCAS</code>)</span></label>
-                  <input className={inputCls}
-                    value={asigurator.asig_denumire_cas}
-                    onChange={e => setAsigurator(p => ({ ...p, asig_denumire_cas: e.target.value }))}
-                    placeholder="ex. Casa Județeană de Asigurări de Sănătate Prahova" />
+                <div>
+                  <label className={labelCls}>1. CNP / NIF <span className="text-gray-400 font-normal">(cnp)</span></label>
+                  <input className={inputCls} maxLength={13}
+                    value={asigurator.asig_cnp}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_cnp: e.target.value }))}
+                    placeholder="ex. 1234567890123" />
                 </div>
                 <div>
-                  <label className={labelCls}>Cod unic CAS <span className="text-gray-400">(XML: <code>CodUnicAsig</code>)</span></label>
+                  <label className={labelCls}>2. CNP / NIF anterior <span className="text-gray-400 font-normal">(cnpAnt)</span></label>
+                  <input className={inputCls} maxLength={13}
+                    value={asigurator.asig_cnp_anterior}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_cnp_anterior: e.target.value }))} />
+                </div>
+                <div>
+                  <label className={labelCls}>3. Nume <span className="text-gray-400 font-normal">(numeSn)</span></label>
                   <input className={inputCls}
-                    value={asigurator.asig_cod_unic}
-                    onChange={e => setAsigurator(p => ({ ...p, asig_cod_unic: e.target.value }))}
-                    placeholder="ex. RO12345678" />
+                    value={asigurator.asig_nume}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_nume: e.target.value.toUpperCase() }))}
+                    placeholder="ex. POPESCU" />
+                </div>
+                <div>
+                  <label className={labelCls}>4. Nume anterior <span className="text-gray-400 font-normal">(numeAnt)</span></label>
+                  <input className={inputCls}
+                    value={asigurator.asig_nume_anterior}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_nume_anterior: e.target.value.toUpperCase() }))} />
+                </div>
+                <div>
+                  <label className={labelCls}>Prenume <span className="text-gray-400 font-normal">(prenumeSn)</span></label>
+                  <input className={inputCls}
+                    value={asigurator.asig_prenume}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_prenume: e.target.value.toUpperCase() }))}
+                    placeholder="ex. ION" />
+                </div>
+                <div>
+                  <label className={labelCls}>Prenume anterior <span className="text-gray-400 font-normal">(prenumeAnt)</span></label>
+                  <input className={inputCls}
+                    value={asigurator.asig_prenume_anterior}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_prenume_anterior: e.target.value.toUpperCase() }))} />
                 </div>
               </div>
             </div>
 
+            {/* Section: Date intrare / iesire + CIS + Casa */}
             <div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-1 border-b border-gray-100">
-                Contract asigurare
+                Date asigurare
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Nr. contract CAS <span className="text-gray-400">(XML: <code>NrContractAsig</code>)</span></label>
-                  <input className={inputCls}
-                    value={asigurator.asig_nr_contract_cas}
-                    onChange={e => setAsigurator(p => ({ ...p, asig_nr_contract_cas: e.target.value }))}
-                    placeholder="ex. 1234/2026" />
-                </div>
-                <div>
-                  <label className={labelCls}>Data contract CAS</label>
+                  <label className={labelCls}>5. Dată intrare categ. asigurat <span className="text-gray-400 font-normal">(dataAng)</span></label>
                   <input className={inputCls} type="date"
-                    value={asigurator.asig_data_contract_cas}
-                    onChange={e => setAsigurator(p => ({ ...p, asig_data_contract_cas: e.target.value }))} />
+                    value={asigurator.asig_data_ang}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_data_ang: e.target.value }))} />
+                </div>
+                <div>
+                  <label className={labelCls}>6. Dată ieșire categ. asigurat <span className="text-gray-400 font-normal">(dataSf)</span></label>
+                  <input className={inputCls} type="date"
+                    value={asigurator.asig_data_sf}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_data_sf: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>Cod unic identificare CIS <span className="text-gray-400 font-normal">(cisAsig — doar pt. NIF asigurat)</span></label>
+                  <input className={inputCls}
+                    value={asigurator.asig_cis}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_cis: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>7. Casa de asigurări de sănătate a asiguratului <span className="text-gray-400 font-normal">(casaSn)</span></label>
+                  <select className={inputCls}
+                    value={asigurator.asig_casa_sn}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_casa_sn: e.target.value }))}>
+                    <option value="">— Selectează —</option>
+                    {[...VALID_CASA_ANG].sort().map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
               </div>
             </div>
 
+            {/* Section: Status asigurare */}
             <div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-1 border-b border-gray-100">
-                Date bancare plată contribuții CASS
+                Statut asigurare
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Bancă plată contribuții <span className="text-gray-400">(XML: <code>BancaPlata</code>)</span></label>
-                  <input className={inputCls}
-                    value={asigurator.asig_banca_plata}
-                    onChange={e => setAsigurator(p => ({ ...p, asig_banca_plata: e.target.value }))}
-                    placeholder="ex. BCR, ING, BRD" />
+                  <label className={labelCls}>8. Asigurat concedii/indemnizații <span className="text-gray-400 font-normal">(asigCI)</span></label>
+                  <select className={inputCls}
+                    value={asigurator.asig_ci}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_ci: e.target.value }))}>
+                    <option value="1">1 — asigurat</option>
+                    <option value="2">2 — neasigurat</option>
+                  </select>
                 </div>
                 <div>
-                  <label className={labelCls}>Cont IBAN plată CASS <span className="text-gray-400">(XML: <code>ContPlata</code>)</span></label>
-                  <input className={inputCls}
-                    value={asigurator.asig_cont_plata}
-                    onChange={e => setAsigurator(p => ({ ...p, asig_cont_plata: e.target.value.toUpperCase() }))}
-                    placeholder="ex. RO49AAAA1B31007593840000" maxLength={34} />
+                  <label className={labelCls}>9. Asigurat șomaj <span className="text-gray-400 font-normal">(asigSO)</span></label>
+                  <select className={inputCls}
+                    value={asigurator.asig_so}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_so: e.target.value }))}>
+                    <option value="1">1 — asigurat</option>
+                    <option value="2">2 — neasigurat</option>
+                  </select>
                 </div>
+                <div>
+                  <label className={labelCls}>10. PF scutită plată impozit venit <span className="text-gray-400 font-normal">(asigScu)</span></label>
+                  <input className={inputCls}
+                    value={asigurator.asig_scu}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_scu: e.target.value }))}
+                    placeholder="cf. art. ... din CF" />
+                </div>
+                <div>
+                  <label className={labelCls}>11. Exceptat plată CAS+CASS salariu minim <span className="text-gray-400 font-normal">(asigExc)</span></label>
+                  <select className={inputCls}
+                    value={asigurator.asig_exc}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_exc: e.target.value }))}>
+                    <option value="0">0 — nu e cazul</option>
+                    <option value="1">1 — exceptat cf. art.146(5^7) CF</option>
+                    <option value="2">2 — exceptat cf. art.168(6^1) CF</option>
+                  </select>
+                </div>
+                {asigurator.asig_exc !== '0' && (
+                  <div className="col-span-2">
+                    <label className={labelCls}>12. Motiv exceptare CAS+CASS salariu minim <span className="text-gray-400 font-normal">(motivExc)</span></label>
+                    <textarea className={inputCls} rows={2}
+                      value={asigurator.asig_motiv_exc}
+                      onChange={e => setAsigurator(p => ({ ...p, asig_motiv_exc: e.target.value }))}
+                      placeholder="cf. art.146(5^7) din CF, daca e cazul" />
+                  </div>
+                )}
               </div>
-              <p className="mt-2 text-xs text-gray-400">
-                Contul IBAN al CAS-ului pentru viramentul contribuțiilor CASS reținute (cod 469).
-                Verificați pe site-ul CNAS sau al casei județene respective.
-              </p>
             </div>
 
             <button type="submit" disabled={savingAsig} className="px-5 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50">
-              {savingAsig ? 'Se salveaza...' : 'Salveaza datele asigurătorului'}
+              {savingAsig ? 'Se salveaza...' : 'Salveaza date asigurat D112'}
             </button>
           </div>
         </form>

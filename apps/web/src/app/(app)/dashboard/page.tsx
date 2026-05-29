@@ -137,7 +137,7 @@ export default function DashboardPage() {
             { label: 'Arendator nou', href: '/arendatori/nou', icon: Users },
             { label: 'Contract nou', href: '/contracte/nou', icon: FileText },
             { label: 'Parcelă nouă', href: '/parcele/nou', icon: MapPin },
-            { label: 'Plăți restante', href: '/plati', icon: AlertTriangle },
+            { label: 'Tranzacții', href: '/plati', icon: AlertTriangle },
             { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3 },
           ].map(({ label, href, icon: Icon }) => (
             <button

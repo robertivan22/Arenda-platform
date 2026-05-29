@@ -112,7 +112,7 @@ export default function ApiaPage() {
           <p><strong>Export APIA</strong> = datele necesare pentru completarea Cererii Unice de Plată (CUP) — fiecare parcelă arendată trebuie declarată cu: bloc fizic, tarla, număr parcelă, suprafață, județ, localitate.</p>
           <p><strong className="text-yellow-700">⚠ APIA NU</strong> = parcela <strong>nu are completate câmpurile obligatorii</strong> pentru APIA: <em>Bloc Fizic</em>, <em>Tarla</em> sau <em>Nr. Parcelă</em>. Accesați parcela din <strong>Gestiune → Parcele → Listă parcele</strong> și completați aceste câmpuri.</p>
           <p><strong className="text-green-700">✓ APIA DA</strong> = parcela are Bloc Fizic + Tarla + Nr. Parcelă completate — poate fi inclusă în declarația APIA.</p>
-          <p className="text-blue-600">Nota: Blocul fizic (ex: <code>AB001-221</code>) se găsește pe <a href="https://geo-spatial.org/vechi/harts/apia" target="_blank" rel="noreferrer" className="underline">harta LPIS APIA</a> sau în aplicația LPIS.</p>
+
         </div>
       </div>
 
@@ -152,7 +152,7 @@ export default function ApiaPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[
               { label: 'Parcele', value: dataset.rows.length },
-              { label: 'Suprafață totală (ha)', value: dataset.totalSurfaceHa.toFixed(4) },
+              { label: 'Suprafață totală (ha)', value: String(Number(dataset.totalSurfaceHa.toFixed(4))) },
               { label: 'Nedeclarate APIA', value: dataset.rows.filter(r => !r.apiaDeclared).length, warn: true },
             ].map(card => (
               <div key={card.label} className={`p-3 rounded-lg border ${card.warn && Number(card.value) > 0 ? 'border-yellow-200 bg-yellow-50' : 'border-gray-200 bg-white'}`}>
@@ -190,7 +190,7 @@ export default function ApiaPage() {
                     <td className="px-2.5 py-1.5">{row.parcelTarla}</td>
                     <td className="px-2.5 py-1.5">{row.parcelParcela}</td>
                     <td className="px-2.5 py-1.5">{row.parcelBlocFizic}</td>
-                    <td className="px-2.5 py-1.5 text-right">{row.leasedSurfaceHa.toFixed(4)}</td>
+                    <td className="px-2.5 py-1.5 text-right">{Number(row.leasedSurfaceHa.toFixed(4))}</td>
                     <td className="px-2.5 py-1.5">{row.countyName}</td>
                     <td className="px-2.5 py-1.5">{row.localityName}</td>
                     <td className="px-2.5 py-1.5">

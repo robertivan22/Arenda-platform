@@ -79,7 +79,7 @@ export default function ParceleListPage() {
                 <td className="px-3 py-2">{row.parcel_nr ?? '-'}</td>
                 <td className="px-3 py-2">{row.county}</td>
                 <td className="px-3 py-2">{row.locality}</td>
-                <td className="px-3 py-2 font-medium">{Number(row.surface).toFixed(4)}</td>
+                <td className="px-3 py-2 font-medium">{Number(Number(row.surface).toFixed(4))}</td>
                 <td className="px-3 py-2">{row.lessor_name}</td>
                 <td className="px-3 py-2"><span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">{row.status}</span></td>
                 <td className="px-3 py-2">
