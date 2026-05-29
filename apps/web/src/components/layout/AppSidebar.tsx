@@ -234,7 +234,7 @@ export function AppSidebar() {
       </div>
 
       {/* ── Wheat illustration ────────────── */}
-      <div className="px-2 pt-1 pb-0 flex-shrink-0 pointer-events-none select-none" style={{ opacity: 0.55 }}>
+      <div className="px-0 pt-2 pb-2 flex-shrink-0 pointer-events-none select-none">
         <svg viewBox="0 0 400 120" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%">
           {/* Ground */}
           <rect x="0" y="95" width="400" height="25" fill="#0f1f0f" rx="2" />
@@ -254,35 +254,113 @@ export function AppSidebar() {
           <line x1="18" y1="49" x2="18" y2="54" stroke="#c8973a" strokeWidth="1"/>
           <line x1="18" y1="19" x2="20" y2="8" stroke="#d4a035" strokeWidth="1" strokeLinecap="round"/>
           {/* Stalk 2 */}
-          <line x1="38" y1="95" x2="41" y2="13" stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
-          <ellipse cx="33" cy="16" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(-30 33 16)"/>
-          <ellipse cx="43" cy="16" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(30 43 16)"/>
-          <line x1="38" y1="14" x2="38" y2="19" stroke="#c8973a" strokeWidth="1"/>
-          <ellipse cx="34" cy="28" rx="4" ry="2.5" fill="#d4a035" transform="rotate(-30 34 28)"/>
-          <ellipse cx="42" cy="28" rx="4" ry="2.5" fill="#d4a035" transform="rotate(30 42 28)"/>
-          <line x1="38" y1="26" x2="38" y2="31" stroke="#c8973a" strokeWidth="1"/>
-          <ellipse cx="33" cy="38" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 33 38)"/>
-          <ellipse cx="43" cy="38" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 43 38)"/>
-          <line x1="38" y1="36" x2="38" y2="41" stroke="#c8973a" strokeWidth="1"/>
-          <ellipse cx="34" cy="48" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 34 48)"/>
-          <ellipse cx="42" cy="48" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 42 48)"/>
-          <line x1="38" y1="46" x2="38" y2="51" stroke="#c8973a" strokeWidth="1"/>
-          <line x1="41" y1="13" x2="39" y2="2" stroke="#d4a035" strokeWidth="1" strokeLinecap="round"/>
+          <line x1="60" y1="95" x2="63" y2="13" stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
+          <ellipse cx="55" cy="16" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(-30 55 16)"/>
+          <ellipse cx="65" cy="16" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(30 65 16)"/>
+          <line x1="60" y1="14" x2="60" y2="19" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="56" cy="28" rx="4" ry="2.5" fill="#d4a035" transform="rotate(-30 56 28)"/>
+          <ellipse cx="64" cy="28" rx="4" ry="2.5" fill="#d4a035" transform="rotate(30 64 28)"/>
+          <line x1="60" y1="26" x2="60" y2="31" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="55" cy="38" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 55 38)"/>
+          <ellipse cx="65" cy="38" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 65 38)"/>
+          <line x1="60" y1="36" x2="60" y2="41" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="56" cy="48" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 56 48)"/>
+          <ellipse cx="64" cy="48" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 64 48)"/>
+          <line x1="60" y1="46" x2="60" y2="51" stroke="#c8973a" strokeWidth="1"/>
+          <line x1="63" y1="13" x2="61" y2="2" stroke="#d4a035" strokeWidth="1" strokeLinecap="round"/>
           {/* Stalk 3 */}
-          <line x1="58" y1="95" x2="56" y2="25" stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
-          <ellipse cx="53" cy="28" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(-30 53 28)"/>
-          <ellipse cx="63" cy="28" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(30 63 28)"/>
-          <line x1="58" y1="26" x2="58" y2="31" stroke="#c8973a" strokeWidth="1"/>
-          <ellipse cx="53" cy="38" rx="4" ry="2.5" fill="#d4a035" transform="rotate(-30 53 38)"/>
-          <ellipse cx="63" cy="38" rx="4" ry="2.5" fill="#d4a035" transform="rotate(30 63 38)"/>
-          <line x1="58" y1="36" x2="58" y2="41" stroke="#c8973a" strokeWidth="1"/>
-          <ellipse cx="54" cy="48" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 54 48)"/>
-          <ellipse cx="62" cy="48" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 62 48)"/>
-          <line x1="58" y1="46" x2="58" y2="51" stroke="#c8973a" strokeWidth="1"/>
-          <ellipse cx="53" cy="57" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 53 57)"/>
-          <ellipse cx="63" cy="57" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 63 57)"/>
-          <line x1="58" y1="55" x2="58" y2="60" stroke="#c8973a" strokeWidth="1"/>
-          <line x1="56" y1="25" x2="58" y2="14" stroke="#d4a035" strokeWidth="1" strokeLinecap="round"/>
+          <line x1="102" y1="95" x2="100" y2="25" stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
+          <ellipse cx="97" cy="28" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(-30 97 28)"/>
+          <ellipse cx="107" cy="28" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(30 107 28)"/>
+          <line x1="102" y1="26" x2="102" y2="31" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="97" cy="38" rx="4" ry="2.5" fill="#d4a035" transform="rotate(-30 97 38)"/>
+          <ellipse cx="107" cy="38" rx="4" ry="2.5" fill="#d4a035" transform="rotate(30 107 38)"/>
+          <line x1="102" y1="36" x2="102" y2="41" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="98" cy="48" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 98 48)"/>
+          <ellipse cx="106" cy="48" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 106 48)"/>
+          <line x1="102" y1="46" x2="102" y2="51" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="97" cy="57" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 97 57)"/>
+          <ellipse cx="107" cy="57" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 107 57)"/>
+          <line x1="102" y1="55" x2="102" y2="60" stroke="#c8973a" strokeWidth="1"/>
+          <line x1="100" y1="25" x2="102" y2="14" stroke="#d4a035" strokeWidth="1" strokeLinecap="round"/>
+          {/* Stalk 4 */}
+          <line x1="144" y1="95" x2="142" y2="20" stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
+          <ellipse cx="139" cy="23" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(-30 139 23)"/>
+          <ellipse cx="149" cy="23" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(30 149 23)"/>
+          <line x1="144" y1="21" x2="144" y2="26" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="139" cy="33" rx="4" ry="2.5" fill="#d4a035" transform="rotate(-30 139 33)"/>
+          <ellipse cx="149" cy="33" rx="4" ry="2.5" fill="#d4a035" transform="rotate(30 149 33)"/>
+          <line x1="144" y1="31" x2="144" y2="36" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="140" cy="43" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 140 43)"/>
+          <ellipse cx="148" cy="43" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 148 43)"/>
+          <line x1="144" y1="41" x2="144" y2="46" stroke="#c8973a" strokeWidth="1"/>
+          <line x1="142" y1="20" x2="144" y2="9" stroke="#d4a035" strokeWidth="1" strokeLinecap="round"/>
+          {/* Stalk 5 */}
+          <line x1="186" y1="95" x2="188" y2="15" stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
+          <ellipse cx="181" cy="18" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(-30 181 18)"/>
+          <ellipse cx="191" cy="18" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(30 191 18)"/>
+          <line x1="186" y1="16" x2="186" y2="21" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="182" cy="28" rx="4" ry="2.5" fill="#d4a035" transform="rotate(-30 182 28)"/>
+          <ellipse cx="190" cy="28" rx="4" ry="2.5" fill="#d4a035" transform="rotate(30 190 28)"/>
+          <line x1="186" y1="26" x2="186" y2="31" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="181" cy="38" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 181 38)"/>
+          <ellipse cx="191" cy="38" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 191 38)"/>
+          <line x1="186" y1="36" x2="186" y2="41" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="182" cy="47" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 182 47)"/>
+          <ellipse cx="190" cy="47" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 190 47)"/>
+          <line x1="186" y1="45" x2="186" y2="50" stroke="#c8973a" strokeWidth="1"/>
+          <line x1="188" y1="15" x2="186" y2="4" stroke="#d4a035" strokeWidth="1" strokeLinecap="round"/>
+          {/* Stalk 6 */}
+          <line x1="228" y1="95" x2="230" y2="22" stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
+          <ellipse cx="223" cy="25" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(-30 223 25)"/>
+          <ellipse cx="233" cy="25" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(30 233 25)"/>
+          <line x1="228" y1="23" x2="228" y2="28" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="224" cy="35" rx="4" ry="2.5" fill="#d4a035" transform="rotate(-30 224 35)"/>
+          <ellipse cx="232" cy="35" rx="4" ry="2.5" fill="#d4a035" transform="rotate(30 232 35)"/>
+          <line x1="228" y1="33" x2="228" y2="38" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="223" cy="45" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 223 45)"/>
+          <ellipse cx="233" cy="45" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 233 45)"/>
+          <line x1="228" y1="43" x2="228" y2="48" stroke="#c8973a" strokeWidth="1"/>
+          <line x1="230" y1="22" x2="228" y2="11" stroke="#d4a035" strokeWidth="1" strokeLinecap="round"/>
+          {/* Stalk 7 */}
+          <line x1="270" y1="95" x2="268" y2="27" stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
+          <ellipse cx="265" cy="30" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(-30 265 30)"/>
+          <ellipse cx="275" cy="30" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(30 275 30)"/>
+          <line x1="270" y1="28" x2="270" y2="33" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="265" cy="40" rx="4" ry="2.5" fill="#d4a035" transform="rotate(-30 265 40)"/>
+          <ellipse cx="275" cy="40" rx="4" ry="2.5" fill="#d4a035" transform="rotate(30 275 40)"/>
+          <line x1="270" y1="38" x2="270" y2="43" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="266" cy="50" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 266 50)"/>
+          <ellipse cx="274" cy="50" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 274 50)"/>
+          <line x1="270" y1="48" x2="270" y2="53" stroke="#c8973a" strokeWidth="1"/>
+          <line x1="268" y1="27" x2="270" y2="16" stroke="#d4a035" strokeWidth="1" strokeLinecap="round"/>
+          {/* Stalk 8 */}
+          <line x1="312" y1="95" x2="314" y2="19" stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
+          <ellipse cx="307" cy="22" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(-30 307 22)"/>
+          <ellipse cx="317" cy="22" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(30 317 22)"/>
+          <line x1="312" y1="20" x2="312" y2="25" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="307" cy="32" rx="4" ry="2.5" fill="#d4a035" transform="rotate(-30 307 32)"/>
+          <ellipse cx="317" cy="32" rx="4" ry="2.5" fill="#d4a035" transform="rotate(30 317 32)"/>
+          <line x1="312" y1="30" x2="312" y2="35" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="308" cy="42" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 308 42)"/>
+          <ellipse cx="316" cy="42" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 316 42)"/>
+          <line x1="312" y1="40" x2="312" y2="45" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="307" cy="51" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 307 51)"/>
+          <ellipse cx="317" cy="51" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 317 51)"/>
+          <line x1="312" y1="49" x2="312" y2="54" stroke="#c8973a" strokeWidth="1"/>
+          <line x1="314" y1="19" x2="312" y2="8" stroke="#d4a035" strokeWidth="1" strokeLinecap="round"/>
+          {/* Stalk 9 */}
+          <line x1="354" y1="95" x2="352" y2="24" stroke="#c8973a" strokeWidth="1.5" strokeLinecap="round"/>
+          <ellipse cx="349" cy="27" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(-30 349 27)"/>
+          <ellipse cx="359" cy="27" rx="4" ry="2.5" fill="#e8b84b" transform="rotate(30 359 27)"/>
+          <line x1="354" y1="25" x2="354" y2="30" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="349" cy="37" rx="4" ry="2.5" fill="#d4a035" transform="rotate(-30 349 37)"/>
+          <ellipse cx="359" cy="37" rx="4" ry="2.5" fill="#d4a035" transform="rotate(30 359 37)"/>
+          <line x1="354" y1="35" x2="354" y2="40" stroke="#c8973a" strokeWidth="1"/>
+          <ellipse cx="350" cy="47" rx="4" ry="2.5" fill="#c8973a" transform="rotate(-30 350 47)"/>
+          <ellipse cx="358" cy="47" rx="4" ry="2.5" fill="#c8973a" transform="rotate(30 358 47)"/>
+          <line x1="354" y1="45" x2="354" y2="50" stroke="#c8973a" strokeWidth="1"/>
+          <line x1="352" y1="24" x2="354" y2="13" stroke="#d4a035" strokeWidth="1" strokeLinecap="round"/>
           {/* Ambient glow */}
           <ellipse cx="200" cy="93" rx="190" ry="9" fill="#c8973a" fillOpacity="0.07"/>
         </svg>
@@ -290,7 +368,6 @@ export function AppSidebar() {
 
       {/* ── Settings + Profile ────────────── */}
       <div className="flex-shrink-0">
-        <div className="mx-4 h-px bg-white/8" />
         <Link
           href="/setari"
           onClick={close}
