@@ -4,6 +4,72 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Search, X, MapPin, Loader2 } from 'lucide-react'
 
+// SIRUTA JUD numeric codes for all Romanian counties
+// Used to translate county names typed by users into DB codes
+const COUNTY_CODES: Array<{ code: string; names: string[] }> = [
+  { code: '1',  names: ['alba'] },
+  { code: '2',  names: ['arad'] },
+  { code: '3',  names: ['arges', 'argeș'] },
+  { code: '4',  names: ['bacau', 'bacău'] },
+  { code: '5',  names: ['bihor'] },
+  { code: '6',  names: ['bistrita-nasaud', 'bistrita nasaud', 'bistrița-năsăud', 'bistrita'] },
+  { code: '7',  names: ['botosani', 'botoșani'] },
+  { code: '8',  names: ['brasov', 'brașov'] },
+  { code: '9',  names: ['braila', 'brăila'] },
+  { code: '10', names: ['buzau', 'buzău'] },
+  { code: '11', names: ['caras-severin', 'caraș-severin', 'caras severin'] },
+  { code: '12', names: ['cluj'] },
+  { code: '13', names: ['constanta', 'constanța'] },
+  { code: '14', names: ['covasna'] },
+  { code: '15', names: ['dambovita', 'dâmbovița', 'damboviта'] },
+  { code: '16', names: ['dolj'] },
+  { code: '17', names: ['galati', 'galați'] },
+  { code: '18', names: ['gorj'] },
+  { code: '19', names: ['harghita'] },
+  { code: '20', names: ['hunedoara'] },
+  { code: '21', names: ['ialomita', 'ialomița'] },
+  { code: '22', names: ['iasi', 'iași'] },
+  { code: '23', names: ['ilfov'] },
+  { code: '24', names: ['maramures', 'maramureș'] },
+  { code: '25', names: ['mehedinti', 'mehedinți'] },
+  { code: '26', names: ['mures', 'mureș'] },
+  { code: '27', names: ['neamt', 'neamț'] },
+  { code: '28', names: ['olt'] },
+  { code: '29', names: ['prahova'] },
+  { code: '30', names: ['satu mare'] },
+  { code: '31', names: ['salaj', 'sălaj'] },
+  { code: '32', names: ['sibiu'] },
+  { code: '33', names: ['suceava'] },
+  { code: '34', names: ['teleorman'] },
+  { code: '35', names: ['timis', 'timiș'] },
+  { code: '36', names: ['tulcea'] },
+  { code: '37', names: ['vaslui'] },
+  { code: '38', names: ['valcea', 'vâlcea'] },
+  { code: '39', names: ['vrancea'] },
+  { code: '40', names: ['bucuresti', 'bucurești', 'bucharest', 'municipiul bucuresti'] },
+  { code: '51', names: ['calarasi', 'călărași'] },
+  { code: '52', names: ['giurgiu'] },
+]
+
+function norm(s: string) {
+  return s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ').trim()
+}
+
+/** Returns the DB county code if the input matches a known county name, otherwise null */
+function resolveCountyCode(input: string): string | null {
+  const n = norm(input)
+  if (!n) return null
+  for (const c of COUNTY_CODES) {
+    if (c.names.some(name => norm(name).startsWith(n) || n.startsWith(norm(name)))) {
+      return c.code
+    }
+  }
+  return null
+}
+
 interface SirutaRow {
   code: string
   name: string | null
@@ -45,11 +111,19 @@ export default function SirutaLookup({ county, locality, value, onChange, inputC
     let builder = db
       .from('siruta')
       .select('code, name, type, county')
-      .order('county', { ascending: true })
       .order('name', { ascending: true })
       .limit(80)
 
-    if (cf.trim()) builder = builder.ilike('county', `%${cf.trim()}%`)
+    if (cf.trim()) {
+      const countyCode = resolveCountyCode(cf.trim())
+      if (countyCode) {
+        builder = builder.eq('county', countyCode)
+      } else {
+        // Input might already be a numeric code
+        builder = builder.eq('county', cf.trim())
+      }
+    }
+
     if (q.trim()) {
       builder = builder.ilike('name', `%${q.trim()}%`)
     } else if (lf.trim()) {
@@ -209,7 +283,9 @@ export default function SirutaLookup({ county, locality, value, onChange, inputC
                         </td>
                         <td className="px-4 py-2 text-gray-800">{row.name ?? '—'}</td>
                         <td className="px-4 py-2 text-xs text-gray-400">{row.type ?? '—'}</td>
-                        <td className="px-4 py-2 text-xs text-gray-500">{row.county ?? '—'}</td>
+                        <td className="px-4 py-2 text-xs text-gray-500">
+                          {COUNTY_CODES.find(c => c.code === row.county)?.names[0]?.toUpperCase() ?? row.county ?? '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
