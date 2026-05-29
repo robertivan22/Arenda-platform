@@ -86,21 +86,30 @@ const DEFAULT_LEGEND_ITEMS: LegendItem[] = [
 
 // ─── Nominatim address search ────────────────────────────────────────────────
 async function searchNominatim(query: string): Promise<MapSearchResult[]> {
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=ro&addressdetails=1`,
-    { headers: { 'Accept-Language': 'ro' } },
-  )
-  const data = await res.json() as Array<{
-    lat: string; lon: string; display_name: string
-    address?: { county?: string; state?: string; city?: string; town?: string; village?: string }
-  }>
-  return data.map(r => ({
-    lat: parseFloat(r.lat),
-    lng: parseFloat(r.lon),
-    display_name: r.display_name,
-    judet: r.address?.county ?? r.address?.state ?? '',
-    localitate: r.address?.city ?? r.address?.town ?? r.address?.village ?? '',
-  }))
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=ro&addressdetails=1`,
+      { headers: { 'Accept-Language': 'ro' } },
+    )
+    if (!res.ok) {
+      console.error(`Nominatim API error: ${res.status} ${res.statusText}`)
+      return []
+    }
+    const data = await res.json() as Array<{
+      lat: string; lon: string; display_name: string
+      address?: { county?: string; state?: string; city?: string; town?: string; village?: string }
+    }>
+    return data.map(r => ({
+      lat: parseFloat(r.lat),
+      lng: parseFloat(r.lon),
+      display_name: r.display_name,
+      judet: r.address?.county ?? r.address?.state ?? '',
+      localitate: r.address?.city ?? r.address?.town ?? r.address?.village ?? '',
+    }))
+  } catch (err) {
+    console.error('Nominatim fetch error:', err)
+    return []
+  }
 }
 
 async function reverseGeocode(lat: number, lng: number) {
@@ -576,8 +585,14 @@ export default function MapParcelSelector({
       try {
         const results = await searchNominatim(value.trim())
         setSearchResults(results)
+        // Only show dropdown if there are results
         setShowDropdown(results.length > 0)
-      } catch { setSearchResults([]) }
+      } catch (err) {
+        console.error('Search error:', err)
+        toast.error('Eroare la căutare. Încercați din nou.')
+        setSearchResults([])
+        setShowDropdown(false)
+      }
     }, 300)
   }
 
