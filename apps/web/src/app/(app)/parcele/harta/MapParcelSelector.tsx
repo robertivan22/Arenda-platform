@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
-  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers,
+  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers, Pencil,
 } from 'lucide-react'
 import type { ParceleFitosanitar, GeoJSONPolygon, MapSearchResult } from '@/lib/parcele-types'
 import {
@@ -185,12 +185,13 @@ function makeLegendId(label: string) {
 
 // ─── Parcel list item ─────────────────────────────────────────────────────────
 function ParcelItem({
-  parcel, isSelected, onView, onDelete, onSelect, legendLabel, legendColor,
+  parcel, isSelected, onView, onDelete, onEdit, onSelect, legendLabel, legendColor,
 }: {
   parcel: ParceleFitosanitar
   isSelected: boolean
   onView: () => void
   onDelete: () => void
+  onEdit: () => void
   onSelect?: () => void
   legendLabel?: string
   legendColor?: string
@@ -235,6 +236,10 @@ function ParcelItem({
           <button onClick={onView} title="Vizualizează pe hartă"
             className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50 transition-colors">
             <Eye className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={onEdit} title="Editează parcela"
+            className="p-1.5 text-gray-400 hover:text-green-600 rounded hover:bg-green-50 transition-colors">
+            <Pencil className="w-3.5 h-3.5" />
           </button>
           {onSelect && (
             <button onClick={onSelect} title="Selecteaza"
@@ -291,6 +296,15 @@ export default function MapParcelSelector({
 
   // Delete
   const [deleteId, setDeleteId] = useState<string | null>(null)
+
+  // Edit
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editLocalitate, setEditLocalitate] = useState('')
+  const [editJudet, setEditJudet] = useState('')
+  const [editNote, setEditNote] = useState('')
+  const [editLegendId, setEditLegendId] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
 
   // Address search
   const [searchQuery, setSearchQuery] = useState('')
@@ -620,6 +634,7 @@ export default function MapParcelSelector({
     const { data: { user } } = await db.auth.getUser()
     if (!user) { toast.error('Trebuie sa fii autentificat'); setSaving(false); return }
     const geometryStereo70: GeoJSONPolygon = { type: 'Polygon', coordinates: [drawnRingStereo] }
+    const legendItem = legendItems.find(i => i.id === saveLegendId)
     const { data, error } = await db
       .from('parcele_fitosanitar')
       .insert([{
@@ -633,6 +648,8 @@ export default function MapParcelSelector({
         centru_lat: centruLat,
         centru_lng: centruLng,
         note: saveNote || null,
+        cultura_label: legendItem?.label ?? null,
+        cultura_color: legendItem?.color ?? null,
         ...(saveLinkedParcelId ? { parcela_id: saveLinkedParcelId } : {}),
       }])
       .select()
@@ -656,6 +673,47 @@ export default function MapParcelSelector({
     setSaveLinkedParcelId('')
     setDrawnRingStereo(null)
     drawnItemsRef.current?.clearLayers()
+  }
+
+  // ── Edit ────────────────────────────────────────────────────────────────
+  function openEditModal(parcel: ParceleFitosanitar) {
+    setEditId(parcel.id)
+    setEditName(parcel.nume_parcela)
+    setEditLocalitate(parcel.localitate ?? '')
+    setEditJudet(parcel.judet ?? '')
+    setEditNote(parcel.note ?? '')
+    // Resolve legend from DB cultura_label or from localStorage map
+    const dbCultura = (parcel as any).cultura_label
+    if (dbCultura) {
+      const found = legendItems.find(i => i.label === dbCultura)
+      setEditLegendId(found?.id ?? legendItems[0]?.id ?? '')
+    } else {
+      setEditLegendId(parcelLegendMap[parcel.id] ?? legendItems[0]?.id ?? '')
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editId || !editName.trim()) { toast.error('Introdu un nume.'); return }
+    setEditSaving(true)
+    const db = createClient()
+    const legendItem = legendItems.find(i => i.id === editLegendId)
+    const { error } = await db
+      .from('parcele_fitosanitar')
+      .update({
+        nume_parcela: editName.trim(),
+        localitate: editLocalitate || null,
+        judet: editJudet || null,
+        note: editNote || null,
+        cultura_label: legendItem?.label ?? null,
+        cultura_color: legendItem?.color ?? null,
+      })
+      .eq('id', editId)
+    setEditSaving(false)
+    if (error) { toast.error('Eroare la editare: ' + error.message); return }
+    setParcelLegendMap(prev => ({ ...prev, [editId]: editLegendId }))
+    toast.success('Parcela actualizată.')
+    setEditId(null)
+    await loadParcels()
   }
 
   // ── Delete ──────────────────────────────────────────────────────────────
@@ -909,6 +967,7 @@ export default function MapParcelSelector({
                     isSelected={selectedId === parcel.id}
                     onView={() => focusParcel(parcel)}
                     onDelete={() => setDeleteId(parcel.id)}
+                    onEdit={() => openEditModal(parcel)}
                     onSelect={onParcelSelected ? () => focusParcel(parcel) : undefined}
                     legendLabel={legend?.label}
                     legendColor={legend?.color}
@@ -1115,6 +1174,63 @@ export default function MapParcelSelector({
               <button onClick={() => void handleDeleteConfirm()}
                 className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
                 Sterge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit parcel modal ── */}
+      {editId && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-800">Editează parcela</h2>
+              <button onClick={() => setEditId(null)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nume parcelă <span className="text-red-500">*</span></label>
+                <input type="text" value={editName} onChange={e => setEditName(e.target.value)} maxLength={100}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Localitate</label>
+                  <input type="text" value={editLocalitate} onChange={e => setEditLocalitate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Județ</label>
+                  <input type="text" value={editJudet} onChange={e => setEditJudet(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cultură</label>
+                <select value={editLegendId} onChange={e => setEditLegendId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+                  <option value="">— Fără cultură —</option>
+                  {legendItems.map(item => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Note</label>
+                <textarea value={editNote} onChange={e => setEditNote(e.target.value)} rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+              </div>
+            </div>
+            <div className="flex gap-3 px-6 pb-5">
+              <button onClick={() => void handleSaveEdit()} disabled={editSaving}
+                className="flex-1 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+                {editSaving ? 'Se salvează...' : 'Salvează modificările'}
+              </button>
+              <button onClick={() => setEditId(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+                Anulează
               </button>
             </div>
           </div>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { AlertTriangle, Tractor, Download, Check } from 'lucide-react'
+import { AlertTriangle, Tractor, Download, Check, Info, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 
@@ -102,6 +102,20 @@ export default function ApiaPage() {
         </span>
       </div>
 
+      {/* APIA explanation */}
+      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+        <div className="flex items-center gap-2 text-sm font-semibold text-blue-800">
+          <Info className="w-4 h-4" /> Ce este APIA și ce înseamnă câmpurile?
+        </div>
+        <div className="text-xs text-blue-700 space-y-1.5">
+          <p><strong>APIA</strong> = Agenția de Plăți și Intervenție pentru Agricultură — instituția care acordă subvențiile agricole în România.</p>
+          <p><strong>Export APIA</strong> = datele necesare pentru completarea Cererii Unice de Plată (CUP) — fiecare parcelă arendată trebuie declarată cu: bloc fizic, tarla, număr parcelă, suprafață, județ, localitate.</p>
+          <p><strong className="text-yellow-700">⚠ APIA NU</strong> = parcela <strong>nu are completate câmpurile obligatorii</strong> pentru APIA: <em>Bloc Fizic</em>, <em>Tarla</em> sau <em>Nr. Parcelă</em>. Accesați parcela din <strong>Gestiune → Parcele → Listă parcele</strong> și completați aceste câmpuri.</p>
+          <p><strong className="text-green-700">✓ APIA DA</strong> = parcela are Bloc Fizic + Tarla + Nr. Parcelă completate — poate fi inclusă în declarația APIA.</p>
+          <p className="text-blue-600">Nota: Blocul fizic (ex: <code>AB001-221</code>) se găsește pe <a href="https://geo-spatial.org/vechi/harts/apia" target="_blank" rel="noreferrer" className="underline">harta LPIS APIA</a> sau în aplicația LPIS.</p>
+        </div>
+      </div>
+
       {/* Year selector */}
       <div className="mb-6 flex flex-wrap items-end gap-3 p-4 bg-white border border-gray-200 rounded-lg">
         <div>
@@ -181,8 +195,8 @@ export default function ApiaPage() {
                     <td className="px-2.5 py-1.5">{row.localityName}</td>
                     <td className="px-2.5 py-1.5">
                       {row.apiaDeclared
-                        ? <span className="text-green-600 flex items-center gap-1"><Check className="w-3 h-3" />DA</span>
-                        : <span className="text-yellow-600 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />NU</span>
+                        ? <span className="text-green-600 flex items-center gap-1 font-medium"><Check className="w-3 h-3" />DA</span>
+                        : <span className="text-red-600 flex items-center gap-1 font-medium" title="Lipsesc: Bloc Fizic, Tarla sau Nr. Parcelă"><XCircle className="w-3 h-3" />NU — câmpuri lipsă</span>
                       }
                     </td>
                   </tr>

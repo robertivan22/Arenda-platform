@@ -20,7 +20,7 @@ interface Transaction {
   id: string; campaign_year: number; transaction_date: string
   product_name: string; kg_brut: number; kg_net: number
   price_per_unit: number; ron_brut: number; ron_net: number; tax_amount: number
-  payment_type: string; pv_number: string | null; is_previzionata: boolean
+  payment_type: string; pv_number: string | null; is_previzionata: boolean; is_paid: boolean
 }
 interface Amendment { id: string; number: string; sign_date: string | null; description: string | null }
 interface Deed { id: string; deed_nr: string | null; deed_date: string | null; deed_type: string; file_url: string | null }
@@ -92,6 +92,14 @@ export default function ContractDashboardPage() {
     const { error } = await createClient().from('transactions').delete().eq('id', txnId)
     if (error) { toast.error(error.message); return }
     setTransactions(prev => prev.filter(t => t.id !== txnId))
+  }
+
+  async function togglePaid(txnId: string, currentPaid: boolean) {
+    const newPaid = !currentPaid
+    const { error } = await createClient().from('transactions').update({ is_paid: newPaid }).eq('id', txnId)
+    if (error) { toast.error(error.message); return }
+    setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, is_paid: newPaid } : t))
+    toast.success(newPaid ? 'Marcat ca plătit.' : 'Marcat ca neplătit.')
   }
 
   async function saveAmendment(e: React.FormEvent) {
@@ -304,7 +312,7 @@ export default function ContractDashboardPage() {
           <table className="w-full text-sm min-w-[900px]">
             <thead><tr>
               <th className={thCls + ' w-8'}><input type="checkbox" onChange={e => setSelectedTxns(e.target.checked ? new Set(transactions.map(t => t.id)) : new Set())} /></th>
-              {['An','Arendator','Data','Produs','Kg Brut','Kg Net','Tip Plata','Pret(lei)','RON Brut','RON Net','Impozit',''].map(h => <th key={h} className={thCls}>{h}</th>)}
+              {['An','Arendator','Data','Produs','Kg Brut','Kg Net','Tip Plata','Pret(lei)','RON Brut','RON Net','Impozit','Plătit',''].map(h => <th key={h} className={thCls}>{h}</th>)}
             </tr></thead>
             <tbody>
               {transactions.length === 0 && <tr><td colSpan={13} className="px-3 py-8 text-center text-gray-400">Nicio tranzactie inregistrata</td></tr>}
@@ -322,6 +330,19 @@ export default function ContractDashboardPage() {
                   <td className={tdCls + ' text-right'}>{Number(t.ron_brut).toFixed(2)}</td>
                   <td className={tdCls + ' text-right font-semibold text-green-700'}>{Number(t.ron_net).toFixed(2)}</td>
                   <td className={tdCls + ' text-right text-orange-600'}>{Number(t.tax_amount).toFixed(2)}</td>
+                  <td className={tdCls}>
+                    <button
+                      onClick={() => togglePaid(t.id, t.is_paid)}
+                      title={t.is_paid ? 'Marcat ca plătit — click pentru a anula' : 'Marchează ca plătit'}
+                      className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
+                        t.is_paid
+                          ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200'
+                          : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                      }`}
+                    >
+                      {t.is_paid ? 'Plătit' : 'Neplătit'}
+                    </button>
+                  </td>
                   <td className={tdCls}><button onClick={() => deleteTxn(t.id)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
                 </tr>
               ))}

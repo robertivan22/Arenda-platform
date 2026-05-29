@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       countyName:       p.county   ?? '—',
       localityName:     p.locality ?? '—',
       landUseCategory:  p.land_use_category ?? '—',
-      apiaDeclared:     false,
+      apiaDeclared:     !!(p.bloc_fizic && p.tarla_nr && p.parcel_nr && (p.county || p.locality)),
     }
   })
 

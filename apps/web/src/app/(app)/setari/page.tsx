@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Plus, Trash2, Building2, Package, Upload, X, FileSpreadsheet } from 'lucide-react'
+import { Plus, Trash2, Building2, Package, Upload, X, FileSpreadsheet, Shield } from 'lucide-react'
 import { VALID_CASA_ANG } from '@/lib/d112Validator'
 
 interface CompanySettings {
@@ -29,6 +29,15 @@ interface D112Settings {
   d112_functie_declar: string
 }
 
+interface AsiguratorSettings {
+  asig_denumire_cas: string       // Denumire completă CAS (ex: Casa Județeană de Asigurări PH)
+  asig_nr_contract_cas: string    // Nr. contract cu CAS
+  asig_data_contract_cas: string  // Data contract CAS
+  asig_cont_plata: string         // Cont IBAN plată contribuții CASS
+  asig_banca_plata: string        // Banca cont plată contribuții
+  asig_cod_unic: string           // Cod unic înregistrare la CAS
+}
+
 interface Product {
   id: string; name: string; unit: string; sort_order: number
 }
@@ -46,11 +55,16 @@ const EMPTY_D112: D112Settings = {
 }
 
 export default function SetariPage() {
-  const [tab, setTab] = useState<'company' | 'products' | 'd112'>('company')
+  const [tab, setTab] = useState<'company' | 'products' | 'd112' | 'asigurator'>('company')
   const [company, setCompany] = useState<CompanySettings>(EMPTY_COMPANY)
   const [savingCompany, setSavingCompany] = useState(false)
   const [d112, setD112] = useState<D112Settings>(EMPTY_D112)
   const [savingD112, setSavingD112] = useState(false)
+  const [asigurator, setAsigurator] = useState<AsiguratorSettings>({
+    asig_denumire_cas: '', asig_nr_contract_cas: '', asig_data_contract_cas: '',
+    asig_cont_plata: '', asig_banca_plata: '', asig_cod_unic: '',
+  })
+  const [savingAsig, setSavingAsig] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [newProduct, setNewProduct] = useState({ name: '', unit: 'kg' })
   const [savingProduct, setSavingProduct] = useState(false)
@@ -79,6 +93,14 @@ export default function SetariPage() {
           d112_nume_declar: (data as any).d112_nume_declar ?? '',
           d112_prenume_declar: (data as any).d112_prenume_declar ?? '',
           d112_functie_declar: (data as any).d112_functie_declar ?? 'Administrator',
+        })
+        setAsigurator({
+          asig_denumire_cas: (data as any).asig_denumire_cas ?? '',
+          asig_nr_contract_cas: (data as any).asig_nr_contract_cas ?? '',
+          asig_data_contract_cas: (data as any).asig_data_contract_cas ?? '',
+          asig_cont_plata: (data as any).asig_cont_plata ?? '',
+          asig_banca_plata: (data as any).asig_banca_plata ?? '',
+          asig_cod_unic: (data as any).asig_cod_unic ?? '',
         })
       }
     })
@@ -118,6 +140,21 @@ export default function SetariPage() {
     toast.success('Setarile D112 au fost salvate.')
   }
 
+  async function saveAsigurator(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingAsig(true)
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) { toast.error('Neautentificat.'); setSavingAsig(false); return }
+    const { error } = await db.from('company_settings').upsert(
+      { ...asigurator, user_id: user.id },
+      { onConflict: 'user_id' },
+    )
+    setSavingAsig(false)
+    if (error) { toast.error('Eroare: ' + error.message); return }
+    toast.success('Datele asigurătorului au fost salvate.')
+  }
+
   async function addProduct(e: React.FormEvent) {
     e.preventDefault()
     if (!newProduct.name.trim()) return
@@ -153,6 +190,7 @@ export default function SetariPage() {
           ['company', Building2, 'Date firma'],
           ['products', Package, 'Produse arenda'],
           ['d112', FileSpreadsheet, 'Date Declaratie 112'],
+          ['asigurator', Shield, 'Date Asigurator'],
         ] as const).map(([key, Icon, label]) => (
           <button
             key={key}
@@ -398,6 +436,94 @@ export default function SetariPage() {
 
             <button type="submit" disabled={savingD112} className="px-5 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50">
               {savingD112 ? 'Se salveaza...' : 'Salveaza setarile D112'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Asigurator Tab */}
+      {tab === 'asigurator' && (
+        <form onSubmit={saveAsigurator}>
+          <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-5">
+            <p className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-3 space-y-1">
+              <strong className="block">Date asigurător — mapate în XML D112</strong>
+              Aceste date descriu <strong>Casa de Asigurări de Sănătate (CAS)</strong> la care este înregistrat angajatorul.
+              În XML D112, câmpurile se regăsesc în secțiunea <code>Angajator › CasaAngajatorCod</code> și
+              în blocul de contribuții. Codul CAS (<em>d112_casa_ang</em>) este deja configurat în tab-ul
+              <em> Date Declarație 112</em> — acest tab completează datele suplimentare necesare pentru contractul de asigurare.
+            </p>
+
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-1 border-b border-gray-100">
+                Identificare CAS / Asigurător
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className={labelCls}>Denumire CAS angajator <span className="text-gray-400">(XML: <code>NumeCAS</code>)</span></label>
+                  <input className={inputCls}
+                    value={asigurator.asig_denumire_cas}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_denumire_cas: e.target.value }))}
+                    placeholder="ex. Casa Județeană de Asigurări de Sănătate Prahova" />
+                </div>
+                <div>
+                  <label className={labelCls}>Cod unic CAS <span className="text-gray-400">(XML: <code>CodUnicAsig</code>)</span></label>
+                  <input className={inputCls}
+                    value={asigurator.asig_cod_unic}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_cod_unic: e.target.value }))}
+                    placeholder="ex. RO12345678" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-1 border-b border-gray-100">
+                Contract asigurare
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Nr. contract CAS <span className="text-gray-400">(XML: <code>NrContractAsig</code>)</span></label>
+                  <input className={inputCls}
+                    value={asigurator.asig_nr_contract_cas}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_nr_contract_cas: e.target.value }))}
+                    placeholder="ex. 1234/2026" />
+                </div>
+                <div>
+                  <label className={labelCls}>Data contract CAS</label>
+                  <input className={inputCls} type="date"
+                    value={asigurator.asig_data_contract_cas}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_data_contract_cas: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-1 border-b border-gray-100">
+                Date bancare plată contribuții CASS
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Bancă plată contribuții <span className="text-gray-400">(XML: <code>BancaPlata</code>)</span></label>
+                  <input className={inputCls}
+                    value={asigurator.asig_banca_plata}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_banca_plata: e.target.value }))}
+                    placeholder="ex. BCR, ING, BRD" />
+                </div>
+                <div>
+                  <label className={labelCls}>Cont IBAN plată CASS <span className="text-gray-400">(XML: <code>ContPlata</code>)</span></label>
+                  <input className={inputCls}
+                    value={asigurator.asig_cont_plata}
+                    onChange={e => setAsigurator(p => ({ ...p, asig_cont_plata: e.target.value.toUpperCase() }))}
+                    placeholder="ex. RO49AAAA1B31007593840000" maxLength={34} />
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-gray-400">
+                Contul IBAN al CAS-ului pentru viramentul contribuțiilor CASS reținute (cod 469).
+                Verificați pe site-ul CNAS sau al casei județene respective.
+              </p>
+            </div>
+
+            <button type="submit" disabled={savingAsig} className="px-5 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50">
+              {savingAsig ? 'Se salveaza...' : 'Salveaza datele asigurătorului'}
             </button>
           </div>
         </form>

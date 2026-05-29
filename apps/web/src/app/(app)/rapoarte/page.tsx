@@ -9,7 +9,7 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts'
 import * as XLSX from 'xlsx'
-import { Download, ChevronDown, ChevronRight } from 'lucide-react'
+import { Download, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -82,6 +82,7 @@ export default function RapoartePage() {
   const [txnYear, setTxnYear] = useState('')
   const [txnProduct, setTxnProduct] = useState('')
   const [invType, setInvType] = useState('')
+  const [invStatus, setInvStatus] = useState('')
   const [contractStatus, setContractStatus] = useState('')
   const [expandedLessors, setExpandedLessors] = useState<Set<string>>(new Set())
 
@@ -165,6 +166,21 @@ export default function RapoartePage() {
 
   function toggleLessor(id: string) {
     setExpandedLessors(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  async function updateInvoiceStatus(invId: string, status: string) {
+    const { error } = await createClient().from('invoices').update({ status }).eq('id', invId)
+    if (error) { toast.error(error.message); return }
+    setInvoices(prev => prev.map(i => i.id === invId ? { ...i, status } : i))
+    toast.success('Status actualizat.')
+  }
+
+  async function deleteInvoice(invId: string) {
+    if (!confirm('Stergi acest document? Actiunea nu poate fi anulata.')) return
+    const { error } = await createClient().from('invoices').delete().eq('id', invId)
+    if (error) { toast.error(error.message); return }
+    setInvoices(prev => prev.filter(i => i.id !== invId))
+    toast.success('Document sters.')
   }
 
   if (loading) return <div className="p-8 text-center text-gray-400">Se încarcă...</div>
@@ -535,8 +551,16 @@ export default function RapoartePage() {
 
       {/* ── FACTURI & AVIZE ───────────────────────────────────────────────── */}
       {tab === 4 && (() => {
-        const filtered = invoices.filter(i => !invType || i.doc_type === invType)
+        const filtered = invoices.filter(i =>
+          (!invType || i.doc_type === invType) &&
+          (!invStatus || i.status === invStatus)
+        )
         const totRon = filtered.reduce((s, i) => s + i.total_ron, 0)
+        const statusCls = (s: string) =>
+          s === 'PLATITA' ? 'border-green-300 bg-green-50 text-green-700'
+            : s === 'EMISA' ? 'border-blue-300 bg-blue-50 text-blue-700'
+            : s === 'STORNATA' ? 'border-red-300 bg-red-50 text-red-600'
+            : 'border-gray-300 bg-gray-50 text-gray-600'
         return (
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-3 flex-wrap">
@@ -545,11 +569,18 @@ export default function RapoartePage() {
                 <option value="">Toate tipurile</option>
                 <option value="FACTURA">Facturi</option><option value="AVIZ">Avize</option>
               </select>
+              <select value={invStatus} onChange={e => setInvStatus(e.target.value)} className={selCls}>
+                <option value="">Toate statusurile</option>
+                <option value="DRAFT">Draft</option>
+                <option value="EMISA">Emisă</option>
+                <option value="PLATITA">Plătită</option>
+                <option value="STORNATA">Stornată</option>
+              </select>
               <div className="text-xs text-gray-500">
                 Total: <span className="font-bold text-green-700">{totRon.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON</span>
               </div>
               <button onClick={() => exportXlsx(filtered.map(i => ({
-                'Nr.': i.invoice_number, Data: i.invoice_date, Arendaș: lessorName(i.lessors),
+                'Nr.': i.invoice_number, Data: i.invoice_date, 'Arendaș': lessorName(i.lessors),
                 Tip: i.doc_type, 'Total RON': i.total_ron.toFixed(2), Status: i.status,
               })), 'facturi-avize')}
                 className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded font-medium">
@@ -559,7 +590,8 @@ export default function RapoartePage() {
             <table className="min-w-full">
               <thead><tr>
                 <th className={thCls}>Nr.</th><th className={thCls}>Data</th><th className={thCls}>Arendaș</th>
-                <th className={thCls}>Tip</th><th className={`${thCls} text-right`}>Total RON</th><th className={thCls}>Status</th>
+                <th className={thCls}>Tip</th><th className={`${thCls} text-right`}>Total RON</th>
+                <th className={thCls}>Status</th><th className={thCls}></th>
               </tr></thead>
               <tbody>
                 {filtered.map(i => (
@@ -573,9 +605,27 @@ export default function RapoartePage() {
                       </span>
                     </td>
                     <td className={`${tdCls} text-right font-semibold text-green-700`}>{i.total_ron.toLocaleString('ro-RO', { minimumFractionDigits: 2 })}</td>
-                    <td className={tdCls}><span className="text-xs text-gray-500">{i.status}</span></td>
+                    <td className={tdCls}>
+                      <select
+                        value={i.status}
+                        onChange={e => updateInvoiceStatus(i.id, e.target.value)}
+                        className={`text-xs border rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-brand-400 ${statusCls(i.status)}`}
+                      >
+                        <option value="DRAFT">Draft</option>
+                        <option value="EMISA">Emisă</option>
+                        <option value="PLATITA">Plătită</option>
+                        <option value="STORNATA">Stornată</option>
+                      </select>
+                    </td>
+                    <td className={tdCls}>
+                      <button onClick={() => deleteInvoice(i.id)}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors" title="Șterge">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
+                {filtered.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-sm text-gray-400">Nicio înregistrare</td></tr>}
               </tbody>
             </table>
           </div>

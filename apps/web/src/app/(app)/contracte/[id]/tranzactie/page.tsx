@@ -38,6 +38,7 @@ export default function NewTransactionPage() {
     autoNr: true,
     isPrevizionata: false,
     impozitAplicat: false,
+    isPaid: false,
     notes: '',
   })
 
@@ -131,6 +132,7 @@ export default function NewTransactionPage() {
       pv_number: pvNumber || null,
       is_previzionata: form.isPrevizionata,
       impozit_aplicat: form.impozitAplicat,
+      is_paid: form.isPaid,
       notes: form.notes || null,
     })
     setSaving(false)
@@ -162,6 +164,10 @@ export default function NewTransactionPage() {
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={form.impozitAplicat} onChange={e => setField('impozitAplicat', e.target.checked)} className="rounded" />
               <span className="text-gray-700">Aplică impozit 10% la sursă</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={form.isPaid as boolean} onChange={e => setField('isPaid', e.target.checked)} className="rounded accent-green-600" />
+              <span className="text-green-700 font-medium">Plătit</span>
             </label>
           </div>
 

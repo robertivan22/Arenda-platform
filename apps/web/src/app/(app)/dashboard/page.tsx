@@ -68,7 +68,7 @@ export default function DashboardPage() {
         db.from('contracts').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
         db.from('contracts').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE').lte('end_date', in30).gte('end_date', today),
         db.from('parcels').select('surface').limit(5000),
-        db.from('transactions').select('ron_net').eq('impozit_aplicat', true).limit(1000),
+        db.from('transactions').select('ron_net').eq('is_paid', false).eq('is_previzionata', false).limit(1000),
       ])
       const surfaceTotal = ((parcelsData ?? []) as any[]).reduce((acc, p) => acc + Number(p.surface ?? 0), 0).toFixed(2)
       const paymentsOverdue = (overdueData ?? []).length
@@ -124,9 +124,9 @@ export default function DashboardPage() {
         <StatCard label="Contracte ce expiră (30 zile)" value={dash ?? s.contractsExpiring}  icon={Clock}          iconBg="bg-amber-100"   iconColor="text-amber-600" />
         <StatCard label="Parcele înregistrate"        value={dash ?? s.parcelsTotal}          icon={MapPin}         iconBg="bg-violet-100"  iconColor="text-violet-600"
           sub={loading ? undefined : `Suprafață totală: ${s.surfaceTotal} ha`} />
-        <StatCard label="Plăți restante"              value={dash ?? s.paymentsOverdue}       icon={AlertTriangle}  iconBg="bg-red-100"     iconColor="text-red-500"
-          sub={loading ? undefined : `${s.paymentsOverdueAmount} RON`} />
-        <StatCard label="Total restanțe (RON)"        value={dash ?? s.paymentsOverdueAmount} icon={CreditCard}     iconBg="bg-sky-100"     iconColor="text-sky-600" />
+        <StatCard label="Tranzacții neplătite"         value={dash ?? s.paymentsOverdue}       icon={AlertTriangle}  iconBg="bg-red-100"     iconColor="text-red-500"
+          sub={loading ? undefined : `${s.paymentsOverdueAmount} RON total neplătit`} />
+        <StatCard label="Valoare neplătită (RON)"       value={dash ?? s.paymentsOverdueAmount} icon={CreditCard}     iconBg="bg-sky-100"     iconColor="text-sky-600" />
       </div>
 
       {/* Quick actions */}
