@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings,
+  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -83,18 +83,19 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [perms, setPerms] = useState<Record<string, boolean> | null>(null)
   const [userEmail, setUserEmail] = useState<string>('')
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     const db = createClient()
     db.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
       setUserEmail(user.email ?? '')
-      const { data } = await db
-        .from('user_permissions')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle()
-      if (data) setPerms(data as Record<string, boolean>)
+      const [{ data: permsData }, { data: profileData }] = await Promise.all([
+        db.from('user_permissions').select('*').eq('user_id', user.id).maybeSingle(),
+        db.from('profiles').select('is_admin').eq('id', user.id).maybeSingle(),
+      ])
+      if (permsData) setPerms(permsData as Record<string, boolean>)
+      if (profileData?.is_admin) setIsAdmin(true)
     })
   }, [])
 
@@ -365,6 +366,25 @@ export function AppSidebar() {
           <ellipse cx="200" cy="93" rx="190" ry="9" fill="#c8973a" fillOpacity="0.07"/>
         </svg>
       </div>
+
+      {/* ── Admin link (admins only) ─────── */}
+      {isAdmin && (
+        <div className="px-2 pb-1 flex-shrink-0">
+          <Link
+            href="/admin-cp"
+            onClick={close}
+            className={clsx(
+              'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150',
+              pathname.startsWith('/admin-cp')
+                ? 'bg-amber-500/20 text-amber-300 font-medium'
+                : 'text-white/40 hover:text-white/70 hover:bg-white/5',
+            )}
+          >
+            <Shield className="w-4 h-4 flex-shrink-0" />
+            <span>Admin Panel</span>
+          </Link>
+        </div>
+      )}
 
       {/* ── Settings + Profile ────────────── */}
       <div className="flex-shrink-0">
