@@ -199,10 +199,22 @@ export default function LoginPage() {
             <p className="text-sm text-gray-400">Nu ai cont?</p>
             <a
               href="/contact"
-              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all hover:text-white"
-              style={{ borderColor: '#1a3a0e', color: '#1a3a0e' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#1a3a0e' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all"
+              style={{
+                borderColor: '#1a3a0e',
+                color: '#1a3a0e',
+                background: 'transparent'
+              }}
+              onMouseEnter={e => {
+                const el = e.currentTarget as HTMLElement
+                el.style.background = '#1a3a0e'
+                el.style.color = 'white'
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget as HTMLElement
+                el.style.background = 'transparent'
+                el.style.color = '#1a3a0e'
+              }}
             >
               Contactează-ne
             </a>
