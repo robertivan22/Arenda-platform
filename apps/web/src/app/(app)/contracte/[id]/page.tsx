@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Pencil, Plus, Trash2, Printer, X, FileText } from 'lucide-react'
+import DistributionTracker from '@/components/DistributionTracker'
 
 interface Contract {
   id: string; contract_number: string; contract_type: string
@@ -350,6 +351,9 @@ export default function ContractDashboardPage() {
           </table>
         </div>
       </div>
+
+      {/* Distributie Produs */}
+      <DistributionTracker contractId={id} />
 
       {/* Acte de proprietate */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
