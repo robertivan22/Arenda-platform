@@ -26,6 +26,7 @@ interface Distribution {
 }
 
 interface LessorOption { id: string; display_name: string }
+interface RentLevelInfo { product_name: string; level_per_ha: number }
 
 const UNITS = ['kg', 'tone', 'saci', 'buc']
 
@@ -33,7 +34,9 @@ export default function DistributionTracker({ contractId }: { contractId: string
   const [transactions, setTransactions] = useState<ParcelTransaction[]>([])
   const [distributions, setDistributions] = useState<Record<string, Distribution[]>>({})
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [lessors, setLessors] = useState<LessorOption[]>([])
+  const [contractLessor, setContractLessor] = useState<LessorOption | null>(null)
+  const [rentLevels, setRentLevels] = useState<RentLevelInfo[]>([])
+  const [totalHa, setTotalHa] = useState(0)
   const [loading, setLoading] = useState(true)
 
   const [showAddTxn, setShowAddTxn] = useState(false)
@@ -55,7 +58,7 @@ export default function DistributionTracker({ contractId }: { contractId: string
     const { data: { user } } = await db.auth.getUser()
     if (!user) return
 
-    const [{ data: txns }, { data: dists }, { data: ls }] = await Promise.all([
+    const [{ data: txns }, { data: dists }, { data: contractData }, { data: parcelsData }] = await Promise.all([
       db.from('parcel_transactions')
         .select('*')
         .eq('contract_id', contractId)
@@ -65,10 +68,11 @@ export default function DistributionTracker({ contractId }: { contractId: string
         .select('*, lessors(first_name, last_name, company_name, type)')
         .eq('user_id', user.id)
         .is('deleted_at', null),
-      db.from('lessors')
-        .select('id, first_name, last_name, company_name, type')
-        .eq('user_id', user.id)
-        .order('last_name'),
+      db.from('contracts')
+        .select('lessor_id, lessors(first_name, last_name, company_name, type), contract_rent_levels(product_name, level_per_ha)')
+        .eq('id', contractId)
+        .single(),
+      db.from('parcels').select('surface').eq('contract_id', contractId),
     ])
 
     const distMap: Record<string, Distribution[]> = {}
@@ -87,14 +91,28 @@ export default function DistributionTracker({ contractId }: { contractId: string
 
     setTransactions(withTotals)
     setDistributions(distMap)
-    setLessors((ls ?? []).map((l: any) => ({
-      id: l.id,
-      display_name: l.type === 'LEGAL' ? l.company_name : `${l.last_name} ${l.first_name}`.trim(),
-    })))
+    if (contractData) {
+      const l = Array.isArray((contractData as any).lessors) ? (contractData as any).lessors[0] : (contractData as any).lessors
+      const lessor: LessorOption = {
+        id: (contractData as any).lessor_id,
+        display_name: l ? (l.type === 'LEGAL' ? l.company_name : `${l.last_name} ${l.first_name}`.trim()) : '—',
+      }
+      setContractLessor(lessor)
+      setRentLevels((contractData as any).contract_rent_levels ?? [])
+      // pre-fill distForm with this lessor
+      setDistForm(p => ({ ...p, lessorId: lessor.id }))
+    }
+    setTotalHa((parcelsData ?? []).reduce((s: number, p: any) => s + Number(p.surface ?? 0), 0))
     setLoading(false)
   }, [contractId])
 
   useEffect(() => { void load() }, [load])
+
+  function handleProductSelect(productName: string) {
+    const level = rentLevels.find(r => r.product_name === productName)
+    const suggested = level && totalHa > 0 ? String(Math.round(level.level_per_ha * totalHa)) : ''
+    setTxnForm(p => ({ ...p, productType: productName, totalQuantity: suggested }))
+  }
 
   async function saveAllocation(e: React.FormEvent) {
     e.preventDefault()
@@ -124,7 +142,7 @@ export default function DistributionTracker({ contractId }: { contractId: string
     const qty = parseFloat(distForm.quantityGiven)
     const remaining = txn.total_quantity - txn.distributed_total
     if (qty > remaining + 0.00001) {
-      toast.error(`Cantitate prea mare. Disponibil: ${remaining.toFixed(4)} ${txn.quantity_unit}`)
+      toast.error(`Cantitate prea mare. Disponibil: ${remaining.toFixed(2)} ${txn.quantity_unit}`)
       return
     }
     setSaving(true)
@@ -143,7 +161,7 @@ export default function DistributionTracker({ contractId }: { contractId: string
     if (error) { toast.error(error.message); return }
     toast.success('Distribuție înregistrată.')
     setShowAddDist(null)
-    setDistForm({ lessorId: '', quantityGiven: '', distributionDate: new Date().toISOString().split('T')[0], notes: '' })
+    setDistForm({ lessorId: contractLessor?.id ?? '', quantityGiven: '', distributionDate: new Date().toISOString().split('T')[0], notes: '' })
     void load()
   }
 
@@ -218,13 +236,28 @@ export default function DistributionTracker({ contractId }: { contractId: string
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <div>
               <label className={labelCls}>Produs *</label>
-              <input className={inputCls} placeholder="ex: OVAZ, Porumb" value={txnForm.productType}
-                onChange={e => setTxnForm(p => ({ ...p, productType: e.target.value }))} required />
+              {rentLevels.length > 0 ? (
+                <select className={inputCls} value={txnForm.productType}
+                  onChange={e => handleProductSelect(e.target.value)} required>
+                  <option value="">Selectați</option>
+                  {rentLevels.map(r => (
+                    <option key={r.product_name} value={r.product_name}>{r.product_name}</option>
+                  ))}
+                </select>
+              ) : (
+                <input className={inputCls} placeholder="ex: OVAZ, Porumb" value={txnForm.productType}
+                  onChange={e => setTxnForm(p => ({ ...p, productType: e.target.value }))} required />
+              )}
             </div>
             <div>
               <label className={labelCls}>Cantitate totală *</label>
               <input className={inputCls} type="number" min="0.0001" step="0.0001" placeholder="ex: 1000"
                 value={txnForm.totalQuantity} onChange={e => setTxnForm(p => ({ ...p, totalQuantity: e.target.value }))} required />
+              {txnForm.totalQuantity && rentLevels.find(r => r.product_name === txnForm.productType) && totalHa > 0 && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {rentLevels.find(r => r.product_name === txnForm.productType)!.level_per_ha} kg/ha × {totalHa.toFixed(2)} ha
+                </p>
+              )}
             </div>
             <div>
               <label className={labelCls}>Unitate</label>
@@ -315,6 +348,7 @@ export default function DistributionTracker({ contractId }: { contractId: string
                 <button
                   onClick={() => {
                     setShowAddDist(txn.id)
+                    setDistForm(p => ({ ...p, lessorId: contractLessor?.id ?? '' }))
                     setExpanded(prev => new Set(prev).add(txn.id))
                   }}
                   className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded font-medium"
@@ -341,16 +375,15 @@ export default function DistributionTracker({ contractId }: { contractId: string
                     className="px-4 py-3 border-b border-blue-100 bg-blue-50">
                     <p className="text-xs font-semibold text-gray-600 mb-2">
                       Adaugă distribuție — Disponibil:{' '}
-                      <strong className="text-orange-600">{remaining.toFixed(4)} {txn.quantity_unit}</strong>
+                      <strong className="text-orange-600">{remaining.toFixed(2)} {txn.quantity_unit}</strong>
                     </p>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       <div>
                         <label className={labelCls}>Arendator</label>
-                        <select className={inputCls} value={distForm.lessorId}
-                          onChange={e => setDistForm(p => ({ ...p, lessorId: e.target.value }))}>
-                          <option value="">Selectați</option>
-                          {lessors.map(l => <option key={l.id} value={l.id}>{l.display_name}</option>)}
-                        </select>
+                        <div className={`${inputCls} bg-gray-50 text-gray-700 cursor-default`}>
+                          {contractLessor?.display_name ?? '—'}
+                        </div>
+                        <input type="hidden" value={distForm.lessorId} readOnly />
                       </div>
                       <div>
                         <label className={labelCls}>Cantitate ({txn.quantity_unit}) *</label>

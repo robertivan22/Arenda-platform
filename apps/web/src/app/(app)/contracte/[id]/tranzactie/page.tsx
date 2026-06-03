@@ -105,6 +105,10 @@ export default function NewTransactionPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.productId) { toast.error('Selectati un produs.'); return }
+    if (!form.isPrevizionata && dueTotalKg > 0 && kgBrut > remainingKg) {
+      toast.error(`Cantitate prea mare! Disponibil: ${remainingKg.toFixed(0)} ${form.productName}`)
+      return
+    }
     setSaving(true)
     const db = createClient()
     const { data: { user } } = await db.auth.getUser()
@@ -218,12 +222,24 @@ export default function NewTransactionPage() {
           <div>
             <label className={labelCls}>Cantitate Bruta *</label>
             <input className={inputCls} type="number" min="0" step="0.01" value={form.kgBrut} onChange={e => setField('kgBrut', e.target.value)} required />
+            {kgBrut > 0 && dueTotalKg > 0 && (
+              <div className={`mt-1 text-xs px-2.5 py-1.5 rounded border ${
+                kgBrut > remainingKg
+                  ? 'bg-red-50 text-red-600 border-red-200'
+                  : 'bg-green-50 text-green-700 border-green-200'
+              }`}>
+                {kgBrut > remainingKg
+                  ? `⚠ Cantitate depăşeşte disponibilul — disponibil: ${remainingKg.toFixed(0)} ${level?.product_name ?? 'kg'}`
+                  : `Disponibil după această tranzacție: ${Math.max(0, remainingKg - kgBrut).toFixed(0)} ${level?.product_name ?? 'kg'}`
+                }
+              </div>
+            )}
           </div>
 
           {/* Calculated summary */}
           {kgBrut > 0 && (
             <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-              <div className="flex justify-between"><span className="text-gray-500">Kg Net (fizic):</span><span className="font-semibold">{kgNet.toFixed(4)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Kg Net (fizic):</span><span className="font-semibold">{kgNet.toFixed(2)}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">RON Brut:</span><span>{ronBrut.toFixed(2)}</span></div>
               {form.impozitAplicat && (
                 <div className="flex justify-between"><span className="text-gray-500">Impozit (10%):</span><span className="text-orange-600">{taxAmount.toFixed(2)}</span></div>
