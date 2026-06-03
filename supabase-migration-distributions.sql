@@ -116,3 +116,12 @@ DROP TRIGGER IF EXISTS trg_pt_updated_at ON parcel_transactions;
 CREATE TRIGGER trg_pt_updated_at
   BEFORE UPDATE ON parcel_transactions
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- 6. source_transaction_id: links an auto-synced distribution to its originating transaction
+--    Allows idempotent re-sync (only new transactions get a new distribution row)
+ALTER TABLE transaction_distributions
+  ADD COLUMN IF NOT EXISTS source_transaction_id UUID REFERENCES transactions(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS transaction_distributions_source_idx
+  ON transaction_distributions(source_transaction_id)
+  WHERE source_transaction_id IS NOT NULL;
