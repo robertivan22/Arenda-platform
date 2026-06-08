@@ -20,8 +20,11 @@ export default function NewParcelPage() {
   const [contractsList, setContractsList] = useState<ContractOption[]>([])
   const [form, setForm] = useState({
     blocFizic: '', tarlaNr: '', parcelNr: '',
+    nrCadastral: '',
     county: '', locality: '', landUseCategory: 'Arabil',
+    culture: '', apiaEligibil: 'true',
     surface: '', surfaceRented: '',
+    lat: '', lng: '',
     lessorId: '', contractId: '',
     sirutaCode: '', sirutaName: '',
   })
@@ -52,11 +55,16 @@ export default function NewParcelPage() {
       bloc_fizic: form.blocFizic || null,
       tarla_nr: form.tarlaNr || null,
       parcel_nr: form.parcelNr || null,
+      nr_cadastral: form.nrCadastral || null,
       county: form.county,
       locality: form.locality,
       land_use_category: form.landUseCategory,
+      culture: form.culture || null,
+      apia_eligible: form.apiaEligibil !== '' ? form.apiaEligibil === 'true' : null,
       surface: parseFloat(form.surface) || 0,
       surface_rented: form.surfaceRented ? parseFloat(form.surfaceRented) : null,
+      lat: form.lat ? parseFloat(form.lat) : null,
+      lng: form.lng ? parseFloat(form.lng) : null,
       lessor_id: form.lessorId || null,
       contract_id: form.contractId || null,
       siruta_code: form.sirutaCode || null,
@@ -86,6 +94,7 @@ export default function NewParcelPage() {
             <div><label className={labelCls}>Bloc Fizic (APIA/LPIS)</label><input className={inputCls} placeholder="ex: AB001-0001" value={form.blocFizic} onChange={e => set('blocFizic', e.target.value)} /></div>
             <div><label className={labelCls}>Tarla nr.</label><input className={inputCls} value={form.tarlaNr} onChange={e => set('tarlaNr', e.target.value)} /></div>
             <div><label className={labelCls}>Parcela nr.</label><input className={inputCls} value={form.parcelNr} onChange={e => set('parcelNr', e.target.value)} /></div>
+            <div><label className={labelCls}>Nr. Cadastral</label><input className={inputCls} placeholder="ex: CAD-001234" value={form.nrCadastral} onChange={e => set('nrCadastral', e.target.value)} /></div>
           </div>
         </div>
         <div className="form-section">
@@ -103,6 +112,8 @@ export default function NewParcelPage() {
                 inputClassName={inputCls}
               />
             </div>
+            <div><label className={labelCls}>Latitudine (GPS)</label><input className={inputCls} type="number" step="0.0000001" placeholder="ex: 45.9432" value={form.lat} onChange={e => set('lat', e.target.value)} /></div>
+            <div><label className={labelCls}>Longitudine (GPS)</label><input className={inputCls} type="number" step="0.0000001" placeholder="ex: 24.9668" value={form.lng} onChange={e => set('lng', e.target.value)} /></div>
             <div>
               <label className={labelCls}>Categorie folosinta</label>
               <select className={inputCls} value={form.landUseCategory} onChange={e => set('landUseCategory', e.target.value)}>
@@ -116,6 +127,14 @@ export default function NewParcelPage() {
           <div className="grid grid-cols-2 gap-3">
             <div><label className={labelCls}>Suprafata totala (ha) *</label><input className={inputCls} type="number" min="0" step="0.0001" value={form.surface} onChange={e => set('surface', e.target.value)} required /></div>
             <div><label className={labelCls}>Suprafata arendata (ha)</label><input className={inputCls} type="number" min="0" step="0.0001" value={form.surfaceRented} onChange={e => set('surfaceRented', e.target.value)} /></div>
+            <div><label className={labelCls}>Cultura agricola</label><input className={inputCls} placeholder="ex: Grau, Porumb" value={form.culture} onChange={e => set('culture', e.target.value)} /></div>
+            <div>
+              <label className={labelCls}>APIA Eligibil</label>
+              <select className={inputCls} value={form.apiaEligibil} onChange={e => set('apiaEligibil', e.target.value)}>
+                <option value="true">Da</option>
+                <option value="false">Nu</option>
+              </select>
+            </div>
           </div>
         </div>
         <div className="form-section">

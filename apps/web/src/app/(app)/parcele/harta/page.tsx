@@ -1,11 +1,11 @@
 'use client'
 
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Map } from 'lucide-react'
 
-// Leaflet must be loaded only in the browser (it accesses `window`).
-// ssr: false ensures the import never runs on the server / edge.
 const MapParcelSelector = dynamic(
   () => import('./MapParcelSelector'),
   {
@@ -21,6 +21,26 @@ const MapParcelSelector = dynamic(
   },
 )
 
+function MapWithParams() {
+  const params = useSearchParams()
+  const rawLat  = parseFloat(params.get('lat')  ?? '')
+  const rawLng  = parseFloat(params.get('lng')  ?? '')
+  const rawZoom = parseInt(params.get('zoom')  ?? '')
+  const center: [number, number] = (!isNaN(rawLat) && !isNaN(rawLng))
+    ? [rawLat, rawLng]
+    : [45.9432, 24.9668]
+  const zoom = !isNaN(rawZoom) ? rawZoom : 7
+  return (
+    <MapParcelSelector
+      mode="modal"
+      allowDraw={true}
+      showList={true}
+      initialCenter={center}
+      initialZoom={zoom}
+    />
+  )
+}
+
 export default function HartaParcelePage() {
   return (
     <div className="flex flex-col gap-4 h-full">
@@ -34,14 +54,9 @@ export default function HartaParcelePage() {
           </div>
         }
       />
-
-      <MapParcelSelector
-        mode="modal"
-        allowDraw={true}
-        showList={true}
-        initialCenter={[45.9432, 24.9668]}
-        initialZoom={7}
-      />
+      <Suspense fallback={<div className="h-[500px] bg-gray-50 rounded-xl border border-gray-200" />}>
+        <MapWithParams />
+      </Suspense>
     </div>
   )
 }
