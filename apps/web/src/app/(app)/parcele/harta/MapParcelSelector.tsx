@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 // Loaded ONLY in the browser via dynamic(() => import(...), { ssr: false })
 import L from 'leaflet'
@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import {
   Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers, Pencil,
 } from 'lucide-react'
-import type { ParceleFitosanitar, GeoJSONPolygon, MapSearchResult } from '@/lib/parcele-types'
+import type { ParceleFitosanitar, GeoJSONPolygon, MapSearchResult, RegistryParcel } from '@/lib/parcele-types'
 import {
   wgs84ToStereo70,
   stereo70ToLeaflet,
@@ -192,6 +192,132 @@ function makeLegendId(label: string) {
     .replace(/^-+|-+$/g, '') || `legend-${Date.now()}`
 }
 
+// ─── Geometry helpers ─────────────────────────────────────────────────────────
+function pointInPolygon(x: number, y: number, ring: number[][]): boolean {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1]
+    const xj = ring[j][0], yj = ring[j][1]
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside
+    }
+  }
+  return inside
+}
+
+/** Returns a point guaranteed to be inside the polygon ring (Stereo 70 coords). */
+function safeCenterStereo70(ring: number[][]): [number, number] {
+  const [cx, cy] = centroidStereo70(ring)
+  if (pointInPolygon(cx, cy, ring)) return [cx, cy]
+  // Fallback: bounding-box centre (always in the bounding box)
+  const xs = ring.map(p => p[0])
+  const ys = ring.map(p => p[1])
+  return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+}
+
+function sanitizeColor(color: string): string {
+  return /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : '#22c55e'
+}
+
+function makeCentreIcon(color: string): L.DivIcon {
+  const c = sanitizeColor(color)
+  return L.divIcon({
+    className: '',
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="34" viewBox="0 0 26 34"><path d="M13 0C5.82 0 0 5.82 0 13c0 9.75 13 21 13 21S26 22.75 26 13C26 5.82 20.18 0 13 0z" fill="${c}" stroke="white" stroke-width="2"/><circle cx="13" cy="13" r="5" fill="white" opacity="0.9"/></svg>`,
+    iconSize: [26, 34],
+    iconAnchor: [13, 34],
+  })
+}
+
+function makeRegistryIcon(color: string): L.DivIcon {
+  const c = sanitizeColor(color)
+  return L.divIcon({
+    className: '',
+    html: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="${c}" stroke="white" stroke-width="2.5"/><circle cx="11" cy="11" r="4" fill="white"/></svg>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  })
+}
+
+// ─── Parcel details popup ─────────────────────────────────────────────────────
+function ParcelMapPopup({ parcel, onClose }: { parcel: RegistryParcel; onClose: () => void }) {
+  const statusColors: Record<string, string> = {
+    ACTIVE: 'bg-green-100 text-green-700 border-green-200',
+    INACTIVE: 'bg-gray-100 text-gray-600 border-gray-200',
+    EXPIRED: 'bg-orange-100 text-orange-600 border-orange-200',
+  }
+  return (
+    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden w-72">
+      {/* Header */}
+      <div className="px-4 py-3 bg-green-800 text-white flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="font-bold text-base truncate">{parcel.bloc_fizic || 'Parcelă'}</div>
+          {(parcel.parcel_nr || parcel.tarla_nr) && (
+            <div className="text-xs text-green-200 mt-0.5">
+              {[parcel.parcel_nr && `Nr. ${parcel.parcel_nr}`, parcel.tarla_nr && `Tarla ${parcel.tarla_nr}`].filter(Boolean).join(' · ')}
+            </div>
+          )}
+        </div>
+        <button onClick={onClose} className="p-1 hover:bg-green-700 rounded flex-shrink-0 mt-0.5 transition-colors">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      {/* Body */}
+      <div className="px-4 py-3 space-y-2">
+        {(parcel.locality || parcel.county) && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+            <span>{[parcel.locality, parcel.county].filter(Boolean).join(', ')}</span>
+          </div>
+        )}
+        {parcel.culture && (
+          <div className="flex items-center gap-2 text-sm">
+            <span>🌾</span>
+            <span className="text-green-700 font-medium">{parcel.culture}</span>
+          </div>
+        )}
+        {parcel.lessor_name && (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>👤</span>
+            <span>{parcel.lessor_name}</span>
+          </div>
+        )}
+        {parcel.apia_eligible && (
+          <div className="flex items-center gap-2 text-sm text-green-600">
+            <Check className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>APIA Eligibil</span>
+          </div>
+        )}
+      </div>
+      {/* Footer */}
+      <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+        {parcel.status ? (
+          <span className={`text-xs font-semibold px-2 py-1 rounded border ${statusColors[parcel.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+            {parcel.status}
+          </span>
+        ) : <span />}
+        {parcel.surface != null && (
+          <span className="text-sm font-bold text-gray-800">{Number(parcel.surface).toFixed(2)} HA</span>
+        )}
+      </div>
+      {parcel.contract_number && (
+        <div className="px-4 py-2 border-t border-gray-100 flex items-center gap-1.5 text-xs">
+          <span className="text-gray-500">Contract:</span>
+          <a
+            href={parcel.contract_id ? `/contracte/${parcel.contract_id}` : '#'}
+            className="text-green-700 font-semibold hover:underline"
+          >
+            {parcel.contract_number}
+          </a>
+          {parcel.contract_end_date && (
+            <span className="text-gray-400">· exp. {parcel.contract_end_date}</span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Parcel list item ─────────────────────────────────────────────────────────
 function ParcelItem({
   parcel, isSelected, onView, onDelete, onEdit, onSelect, legendLabel, legendColor,
@@ -284,10 +410,15 @@ export default function MapParcelSelector({
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Live esri-leaflet DynamicMapLayer instances keyed by layer id
   const wmsLayerRefs = useRef<Map<string, EsriLeaflet.DynamicMapLayer>>(new Map())
+  // Centre-pin markers and registry markers (not inside drawnItems)
+  const centreMarkersGroupRef = useRef<L.LayerGroup | null>(null)
+  const registryMarkersGroupRef = useRef<L.LayerGroup | null>(null)
 
   const [parcels, setParcels] = useState<ParceleFitosanitar[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(initialParcelId ?? null)
+  const [registryParcels, setRegistryParcels] = useState<RegistryParcel[]>([])
+  const [popupParcel, setPopupParcel] = useState<RegistryParcel | null>(null)
 
   // Drawing — ring stored in Stereo 70
   const [drawnRingStereo, setDrawnRingStereo] = useState<number[][] | null>(null)
@@ -430,6 +561,12 @@ export default function MapParcelSelector({
     })
     map.on('mouseout', () => { setCursorWgs84(null); setCursorStereo(null) })
 
+    // Separate layer-groups so markers are never inside the editable featureGroup
+    const centreMarkersGroup = L.layerGroup().addTo(map)
+    centreMarkersGroupRef.current = centreMarkersGroup
+    const registryMarkersGroup = L.layerGroup().addTo(map)
+    registryMarkersGroupRef.current = registryMarkersGroup
+
     // Draw controls
     if (allowDraw) {
       const drawnItems = new L.FeatureGroup()
@@ -488,6 +625,22 @@ export default function MapParcelSelector({
           })
         setShowSaveModal(true)
       })
+
+      // Handle edits on the in-progress (unsaved) drawing
+      map.on('draw:edited', (e: L.LeafletEvent) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const layers = (e as any).layers as L.FeatureGroup
+        layers.eachLayer((layer: L.Layer) => {
+          const geo = (layer as L.Polygon).toGeoJSON() as GeoJSON.Feature<GeoJSON.Polygon>
+          const ringStereo = ringWgs84ToStereo70(geo.geometry.coordinates[0])
+          setDrawnRingStereo(ringStereo)
+        })
+      })
+      // Handle deletion of the in-progress (unsaved) drawing
+      map.on('draw:deleted', () => {
+        setDrawnRingStereo(null)
+        setShowSaveModal(false)
+      })
     }
 
     mapRef.current = map
@@ -495,6 +648,8 @@ export default function MapParcelSelector({
       map.remove()
       mapRef.current = null
       drawnItemsRef.current = null
+      centreMarkersGroupRef.current = null
+      registryMarkersGroupRef.current = null
       wmsLayerRefs.current.clear()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -532,20 +687,52 @@ export default function MapParcelSelector({
 
   useEffect(() => { void loadParcels() }, [loadParcels])
 
-  // ── Render parcel polygons ──────────────────────────────────────────────
+  // ── Load registry parcels (parcels table with GPS coords) ───────────────
+  const loadRegistryParcels = useCallback(async () => {
+    const db = createClient()
+    const { data } = await db
+      .from('parcels')
+      .select('id, bloc_fizic, tarla_nr, parcel_nr, county, locality, surface, status, culture, apia_eligible, lat, lng, contract_id, lessors(first_name, last_name, company_name, type), contracts(contract_number, end_date)')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+    if (data) {
+      setRegistryParcels((data as any[]).map(p => {
+        const lessor = p.lessors
+          ? (p.lessors.type === 'LEGAL'
+            ? p.lessors.company_name
+            : `${p.lessors.last_name ?? ''} ${p.lessors.first_name ?? ''}`.trim())
+          : null
+        return {
+          id: p.id, bloc_fizic: p.bloc_fizic, tarla_nr: p.tarla_nr, parcel_nr: p.parcel_nr,
+          county: p.county, locality: p.locality, surface: p.surface, status: p.status,
+          culture: p.culture, apia_eligible: p.apia_eligible, lat: p.lat, lng: p.lng,
+          contract_id: p.contract_id, lessor_name: lessor,
+          contract_number: (p.contracts as any)?.contract_number ?? null,
+          contract_end_date: (p.contracts as any)?.end_date ?? null,
+        } as RegistryParcel
+      }))
+    }
+  }, [])
+
+  useEffect(() => { void loadRegistryParcels() }, [loadRegistryParcels])
+
+  // ── Render parcel polygons + centre-pin markers ─────────────────────────
   useEffect(() => {
     const map = mapRef.current
+    const centreGroup = centreMarkersGroupRef.current
     if (!map) return
     parcelLayersRef.current.forEach(l => map.removeLayer(l))
     parcelLayersRef.current.clear()
+    if (centreGroup) centreGroup.clearLayers()
     parcels.forEach(parcel => {
       const ring = parcel.geometry_geojson?.coordinates?.[0]
       if (!ring || ring.length < 3) return
       const ringWgs84 = isLikelyStereo70(ring[0]) ? ringStereo70ToWgs84(ring) : ring
+      const ringStereo = isLikelyStereo70(ring[0]) ? ring : ringWgs84ToStereo70(ring)
       const isSelected = parcel.id === selectedId
       const legendId = parcelLegendMap[parcel.id]
       const legend = legendItems.find(item => item.id === legendId)
-      const parcelColor = legend?.color ?? '#22c55e'
+      const parcelColor = legend?.color ?? parcel.cultura_color ?? '#22c55e'
       const layer = L.geoJSON(
         { type: 'Polygon', coordinates: [ringWgs84] } as GeoJSON.GeoJsonObject,
         {
@@ -561,9 +748,49 @@ export default function MapParcelSelector({
         .on('click', () => focusParcel(parcel))
       layer.addTo(map)
       parcelLayersRef.current.set(parcel.id, layer)
+      // Centre-pin marker – uses point-in-polygon safe centroid
+      if (centreGroup) {
+        const [cx, cy] = safeCenterStereo70(ringStereo)
+        const [cLat, cLng] = stereo70ToLeaflet(cx, cy)
+        const centreMarker = L.marker([cLat, cLng], { icon: makeCentreIcon(sanitizeColor(parcelColor)) })
+        centreMarker.on('click', () => {
+          const linked = registryParcels.find(rp => rp.id === parcel.parcela_id)
+          if (linked) {
+            setPopupParcel(linked)
+          } else {
+            setPopupParcel({
+              id: parcel.id,
+              bloc_fizic: parcel.nume_parcela,
+              locality: parcel.localitate ?? undefined,
+              county: parcel.judet ?? undefined,
+              surface: parcel.suprafata_ha ?? undefined,
+              culture: parcel.cultura_label ?? undefined,
+            })
+          }
+        })
+        centreGroup.addLayer(centreMarker)
+      }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parcels, selectedId, parcelLegendMap, legendItems])
+  }, [parcels, selectedId, parcelLegendMap, legendItems, registryParcels])
+
+  // ── Render registry-parcel markers (parcels with coords but no polygon) ─
+  useEffect(() => {
+    const map = mapRef.current
+    const regGroup = registryMarkersGroupRef.current
+    if (!map || !regGroup) return
+    regGroup.clearLayers()
+    const linkedIds = new Set(parcels.map(p => p.parcela_id).filter(Boolean))
+    registryParcels.forEach(rp => {
+      if (!rp.lat || !rp.lng) return
+      if (linkedIds.has(rp.id)) return  // polygon centre marker already covers this
+      const marker = L.marker([rp.lat, rp.lng], { icon: makeRegistryIcon('#16a34a') })
+      marker.bindTooltip(rp.bloc_fizic ?? rp.id.slice(0, 8), { sticky: true })
+      marker.on('click', () => setPopupParcel(rp))
+      regGroup.addLayer(marker)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registryParcels, parcels])
 
   function focusParcel(parcel: ParceleFitosanitar) {
     setSelectedId(parcel.id)
@@ -650,7 +877,7 @@ export default function MapParcelSelector({
     const area = calcAreaHaStereo70(drawnRingStereo)
     if (area <= 0) { toast.error('Deseneaza un poligon valid'); return }
     if (area > 10000) { toast.error('Suprafata maxima 10,000 ha'); return }
-    const [cx, cy] = centroidStereo70(drawnRingStereo)
+    const [cx, cy] = safeCenterStereo70(drawnRingStereo)
     const [centruLat, centruLng] = stereo70ToLeaflet(cx, cy)
     setSaving(true)
     const db = createClient()
@@ -680,8 +907,12 @@ export default function MapParcelSelector({
     if (error) toast.error('Eroare la salvare: ' + error.message)
     else {
       toast.success(`Parcela "${saveName}" salvata in Stereo 70!`)
+      // Sync centroid back to the linked registry parcel
+      if (saveLinkedParcelId) {
+        await db.from('parcels').update({ lat: centruLat, lng: centruLng }).eq('id', saveLinkedParcelId)
+      }
       closeSaveModal()
-      await loadParcels()
+      await Promise.all([loadParcels(), loadRegistryParcels()])
       if (data) {
         setParcelLegendMap(prev => ({ ...prev, [data.id]: saveLegendId }))
         focusParcel(data as ParceleFitosanitar)
@@ -743,6 +974,7 @@ export default function MapParcelSelector({
   async function handleDeleteConfirm() {
     if (!deleteId) return
     const db = createClient()
+    const toDelete = parcels.find(p => p.id === deleteId)
     const { error } = await db.from('parcele_fitosanitar').delete().eq('id', deleteId)
     if (error) toast.error('Eroare la stergere: ' + error.message)
     else {
@@ -753,7 +985,11 @@ export default function MapParcelSelector({
         delete next[deleteId]
         return next
       })
-      await loadParcels()
+      // Clear GPS coords from linked registry parcel
+      if (toDelete?.parcela_id) {
+        await db.from('parcels').update({ lat: null, lng: null }).eq('id', toDelete.parcela_id)
+      }
+      await Promise.all([loadParcels(), ...(toDelete?.parcela_id ? [loadRegistryParcels()] : [])])
     }
     setDeleteId(null)
   }
@@ -1018,7 +1254,7 @@ export default function MapParcelSelector({
 
       {/* ── Map + status bar ── */}
       <div
-        className="flex-1 flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm"
+        className="relative flex-1 flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm"
         style={!isModal ? { height } : undefined}
       >
         <div
@@ -1026,6 +1262,13 @@ export default function MapParcelSelector({
           className="flex-1 w-full"
           style={!isModal ? { minHeight: height } : undefined}
         />
+
+        {/* Parcel detail popup – click centre marker or registry marker */}
+        {popupParcel && (
+          <div className="absolute bottom-12 right-3 z-[2000]">
+            <ParcelMapPopup parcel={popupParcel} onClose={() => setPopupParcel(null)} />
+          </div>
+        )}
 
         {/* Status bar */}
         <div className="flex items-center justify-between px-3 py-1.5 bg-gray-900 text-xs font-mono border-t border-gray-700 flex-shrink-0">
@@ -1072,7 +1315,15 @@ export default function MapParcelSelector({
                 </label>
                 <select
                   value={saveLinkedParcelId}
-                  onChange={e => setSaveLinkedParcelId(e.target.value)}
+                  onChange={e => {
+                    const id = e.target.value
+                    setSaveLinkedParcelId(id)
+                    // Auto-fill name from registry parcel if name is still empty
+                    if (id && !saveName.trim()) {
+                      const opt = linkedParcelOptions.find(p => p.id === id)
+                      if (opt) setSaveName(opt.label.split(' — ')[0].trim())
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 >
                   <option value="">— Fără legătură —</option>
