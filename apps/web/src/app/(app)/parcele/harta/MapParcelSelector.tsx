@@ -885,6 +885,41 @@ export default function MapParcelSelector({
     if (!user) { toast.error('Trebuie sa fii autentificat'); setSaving(false); return }
     const geometryStereo70: GeoJSONPolygon = { type: 'Polygon', coordinates: [drawnRingStereo] }
     const legendItem = legendItems.find(i => i.id === saveLegendId)
+
+    // ── Step 1: resolve or create the linked registry parcel ────────────
+    let resolvedParcelaId = saveLinkedParcelId || null
+    if (!resolvedParcelaId) {
+      // Auto-create a parcels entry so the polygon appears in Lista Parcele
+      const { data: newReg, error: regErr } = await db
+        .from('parcels')
+        .insert([{
+          user_id: user.id,
+          bloc_fizic: saveName.trim(),
+          county: saveJudet || '',
+          locality: saveLocalitate || '',
+          surface: area,
+          culture: legendItem?.label ?? null,
+          lat: centruLat,
+          lng: centruLng,
+          status: 'ACTIVE',
+        }])
+        .select('id')
+        .single()
+      if (regErr) {
+        console.warn('Could not auto-create registry parcel:', regErr.message)
+      } else if (newReg) {
+        resolvedParcelaId = newReg.id
+      }
+    } else {
+      // Sync centroid + culture back to the existing registry parcel
+      await db.from('parcels').update({
+        lat: centruLat,
+        lng: centruLng,
+        culture: legendItem?.label ?? null,
+      }).eq('id', resolvedParcelaId)
+    }
+
+    // ── Step 2: save the polygon ─────────────────────────────────────────
     const { data, error } = await db
       .from('parcele_fitosanitar')
       .insert([{
@@ -900,17 +935,13 @@ export default function MapParcelSelector({
         note: saveNote || null,
         cultura_label: legendItem?.label ?? null,
         cultura_color: legendItem?.color ?? null,
-        ...(saveLinkedParcelId ? { parcela_id: saveLinkedParcelId } : {}),
+        ...(resolvedParcelaId ? { parcela_id: resolvedParcelaId } : {}),
       }])
       .select()
       .single()
     if (error) toast.error('Eroare la salvare: ' + error.message)
     else {
-      toast.success(`Parcela "${saveName}" salvata in Stereo 70!`)
-      // Sync centroid back to the linked registry parcel
-      if (saveLinkedParcelId) {
-        await db.from('parcels').update({ lat: centruLat, lng: centruLng }).eq('id', saveLinkedParcelId)
-      }
+      toast.success(`Parcela "${saveName}" salvata — vizibila în Lista și pe Hartă!`)
       closeSaveModal()
       await Promise.all([loadParcels(), loadRegistryParcels()])
       if (data) {
@@ -951,6 +982,7 @@ export default function MapParcelSelector({
     setEditSaving(true)
     const db = createClient()
     const legendItem = legendItems.find(i => i.id === editLegendId)
+    const parcel = parcels.find(p => p.id === editId)
     const { error } = await db
       .from('parcele_fitosanitar')
       .update({
@@ -964,10 +996,19 @@ export default function MapParcelSelector({
       .eq('id', editId)
     setEditSaving(false)
     if (error) { toast.error('Eroare la editare: ' + error.message); return }
+    // Sync changes back to the linked registry parcel
+    if (parcel?.parcela_id) {
+      await db.from('parcels').update({
+        bloc_fizic: editName.trim(),
+        locality: editLocalitate || null,
+        county: editJudet || null,
+        culture: legendItem?.label ?? null,
+      }).eq('id', parcel.parcela_id)
+    }
     setParcelLegendMap(prev => ({ ...prev, [editId]: editLegendId }))
     toast.success('Parcela actualizată.')
     setEditId(null)
-    await loadParcels()
+    await Promise.all([loadParcels(), loadRegistryParcels()])
   }
 
   // ── Delete ──────────────────────────────────────────────────────────────
