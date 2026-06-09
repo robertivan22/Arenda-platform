@@ -9,3 +9,4 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 SENTINEL_HUB_CLIENT_ID = "sh-be9705ef-1648-4e81-ba89-1ccc63b18e1c"
 SENTINEL_HUB_BASE_URL = "https://sh.dataspace.copernicus.eu"
 SENTINEL_HUB_TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
+ANAF_ENV = "test"
