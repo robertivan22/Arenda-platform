@@ -1,7 +1,7 @@
 // ─── Sentinel Hub / CDSE Statistics API client ───────────────────────────────
-// Collection: sentinel-2-l1c (S2L1C) — instance f8b5635c, evalscript uses index() helper.
+// Collection: sentinel-2-l2a (L2A = BOA, atmospherically corrected — correct for analytics).
 // Statistics API v1, unnamed 2-band output: B0=NDVI, B1=dataMask.
-// dataMask in L1C = scene-edge mask ONLY (not cloud); no maskMean cloud filter.
+// Evalscript uses explicit formula (index() helper not guaranteed in Stats API).
 
 export type BBox = [number, number, number, number]
 
@@ -115,20 +115,19 @@ export async function fetchParcelNdviStats(params: {
       bounds: { bbox: params.bbox },
       data: [
         {
-          type: 'sentinel-2-l1c',
-          dataFilter: {
-            maxCloudCoverage: 20,
-            timeRange: { from: params.from, to: params.to },
-          },
+          type: 'sentinel-2-l2a',
+          // maxCloudCoverage filters scenes at acquisition time.
+          // Do NOT include timeRange here — it belongs only in aggregation.timeRange.
+          dataFilter: { maxCloudCoverage: 20 },
         },
       ],
     },
     aggregation: {
       timeRange: { from: params.from, to: params.to },
       aggregationInterval: { of: params.aggregationInterval ?? 'P10D' },
-      // Evalscript identical to the CDSE "NDVI TEST" layer (instance f8b5635c).
-      // Unnamed 2-band output: B0 = NDVI, B1 = dataMask.
-      // L1C dataMask = 1 for valid pixels, 0 only at scene edges (not clouds).
+      // Numeric analytics evalscript — NOT a color-ramp visualization script.
+      // Band 0 (B0) = NDVI value (finite float), Band 1 (B1) = dataMask.
+      // Explicit formula — avoids relying on index() helper availability in Stats API.
       evalscript: `//VERSION=3
 function setup() {
   return {
@@ -137,8 +136,8 @@ function setup() {
   };
 }
 function evaluatePixel(samples) {
-  var val = index(samples.B08, samples.B04);
-  return [val, samples.dataMask];
+  var ndvi = (samples.B08 - samples.B04) / (samples.B08 + samples.B04 + 0.0001);
+  return [ndvi, samples.dataMask];
 }`,
     },
   }
@@ -156,7 +155,11 @@ function evaluatePixel(samples) {
   }
 
   const json = (await res.json()) as StatsResponse
-  console.info('[NDVI] Stats response intervals:', json.data?.length ?? 0)
+  const validCount = (json.data ?? []).filter(d => {
+    const m = d.outputs?.default?.bands?.B0?.stats?.mean
+    return typeof m === 'number' && isFinite(m)
+  }).length
+  console.info('[NDVI] Stats response: total intervals =', json.data?.length ?? 0, 'valid =', validCount)
   return json
 }
 
@@ -169,9 +172,9 @@ export function extractParcelNdvi(stats: StatsResponse): ParcelNdviResult {
       const noDataCount = typeof ndviStats?.noDataCount === 'number' ? ndviStats.noDataCount : null
       const rawMean = ndviStats?.mean
       const mean = typeof rawMean === 'number' && isFinite(rawMean) ? round(rawMean, 3) : null
-      // For L1C dataMask is scene-edge only — cloud blocking is solely via maxCloudCoverage
-      // on the scene selector. Only discard intervals with zero valid pixels.
-      const cloudBlock = sampleCount === null || sampleCount < 1
+      // cloud_block = true when fewer than 10 valid (non-masked) pixels were
+      // aggregated. A tiny sampleCount means NDVI is statistically unreliable.
+      const cloudBlock = sampleCount === null || sampleCount < 10
       return {
         from: item.interval?.from ?? null,
         to: item.interval?.to ?? null,
@@ -215,9 +218,10 @@ export async function getParcelNdviFromLatLng(params: {
 }): Promise<ParcelNdviResult> {
   const bbox = parcelToBBox(params.lat, params.lng, params.bboxDelta ?? 0.01)
   const to = `${params.fetchDate}T23:59:59Z`
-  // 30-day lookback with 20% maxCloudCoverage — matches the CDSE layer config (1-month window)
+  // 60-day lookback: at 20% maxCloudCoverage in central/eastern Europe we need
+  // a wider window to guarantee ≥2 valid P10D intervals for trend computation.
   const fromDate = new Date(`${params.fetchDate}T00:00:00Z`)
-  fromDate.setUTCDate(fromDate.getUTCDate() - 30)
+  fromDate.setUTCDate(fromDate.getUTCDate() - 60)
   const from = fromDate.toISOString().replace('.000Z', 'Z')
 
   const stats = await fetchParcelNdviStats({ bbox, from, to, aggregationInterval: 'P10D' })

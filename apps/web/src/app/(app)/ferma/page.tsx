@@ -140,9 +140,15 @@ function ParcelCard({ result, name, selected, onClick }: {
           <h3 className="font-semibold text-gray-900 truncate text-sm">{name}</h3>
           <p className="text-xs text-gray-500 mt-0.5">{meta.join(' · ') || '—'}</p>
         </div>
-        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border flex-shrink-0 ${healthBg(result.health_label)}`}>
-          {result.health_label} · {result.health_score}%
-        </span>
+        {result.no_data ? (
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full border flex-shrink-0 bg-gray-100 text-gray-500 border-gray-200">
+            Date indisponibile
+          </span>
+        ) : (
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border flex-shrink-0 ${healthBg(result.health_label)}`}>
+            {result.health_label} · {result.health_score}%
+          </span>
+        )}
       </div>
       <div className="grid grid-cols-5 gap-2 mb-3">
         <ParcelKpiMini label="Temp" icon={Thermometer} iconClass="text-orange-500"

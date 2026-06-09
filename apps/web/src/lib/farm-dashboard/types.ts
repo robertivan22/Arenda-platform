@@ -64,6 +64,8 @@ export interface ParcelResult {
   alerts: Alert[]
   health_score: number
   health_label: HealthLabel
+  /** true when weather, soil AND ndvi all returned no usable data (coords bad or APIs down) */
+  no_data: boolean
 }
 
 export interface FarmSummary {

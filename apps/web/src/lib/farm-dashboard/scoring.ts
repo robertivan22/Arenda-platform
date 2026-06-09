@@ -6,9 +6,18 @@ export function computeHealthScore(
   soil: SoilData,
   alerts: Alert[],
 ): { score: number; label: HealthLabel } {
+  const nc = ndvi.current
+
+  // ── No-data guard ────────────────────────────────────────────────────────
+  // When BOTH sensor inputs are unavailable, the formula would produce 37 which
+  // falls into "Critic" — a completely misleading result for missing telemetry.
+  // Return a neutral 50/Moderat instead; the UI marks these with no_data=true.
+  if (nc == null && soil.status == null) {
+    return { score: 50, label: 'Moderat' }
+  }
+
   // NDVI component (0–40 pts)
   let ndvi_pts: number
-  const nc = ndvi.current
   if (nc == null) ndvi_pts = 20          // unknown: neutral mid-score
   else if (nc >= 0.6) ndvi_pts = 40
   else if (nc >= 0.4) ndvi_pts = 25

@@ -27,11 +27,13 @@ function nullParcel(input: ParcelInput): ParcelResult {
     alerts: [],
     health_score: 50,
     health_label: 'Moderat',
+    no_data: true,
   }
 }
 
-function validCoords(lat: number, lng: number): boolean {
+function validCoords(lat: unknown, lng: unknown): lat is number {
   return (
+    typeof lat === 'number' && typeof lng === 'number' &&
     isFinite(lat) && isFinite(lng) &&
     lat >= -90 && lat <= 90 &&
     lng >= -180 && lng <= 180 &&
@@ -40,12 +42,22 @@ function validCoords(lat: number, lng: number): boolean {
 }
 
 async function processParcel(input: ParcelInput): Promise<ParcelResult> {
-  if (!validCoords(input.lat, input.lng)) return nullParcel(input)
+  if (!validCoords(input.lat, input.lng)) {
+    console.warn('[Dashboard] Invalid coords for parcel', input.id, { lat: input.lat, lng: input.lng })
+    return nullParcel(input)
+  }
 
   const [weatherSettled, ndviSettled] = await Promise.allSettled([
     fetchOpenMeteo(input.lat, input.lng),
     getParcelNdviFromLatLng({ lat: input.lat, lng: input.lng, fetchDate: TODAY }),
   ])
+
+  if (weatherSettled.status === 'rejected') {
+    console.error('[Dashboard] Weather fetch rejected for', input.id, weatherSettled.reason)
+  }
+  if (ndviSettled.status === 'rejected') {
+    console.error('[Dashboard] NDVI fetch rejected for', input.id, String(ndviSettled.reason))
+  }
 
   const rawWeather = weatherSettled.status === 'fulfilled' ? weatherSettled.value : null
   const weather = normalizeWeather(rawWeather)
@@ -53,6 +65,12 @@ async function processParcel(input: ParcelInput): Promise<ParcelResult> {
 
   const ndviResult = ndviSettled.status === 'fulfilled' ? ndviSettled.value : null
   const ndvi: NdviData = ndviResult ?? { ...NULL_NDVI }
+
+  const no_data = (
+    weather.temp_current == null &&
+    soil.moisture_avg == null &&
+    ndvi.current == null
+  )
 
   const alerts = computeAlerts({ weather, soil, ndvi, bbch_stage: input.bbch_stage ?? null })
   const { score: health_score, label: health_label } = computeHealthScore(ndvi, soil, alerts)
@@ -69,6 +87,7 @@ async function processParcel(input: ParcelInput): Promise<ParcelResult> {
     alerts,
     health_score,
     health_label,
+    no_data,
   }
 }
 
