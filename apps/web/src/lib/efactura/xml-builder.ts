@@ -65,6 +65,24 @@ function contactBlock(phone: string | null | undefined, email: string | null | u
       </cac:Contact>`
 }
 
+/**
+ * BR-CO-09: PartyTaxScheme/CompanyID must start with ISO 3166-1 alpha-2 country code.
+ * For NATURAL persons (CNP holders): omit PartyTaxScheme entirely — CNP is not a VAT ID.
+ * For LEGAL / PFA: include with "RO" prefix on the CUI.
+ */
+function customerPartyTaxScheme(cifCnp: string, type: string): string {
+  if (type === 'NATURAL') return ''          // natural persons have no VAT ID (BT-48 is optional)
+  const val = cifCnp.replace(/\s/g, '')
+  const id = /^[A-Za-z]{2}/.test(val) ? val.toUpperCase() : `RO${val}`
+  return `
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>${xe(id)}</cbc:CompanyID>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:PartyTaxScheme>`
+}
+
 // ─── Main builder ─────────────────────────────────────────────────────────────
 
 export function buildInvoiceXml(inv: EFacturaInvoice): string {
@@ -159,13 +177,7 @@ export function buildInvoiceXml(inv: EFacturaInvoice): string {
         <cac:Country>
           <cbc:IdentificationCode>RO</cbc:IdentificationCode>
         </cac:Country>
-      </cac:PostalAddress>
-      <cac:PartyTaxScheme>
-        <cbc:CompanyID>${xe(inv.customer.cif_cnp)}</cbc:CompanyID>
-        <cac:TaxScheme>
-          <cbc:ID>VAT</cbc:ID>
-        </cac:TaxScheme>
-      </cac:PartyTaxScheme>
+      </cac:PostalAddress>${customerPartyTaxScheme(inv.customer.cif_cnp, inv.customer.type)}
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${xe(inv.customer.name)}</cbc:RegistrationName>
         <cbc:CompanyID>${xe(inv.customer.cif_cnp)}</cbc:CompanyID>
