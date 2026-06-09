@@ -55,11 +55,14 @@ const OP_COLORS: Record<string, string> = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface Machine { id: string; name: string; type: string }
+
 interface WorkOrder {
   id: string
   campaign_id: string
   parcel_id: string | null
   crop_plan_id: string | null
+  machine_id: string | null
   operation_type: string
   planned_date: string | null
   executed_date: string | null
@@ -70,6 +73,7 @@ interface WorkOrder {
   // joined
   parcel_name?: string | null
   parcel_surface?: number | null
+  machine_name?: string | null
 }
 
 interface Parcel {
@@ -100,7 +104,7 @@ const INPUT_TYPES = [
   { value: 'ALTELE',      label: 'Altele' },
 ]
 
-type FormState = Omit<WorkOrder, 'id' | 'campaign_id' | 'created_at' | 'parcel_name' | 'parcel_surface' | 'area_ha'> & {
+type FormState = Omit<WorkOrder, 'id' | 'campaign_id' | 'created_at' | 'parcel_name' | 'parcel_surface' | 'machine_name' | 'area_ha'> & {
   parcel_id: string
   area_ha: string
 }
@@ -108,6 +112,7 @@ type FormState = Omit<WorkOrder, 'id' | 'campaign_id' | 'created_at' | 'parcel_n
 const EMPTY_FORM = (): FormState => ({
   parcel_id: '',
   crop_plan_id: null,
+  machine_id: null,
   operation_type: 'SEMANAT',
   planned_date: null,
   executed_date: null,
@@ -136,24 +141,24 @@ function fmtDate(d: string | null) {
 function CampaignTabs({ year }: { year: number }) {
   const pathname = usePathname()
   const isActivitati = pathname.endsWith('/activitati')
+  const isStocuri = pathname.endsWith('/stocuri')
   return (
     <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
-      <a
-        href={`/campanie/${year}`}
-        className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-          !isActivitati ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
-        }`}
-      >
-        Planuri culturi
-      </a>
-      <a
-        href={`/campanie/${year}/activitati`}
-        className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-          isActivitati ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
-        }`}
-      >
-        Activități câmp
-      </a>
+      {[
+        { label: 'Planuri culturi', href: `/campanie/${year}` },
+        { label: 'Activități câmp', href: `/campanie/${year}/activitati` },
+        { label: 'Stocuri & Inputuri', href: `/campanie/${year}/stocuri` },
+      ].map(t => {
+        const active = (isActivitati && t.href.endsWith('activitati')) || (isStocuri && t.href.endsWith('stocuri')) || (!isActivitati && !isStocuri && t.href === `/campanie/${year}`)
+        return (
+          <a key={t.href} href={t.href}
+            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+              active ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {t.label}
+          </a>
+        )
+      })}
     </div>
   )
 }
@@ -167,6 +172,7 @@ export default function ActivitatiPage() {
 
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [parcels, setParcels] = useState<Parcel[]>([])
+  const [machines, setMachines] = useState<Machine[]>([])
   const [orders, setOrders] = useState<WorkOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -202,6 +208,16 @@ export default function ActivitatiPage() {
       .then(({ data }) => { if (data) setParcels(data as Parcel[]) })
   }, [])
 
+  // ── Load machines ──
+  useEffect(() => {
+    createClient()
+      .from('machines')
+      .select('id,name,type')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => { if (data) setMachines(data as Machine[]) })
+  }, [])
+
   // ── Load work orders ──
   async function loadOrders(cam?: Campaign | null) {
     const c = cam ?? campaign
@@ -214,10 +230,12 @@ export default function ActivitatiPage() {
       .eq('campaign_id', c.id)
       .order('planned_date', { ascending: true })
     if (data) {
+      const machineMap = new Map(machines.map(m => [m.id, m.name]))
       setOrders(data.map((r: any) => ({
         ...r,
         parcel_name: r.parcels?.bloc_fizic ?? null,
         parcel_surface: r.parcels?.surface ?? null,
+        machine_name: r.machine_id ? (machineMap.get(r.machine_id) ?? null) : null,
       })))
     }
     setLoading(false)
@@ -306,6 +324,7 @@ export default function ActivitatiPage() {
       user_id: user.id,
       campaign_id: campaign.id,
       parcel_id: form.parcel_id || null,
+      machine_id: form.machine_id || null,
       operation_type: form.operation_type,
       planned_date: form.planned_date || null,
       executed_date: form.executed_date || null,
@@ -334,6 +353,7 @@ export default function ActivitatiPage() {
     setForm({
       parcel_id: o.parcel_id ?? '',
       crop_plan_id: o.crop_plan_id,
+      machine_id: o.machine_id,
       operation_type: o.operation_type,
       planned_date: o.planned_date,
       executed_date: o.executed_date,
@@ -410,6 +430,14 @@ export default function ActivitatiPage() {
                     {p.bloc_fizic ?? p.id.slice(0, 8)}{p.locality ? ` — ${p.locality}` : ''}
                   </option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Utilaj</label>
+              <select className={inputCls} value={form.machine_id ?? ''}
+                onChange={e => setForm(f => ({ ...f, machine_id: e.target.value || null }))}>
+                <option value="">— Fără utilaj —</option>
+                {machines.map(m => <option key={m.id} value={m.id}>{m.name} ({m.type})</option>)}
               </select>
             </div>
             <div>
@@ -502,6 +530,7 @@ export default function ActivitatiPage() {
             <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-medium uppercase tracking-wide">
               <th className="px-4 py-3 text-left">Operație</th>
               <th className="px-4 py-3 text-left">Parcelă</th>
+              <th className="px-4 py-3 text-left">Utilaj</th>
               <th className="px-4 py-3 text-left">Dată planif.</th>
               <th className="px-4 py-3 text-left">Dată exec.</th>
               <th className="px-4 py-3 text-right">Suprafață</th>
@@ -512,12 +541,12 @@ export default function ActivitatiPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading && (
-              <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">
-                <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />Încarcare...
+              <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">
+                <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />Încărcare...
               </td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+              <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">
                 {orders.length === 0 ? 'Nicio activitate înregistrată pentru această campanie.' : 'Niciun rezultat pentru filtrele aplicate.'}
               </td></tr>
             )}
@@ -536,6 +565,9 @@ export default function ActivitatiPage() {
                     {o.parcel_surface && (
                       <span className="text-xs text-gray-400 ml-1">({o.parcel_surface} ha)</span>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">
+                    {o.machine_name ?? <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(o.planned_date)}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(o.executed_date)}</td>
@@ -570,7 +602,7 @@ export default function ActivitatiPage() {
                 {/* ── Inputs sub-row ── */}
                 {expandedId === o.id && (
                   <tr key={o.id + '_inputs'} className="bg-gray-50">
-                    <td colSpan={8} className="px-6 py-3">
+                    <td colSpan={9} className="px-6 py-3">
                       <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Materiale / Inputuri consumate</div>
                       {(inputsCache.get(o.id) ?? []).length > 0 && (
                         <table className="w-full text-xs mb-3">

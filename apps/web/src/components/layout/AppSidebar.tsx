@@ -62,6 +62,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
         children: [
           { label: 'Planuri culturi', href: '/campanie' },
           { label: 'Activități câmp', href: '/campanie/activitati' },
+          { label: 'Stocuri & Inputuri', href: '/campanie/stocuri' },
         ],
       },
     ],

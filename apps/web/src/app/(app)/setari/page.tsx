@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Plus, Trash2, Building2, Package, Upload, X, FileSpreadsheet, Shield, Wheat } from 'lucide-react'
+import { Plus, Trash2, Building2, Package, Upload, X, FileSpreadsheet, Shield, Wheat, Tractor } from 'lucide-react'
 import { VALID_CASA_ANG } from '@/lib/d112Validator'
 import type { Campaign } from '@/lib/campaign-types'
 
@@ -51,6 +51,12 @@ interface AsiguratorSettings {
   asig_motiv_exc: string      // motivExc — motiv exceptare
 }
 
+interface Machine {
+  id: string; user_id: string; name: string; type: string
+  brand: string | null; model: string | null; year: number | null
+  plate: string | null; fuel_type: string; is_active: boolean; notes: string | null
+}
+
 interface Product {
   id: string; name: string; unit: string; sort_order: number
 }
@@ -68,7 +74,7 @@ const EMPTY_D112: D112Settings = {
 }
 
 export default function SetariPage() {
-  const [tab, setTab] = useState<'company' | 'products' | 'd112' | 'asigurator' | 'campanii'>('company')
+  const [tab, setTab] = useState<'company' | 'products' | 'd112' | 'asigurator' | 'campanii' | 'utilaje'>('company')
   const [company, setCompany] = useState<CompanySettings>(EMPTY_COMPANY)
   const [savingCompany, setSavingCompany] = useState(false)
   const [d112, setD112] = useState<D112Settings>(EMPTY_D112)
@@ -89,6 +95,9 @@ export default function SetariPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [newProduct, setNewProduct] = useState({ name: '', unit: 'kg' })
   const [savingProduct, setSavingProduct] = useState(false)
+  const [machines, setMachines] = useState<Machine[]>([])
+  const [newMachine, setNewMachine] = useState({ name: '', type: 'TRACTOR', brand: '', model: '', year: '', plate: '', fuel_type: 'motorina', notes: '' })
+  const [savingMachine, setSavingMachine] = useState(false)
 
   const inputCls = 'w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500'
   const labelCls = 'block text-xs font-medium text-gray-700 mb-1'
@@ -136,7 +145,50 @@ export default function SetariPage() {
     })
     loadProducts(db)
     loadCampaigns(db)
+    loadMachines(db)
   }, [])
+
+  async function loadMachines(db = createClient()) {
+    const { data } = await db.from('machines').select('*').order('name')
+    if (data) setMachines(data as Machine[])
+  }
+
+  async function addMachine(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newMachine.name.trim()) return
+    setSavingMachine(true)
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) { setSavingMachine(false); return }
+    const { error } = await db.from('machines').insert({
+      user_id: user.id,
+      name: newMachine.name.trim(),
+      type: newMachine.type,
+      brand: newMachine.brand || null,
+      model: newMachine.model || null,
+      year: newMachine.year ? parseInt(newMachine.year) : null,
+      plate: newMachine.plate || null,
+      fuel_type: newMachine.fuel_type,
+      notes: newMachine.notes || null,
+    })
+    setSavingMachine(false)
+    if (error) { toast.error(error.message); return }
+    setNewMachine({ name: '', type: 'TRACTOR', brand: '', model: '', year: '', plate: '', fuel_type: 'motorina', notes: '' })
+    toast.success('Utilaj adăugat.')
+    loadMachines()
+  }
+
+  async function toggleMachineActive(m: Machine) {
+    await createClient().from('machines').update({ is_active: !m.is_active }).eq('id', m.id)
+    setMachines(prev => prev.map(x => x.id === m.id ? { ...x, is_active: !m.is_active } : x))
+  }
+
+  async function deleteMachine(id: string) {
+    const { error } = await createClient().from('machines').delete().eq('id', id)
+    if (error) { toast.error(error.message); return }
+    setMachines(m => m.filter(x => x.id !== id))
+    toast.success('Utilaj șters.')
+  }
 
   async function loadProducts(db = createClient()) {
     const { data, error } = await db.from('products').select('*').order('sort_order').order('name')
@@ -267,6 +319,7 @@ export default function SetariPage() {
           ['company', Building2, 'Date firma'],
           ['products', Package, 'Produse arenda'],
           ['campanii', Wheat, 'Campanii'],
+          ['utilaje', Tractor, 'Utilaje'],
           ['d112', FileSpreadsheet, 'Date Declaratie 112'],
           ['asigurator', Shield, 'Date Asigurator'],
         ] as const).map(([key, Icon, label]) => (
@@ -513,6 +566,98 @@ export default function SetariPage() {
             >
               <Plus className="w-4 h-4" />
               {savingCampaign ? 'Se salvează...' : 'Adaugă campanie'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Utilaje Tab */}
+      {tab === 'utilaje' && (
+        <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-5">
+          <p className="text-xs text-gray-500">
+            Registrul utilajelor agricole. Utilajele active pot fi asociate activităților câmp.
+          </p>
+
+          {/* Machine list */}
+          {machines.length > 0 && (
+            <div className="space-y-2">
+              {machines.map(m => (
+                <div key={m.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-lg bg-gray-50">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-gray-800">{m.name}</span>
+                      <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{m.type}</span>
+                      {!m.is_active && <span className="text-xs text-gray-400">(inactiv)</span>}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {[m.brand, m.model, m.year, m.plate].filter(Boolean).join(' · ')}
+                      {m.fuel_type && ` · ${m.fuel_type}`}
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => void toggleMachineActive(m)}
+                    className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-gray-500">
+                    {m.is_active ? 'Dezactivează' : 'Activează'}
+                  </button>
+                  <button type="button" onClick={() => void deleteMachine(m.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add machine form */}
+          <form onSubmit={e => void addMachine(e)} className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-medium text-gray-700 mb-3">Utilaj nou</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Denumire *</label>
+                <input className={inputCls} required placeholder="ex: John Deere 6140R"
+                  value={newMachine.name} onChange={e => setNewMachine(p => ({ ...p, name: e.target.value }))} />
+              </div>
+              <div>
+                <label className={labelCls}>Tip *</label>
+                <select className={inputCls} value={newMachine.type} onChange={e => setNewMachine(p => ({ ...p, type: e.target.value }))}>
+                  {['TRACTOR','COMBINA','SEMANATOARE','STROPITOARE','REMORCA','ALTELE'].map(t =>
+                    <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Marcă</label>
+                <input className={inputCls} placeholder="John Deere"
+                  value={newMachine.brand} onChange={e => setNewMachine(p => ({ ...p, brand: e.target.value }))} />
+              </div>
+              <div>
+                <label className={labelCls}>Model</label>
+                <input className={inputCls} placeholder="6140R"
+                  value={newMachine.model} onChange={e => setNewMachine(p => ({ ...p, model: e.target.value }))} />
+              </div>
+              <div>
+                <label className={labelCls}>An fabricație</label>
+                <input className={inputCls} type="number" min={1950} max={2100} placeholder="2020"
+                  value={newMachine.year} onChange={e => setNewMachine(p => ({ ...p, year: e.target.value }))} />
+              </div>
+              <div>
+                <label className={labelCls}>Nr. înmatriculare</label>
+                <input className={inputCls} placeholder="IS 01 AAA"
+                  value={newMachine.plate} onChange={e => setNewMachine(p => ({ ...p, plate: e.target.value }))} />
+              </div>
+              <div>
+                <label className={labelCls}>Combustibil</label>
+                <select className={inputCls} value={newMachine.fuel_type} onChange={e => setNewMachine(p => ({ ...p, fuel_type: e.target.value }))}>
+                  {['motorina','benzina','electric','hibrid'].map(f => <option key={f}>{f}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Observații</label>
+                <input className={inputCls} value={newMachine.notes} onChange={e => setNewMachine(p => ({ ...p, notes: e.target.value }))} />
+              </div>
+            </div>
+            <button type="submit" disabled={savingMachine}
+              className="mt-3 flex items-center gap-1.5 px-4 py-2 text-sm bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">
+              <Plus className="w-4 h-4" />
+              {savingMachine ? 'Se salvează...' : 'Adaugă utilaj'}
             </button>
           </form>
         </div>

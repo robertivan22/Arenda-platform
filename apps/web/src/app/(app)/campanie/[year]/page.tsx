@@ -87,24 +87,24 @@ interface EditState {
 function CampaignTabs({ year }: { year: number }) {
   const pathname = usePathname()
   const isActivitati = pathname.endsWith('/activitati')
+  const isStocuri = pathname.endsWith('/stocuri')
   return (
     <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
-      <a
-        href={`/campanie/${year}`}
-        className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-          !isActivitati ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
-        }`}
-      >
-        Planuri culturi
-      </a>
-      <a
-        href={`/campanie/${year}/activitati`}
-        className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-          isActivitati ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
-        }`}
-      >
-        Activități câmp
-      </a>
+      {[
+        { label: 'Planuri culturi', href: `/campanie/${year}` },
+        { label: 'Activități câmp', href: `/campanie/${year}/activitati` },
+        { label: 'Stocuri & Inputuri', href: `/campanie/${year}/stocuri` },
+      ].map(t => {
+        const active = pathname === t.href || (!pathname.endsWith('/activitati') && !isStocuri && t.href === `/campanie/${year}`) || (isActivitati && t.href.endsWith('activitati')) || (isStocuri && t.href.endsWith('stocuri'))
+        return (
+          <a key={t.href} href={t.href}
+            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+              active ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {t.label}
+          </a>
+        )
+      })}
     </div>
   )
 }
