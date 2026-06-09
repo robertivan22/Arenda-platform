@@ -95,6 +95,9 @@ export interface MachineWorkLog {
   end_hours: number | null
   notes: string | null
   created_at: string
+  // Joined fields from Supabase nested select
+  operators?: { name: string } | null
+  implements?: { name: string } | null
 }
 
 export interface TelematicsDevice {
