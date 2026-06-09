@@ -132,10 +132,11 @@ export async function fetchParcelNdviStats(params: {
     aggregation: {
       timeRange: { from: params.from, to: params.to },
       aggregationInterval: { of: params.aggregationInterval ?? 'P10D' },
-      // resx/resy are required by the Statistics API to know the processing grid.
-      // 10m matches the native resolution of S2 bands B04 and B08.
-      resx: 10,
-      resy: 10,
+      // Resolution must be in the native units of the CRS (EPSG:4326 = degrees).
+      // 0.0001° ≈ 11m in latitude, ≈ 8m in longitude at 44°N — close to
+      // Sentinel-2's native 10m, well under the S2L2A 1500 m/px API limit.
+      resx: 0.0001,
+      resy: 0.0001,
       evalscript: `//VERSION=3
 function setup() {
   return {
