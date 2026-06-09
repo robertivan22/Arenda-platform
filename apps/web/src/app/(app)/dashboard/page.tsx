@@ -3,9 +3,20 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Users, FileText, MapPin, CreditCard, AlertTriangle, Clock, Plus, BarChart3, MessageSquare } from 'lucide-react'
+import { Users, FileText, MapPin, CreditCard, AlertTriangle, Clock, Plus, BarChart3, MessageSquare, Wheat, Tractor, ArrowRight } from 'lucide-react'
 
 export const runtime = 'edge'
+
+interface CampaignWidget {
+  id: string
+  name: string
+  year: number
+  totalParcels: number
+  plannedParcels: number
+  harvestedParcels: number
+  opsFinished: number
+  opsTotal: number
+}
 
 interface Stats {
   lessorsTotal: number
@@ -52,6 +63,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
+  const [campaignWidget, setCampaignWidget] = useState<CampaignWidget | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -77,6 +89,29 @@ export default function DashboardPage() {
       const paymentsOverdueAmount = ((overdueData ?? []) as any[]).reduce((acc, p) => acc + Number(p.ron_net ?? 0), 0).toFixed(2)
       setS({ lessorsTotal: lessorsTotal ?? 0, contractsActive: contractsActive ?? 0, contractsExpiring: contractsExpiring ?? 0, parcelsTotal: (parcelsData ?? []).length, surfaceTotal, paymentsOverdue, paymentsOverdueAmount })
       setLoading(false)
+
+      // Campaign progress widget
+      try {
+        const { data: activeCampaign } = await db.from('campaigns').select('id,name,year').eq('is_active', true).maybeSingle()
+        if (activeCampaign) {
+          const [{ count: totalParcels }, { data: plans }, { count: opsTotal }, { count: opsFinished }] = await Promise.all([
+            db.from('parcels').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+            db.from('crop_plans').select('parcel_id,status').eq('campaign_id', activeCampaign.id),
+            db.from('work_orders').select('id', { count: 'exact', head: true }).eq('campaign_id', activeCampaign.id),
+            db.from('work_orders').select('id', { count: 'exact', head: true }).eq('campaign_id', activeCampaign.id).eq('status', 'FINALIZAT'),
+          ])
+          setCampaignWidget({
+            id: activeCampaign.id,
+            name: activeCampaign.name,
+            year: activeCampaign.year,
+            totalParcels: totalParcels ?? 0,
+            plannedParcels: (plans ?? []).length,
+            harvestedParcels: (plans ?? []).filter((p: any) => p.status === 'RECOLTAT').length,
+            opsFinished: opsFinished ?? 0,
+            opsTotal: opsTotal ?? 0,
+          })
+        }
+      } catch { /* campaigns table may not exist yet */ }
       // Admin: check for unread contact messages
       const { data: { user } } = await db.auth.getUser()
       if (user) {
@@ -162,6 +197,61 @@ export default function DashboardPage() {
           sub={loading ? undefined : `${s.paymentsOverdueAmount} RON total neplătit`} />
         <StatCard label="Valoare neplătită (RON)"       value={dash ?? s.paymentsOverdueAmount} icon={CreditCard}     iconBg="bg-sky-100"     iconColor="text-sky-600" />
       </div>
+
+      {/* Campaign Progress Widget */}
+      {campaignWidget && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm mb-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-xl"><Wheat className="w-5 h-5 text-green-700" /></div>
+              <div>
+                <div className="text-xs text-green-600 font-semibold uppercase tracking-wide">{campaignWidget.year}</div>
+                <div className="text-base font-bold text-gray-800">{campaignWidget.name}</div>
+              </div>
+            </div>
+            <a href={`/campanie/${campaignWidget.year}`}
+              className="flex items-center gap-1 text-xs text-brand-600 border border-brand-200 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors">
+              Deschide <ArrowRight className="w-3 h-3" />
+            </a>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                <span>Planuri culturi</span>
+                <span className="font-medium text-gray-700">{campaignWidget.plannedParcels} / {campaignWidget.totalParcels} parcele</span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-brand-500 rounded-full transition-all"
+                  style={{ width: `${campaignWidget.totalParcels ? (campaignWidget.plannedParcels / campaignWidget.totalParcels) * 100 : 0}%` }} />
+              </div>
+            </div>
+            {campaignWidget.harvestedParcels > 0 && (
+              <div>
+                <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                  <span>Recoltat</span>
+                  <span className="font-medium text-gray-700">{campaignWidget.harvestedParcels} / {campaignWidget.plannedParcels} parcele planificate</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-amber-400 rounded-full transition-all"
+                    style={{ width: `${campaignWidget.plannedParcels ? (campaignWidget.harvestedParcels / campaignWidget.plannedParcels) * 100 : 0}%` }} />
+                </div>
+              </div>
+            )}
+            {campaignWidget.opsTotal > 0 && (
+              <div>
+                <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                  <span>Activități câmp finalizate</span>
+                  <span className="font-medium text-gray-700">{campaignWidget.opsFinished} / {campaignWidget.opsTotal} operații</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-teal-500 rounded-full transition-all"
+                    style={{ width: `${(campaignWidget.opsFinished / campaignWidget.opsTotal) * 100}%` }} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Quick actions */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">

@@ -10,7 +10,7 @@ import { CampaignSelector } from '@/components/CampaignSelector'
 import { toast } from 'sonner'
 import {
   Plus, Pencil, Check, X, ChevronDown, Wheat, Loader2,
-  MapPin, TrendingUp, BarChart3, Leaf,
+  MapPin, TrendingUp, BarChart3, Leaf, ArrowDownToLine,
 } from 'lucide-react'
 import type { Campaign, CropPlan } from '@/lib/campaign-types'
 
@@ -53,8 +53,22 @@ interface Parcel {
   culture: string | null
 }
 
+interface HarvestLot {
+  id: string
+  parcel_id: string
+  crop_plan_id: string | null
+  crop: string
+  harvested_date: string | null
+  area_harvested_ha: number | null
+  yield_t_ha: number | null
+  total_quantity_t: number | null
+  moisture_pct: number | null
+  notes: string | null
+}
+
 interface Row extends Parcel {
   plan: CropPlan | null
+  harvest: HarvestLot | null
 }
 
 interface EditState {
@@ -115,6 +129,9 @@ export default function CampaniePage() {
   const [editing, setEditing] = useState<EditState | null>(null)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [harvesting, setHarvesting] = useState<string | null>(null)  // parcel_id being harvested
+  const [harvestForm, setHarvestForm] = useState({ harvested_date: '', area_ha: '', yield_t_ha: '', notes: '' })
+  const [savingHarvest, setSavingHarvest] = useState(false)
 
   // ── Load campaign for this year ──
   const loadCampaign = useCallback(async () => {
@@ -136,12 +153,18 @@ export default function CampaniePage() {
     if (!c) return
     setLoading(true)
     const db = createClient()
-    const [{ data: parcels }, { data: plans }] = await Promise.all([
+    const [{ data: parcels }, { data: plans }, { data: harvests }] = await Promise.all([
       db.from('parcels').select('id,bloc_fizic,tarla_nr,parcel_nr,locality,county,surface,status,culture').eq('status', 'ACTIVE').order('bloc_fizic'),
       db.from('crop_plans').select('*').eq('campaign_id', c.id),
+      db.from('harvest_lots').select('*').eq('campaign_id', c.id),
     ])
-    const planMap = new Map((plans ?? []).map(p => [p.parcel_id, p as CropPlan]))
-    setRows((parcels ?? []).map(p => ({ ...(p as Parcel), plan: planMap.get(p.id) ?? null })))
+    const planMap    = new Map((plans    ?? []).map(p => [p.parcel_id, p as CropPlan]))
+    const harvestMap = new Map((harvests ?? []).map(h => [h.parcel_id, h as HarvestLot]))
+    setRows((parcels ?? []).map(p => ({
+      ...(p as Parcel),
+      plan:    planMap.get(p.id)    ?? null,
+      harvest: harvestMap.get(p.id) ?? null,
+    })))
     setLoading(false)
   }, [campaign])
 
@@ -158,7 +181,7 @@ export default function CampaniePage() {
   const totalHa     = rows.reduce((s, r) => s + r.surface, 0)
   const plannedRows = rows.filter(r => r.plan)
   const plannedHa   = plannedRows.reduce((s, r) => s + (r.plan!.planned_area_ha ?? r.surface), 0)
-  const recoltate   = rows.filter(r => r.plan?.status === 'RECOLTAT').length
+  const recoltate   = rows.filter(r => r.harvest != null).length
 
   const filtered = rows.filter(r => {
     if (!search) return true
@@ -211,6 +234,46 @@ export default function CampaniePage() {
     if (error) { toast.error(error.message); return }
     toast.success('Plan de cultură salvat.')
     setEditing(null)
+    void loadRows()
+  }
+
+  function startHarvest(row: Row) {
+    setEditing(null)
+    setHarvesting(row.id)
+    setHarvestForm({
+      harvested_date: new Date().toISOString().split('T')[0],
+      area_ha: String(row.plan?.planned_area_ha ?? row.surface ?? ''),
+      yield_t_ha: String(row.plan?.planned_yield_t_ha ?? ''),
+      notes: '',
+    })
+  }
+
+  async function saveHarvest(row: Row) {
+    if (!campaign) return
+    setSavingHarvest(true)
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) { toast.error('Neautentificat.'); setSavingHarvest(false); return }
+    const payload = {
+      user_id: user.id,
+      campaign_id: campaign.id,
+      parcel_id: row.id,
+      crop_plan_id: row.plan?.id ?? null,
+      crop: row.plan?.crop ?? row.culture ?? '',
+      harvested_date: harvestForm.harvested_date || null,
+      area_harvested_ha: harvestForm.area_ha ? parseFloat(harvestForm.area_ha) : null,
+      yield_t_ha: harvestForm.yield_t_ha ? parseFloat(harvestForm.yield_t_ha) : null,
+      moisture_pct: null,
+      notes: harvestForm.notes || null,
+    }
+    const { error } = await db.from('harvest_lots').upsert(payload, { onConflict: 'campaign_id,parcel_id' })
+    if (!error && row.plan) {
+      await db.from('crop_plans').update({ status: 'RECOLTAT' }).eq('id', row.plan.id)
+    }
+    setSavingHarvest(false)
+    if (error) { toast.error(error.message); return }
+    toast.success('Recoltare înregistrată!')
+    setHarvesting(null)
     void loadRows()
   }
 
@@ -306,7 +369,7 @@ export default function CampaniePage() {
               <th className="px-4 py-3 text-right">Suprafață</th>
               <th className="px-4 py-3 text-left">Cultură planificată</th>
               <th className="px-4 py-3 text-left">Soi / Varietate</th>
-              <th className="px-4 py-3 text-right">Producție planif.</th>
+              <th className="px-4 py-3 text-right">Plan / Recoltat</th>
               <th className="px-4 py-3 text-center">Status</th>
               <th className="px-4 py-3 text-center">Acțiuni</th>
             </tr>
@@ -394,6 +457,56 @@ export default function CampaniePage() {
                 )
               }
 
+              if (harvesting === row.id) {
+                return (
+                  <tr key={row.id + '_harvest'} className="bg-green-50">
+                    <td colSpan={8} className="px-4 py-4">
+                      <div className="flex flex-wrap items-end gap-3">
+                        <div className="text-xs font-semibold text-green-700 w-full mb-1">
+                          Înregistrează recoltare — {row.bloc_fizic ?? ''} {row.plan?.crop ? `· ${row.plan.crop}` : ''}
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Dată recoltare</label>
+                          <input type="date" className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-green-500"
+                            value={harvestForm.harvested_date}
+                            onChange={e => setHarvestForm(f => ({ ...f, harvested_date: e.target.value }))} />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Suprafață recoltată (ha)</label>
+                          <input type="number" step="0.01" min="0" className="w-24 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-green-500"
+                            value={harvestForm.area_ha}
+                            onChange={e => setHarvestForm(f => ({ ...f, area_ha: e.target.value }))} />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Producție reală (t/ha)</label>
+                          <input type="number" step="0.1" min="0" className="w-24 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-green-500"
+                            value={harvestForm.yield_t_ha}
+                            onChange={e => setHarvestForm(f => ({ ...f, yield_t_ha: e.target.value }))} />
+                        </div>
+                        <div className="flex-1 min-w-[140px]">
+                          <label className="block text-xs text-gray-600 mb-1">Observații</label>
+                          <input type="text" className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-green-500"
+                            placeholder="Opțional..."
+                            value={harvestForm.notes}
+                            onChange={e => setHarvestForm(f => ({ ...f, notes: e.target.value }))} />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => void saveHarvest(row)} disabled={savingHarvest}
+                            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
+                            {savingHarvest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                            Salvează
+                          </button>
+                          <button onClick={() => setHarvesting(null)}
+                            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
+                            Anulează
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              }
+
               return (
                 <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-800">
@@ -416,8 +529,13 @@ export default function CampaniePage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{row.plan?.seed_variety ?? '—'}</td>
-                  <td className="px-4 py-3 text-right text-gray-700 text-xs">
-                    {row.plan?.planned_yield_t_ha ? `${row.plan.planned_yield_t_ha} t/ha` : '—'}
+                  <td className="px-4 py-3 text-right text-xs">
+                    {row.plan?.planned_yield_t_ha
+                      ? <span className="text-gray-400">{row.plan.planned_yield_t_ha} t/ha</span>
+                      : <span className="text-gray-300">—</span>}
+                    {row.harvest?.yield_t_ha != null && (
+                      <div className="text-green-600 font-medium">{row.harvest.yield_t_ha} t/ha ✓</div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {st ? (
@@ -435,6 +553,15 @@ export default function CampaniePage() {
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
+                      {row.plan && (
+                        <button
+                          onClick={() => startHarvest(row)}
+                          className="p-1.5 text-gray-400 hover:text-green-600 rounded transition-colors"
+                          title="Înregistrează recoltare"
+                        >
+                          <ArrowDownToLine className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       {row.plan && (
                         <button
                           onClick={() => void deletePlan(row.id)}
