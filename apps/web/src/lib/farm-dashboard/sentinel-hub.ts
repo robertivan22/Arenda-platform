@@ -9,19 +9,19 @@ const SH_TOKEN_URL =
 const SH_BASE_URL = 'https://sh.dataspace.copernicus.eu'
 const SH_STATS_URL = `${SH_BASE_URL}/api/v1/statistics`
 
-// CDSE-compatible evalscript: 2-band output (B0=NDVI, B1=dataMask)
-// index() is a built-in CDSE helper: (a-b)/(a+b)
+// Evalscript for CDSE Statistics API — 2 bands: B0=NDVI value, B1=dataMask
+// Uses explicit formula instead of index() helper for CDSE compatibility
 const NDVI_EVALSCRIPT = `//VERSION=3
-function evaluatePixel(samples) {
-  let val = index(samples.B08, samples.B04);
-  return [val, samples.dataMask];
-}
-
 function setup() {
   return {
     input: [{ bands: ["B04", "B08", "dataMask"] }],
     output: { bands: 2 }
   }
+}
+function evaluatePixel(samples) {
+  var denom = samples.B08 + samples.B04;
+  var ndvi = denom > 0 ? (samples.B08 - samples.B04) / denom : 0;
+  return [ndvi, samples.dataMask];
 }`
 
 interface ShBandStats {
@@ -86,8 +86,9 @@ export async function fetchNdviStats(
         bbox,
         properties: { crs: 'http://www.opengis.net/def/crs/EPSG/0/4326' },
       },
-      // Note: mosaickingOrder is NOT supported by CDSE Statistics API – omit it
-      data: [{ type: 'sentinel-2-l2a', dataFilter: { maxCloudCoverage: 80 } }],
+      // S2L1C (Level-1C) — collection type from user's CDSE configuration
+      // maxCloudCoverage: 20 matches the CDSE config default
+      data: [{ type: 'sentinel-2-l1c', dataFilter: { maxCloudCoverage: 20 } }],
     },
     aggregation: {
       timeRange: { from: fmt(from), to: fmt(to) },

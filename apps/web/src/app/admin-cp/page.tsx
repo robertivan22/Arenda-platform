@@ -57,7 +57,7 @@ const PERM_FIELDS: { key: keyof Omit<Permissions, 'user_id'>; label: string }[] 
   { key: 'can_dashboard',    label: 'Dashboard' },
   { key: 'can_arendasi',     label: 'Arendași' },
   { key: 'can_contracte',    label: 'Contracte' },
-  { key: 'can_parcele',      label: 'Parcele' },
+  { key: 'can_parcele',      label: 'Parcele / Utilaje / Ferma' },
   { key: 'can_tranzactii',   label: 'Tranzacții' },
   { key: 'can_facturi',      label: 'Facturi & Avize' },
   { key: 'can_rapoarte',     label: 'Rapoarte' },
