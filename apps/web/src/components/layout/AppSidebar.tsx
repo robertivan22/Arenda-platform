@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat,
+  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -63,6 +63,14 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
           { label: 'Planuri culturi', href: '/campanie' },
           { label: 'Activități câmp', href: '/campanie/activitati' },
           { label: 'Stocuri & Inputuri', href: '/campanie/stocuri' },
+        ],
+      },
+      {
+        label: 'Utilaje', icon: Tractor, permKey: 'can_parcele',
+        children: [
+          { label: 'Parc utilaje', href: '/utilaje' },
+          { label: 'Implementuri', href: '/utilaje/implementuri' },
+          { label: 'Operatori', href: '/utilaje/operatori' },
         ],
       },
     ],

@@ -573,93 +573,19 @@ export default function SetariPage() {
 
       {/* Utilaje Tab */}
       {tab === 'utilaje' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-5">
-          <p className="text-xs text-gray-500">
-            Registrul utilajelor agricole. Utilajele active pot fi asociate activităților câmp.
-          </p>
-
-          {/* Machine list */}
-          {machines.length > 0 && (
-            <div className="space-y-2">
-              {machines.map(m => (
-                <div key={m.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-lg bg-gray-50">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-gray-800">{m.name}</span>
-                      <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{m.type}</span>
-                      {!m.is_active && <span className="text-xs text-gray-400">(inactiv)</span>}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      {[m.brand, m.model, m.year, m.plate].filter(Boolean).join(' · ')}
-                      {m.fuel_type && ` · ${m.fuel_type}`}
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => void toggleMachineActive(m)}
-                    className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-gray-500">
-                    {m.is_active ? 'Dezactivează' : 'Activează'}
-                  </button>
-                  <button type="button" onClick={() => void deleteMachine(m.id)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 rounded transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Add machine form */}
-          <form onSubmit={e => void addMachine(e)} className="border-t border-gray-100 pt-4">
-            <p className="text-xs font-medium text-gray-700 mb-3">Utilaj nou</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Denumire *</label>
-                <input className={inputCls} required placeholder="ex: John Deere 6140R"
-                  value={newMachine.name} onChange={e => setNewMachine(p => ({ ...p, name: e.target.value }))} />
-              </div>
-              <div>
-                <label className={labelCls}>Tip *</label>
-                <select className={inputCls} value={newMachine.type} onChange={e => setNewMachine(p => ({ ...p, type: e.target.value }))}>
-                  {['TRACTOR','COMBINA','SEMANATOARE','STROPITOARE','REMORCA','ALTELE'].map(t =>
-                    <option key={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>Marcă</label>
-                <input className={inputCls} placeholder="John Deere"
-                  value={newMachine.brand} onChange={e => setNewMachine(p => ({ ...p, brand: e.target.value }))} />
-              </div>
-              <div>
-                <label className={labelCls}>Model</label>
-                <input className={inputCls} placeholder="6140R"
-                  value={newMachine.model} onChange={e => setNewMachine(p => ({ ...p, model: e.target.value }))} />
-              </div>
-              <div>
-                <label className={labelCls}>An fabricație</label>
-                <input className={inputCls} type="number" min={1950} max={2100} placeholder="2020"
-                  value={newMachine.year} onChange={e => setNewMachine(p => ({ ...p, year: e.target.value }))} />
-              </div>
-              <div>
-                <label className={labelCls}>Nr. înmatriculare</label>
-                <input className={inputCls} placeholder="IS 01 AAA"
-                  value={newMachine.plate} onChange={e => setNewMachine(p => ({ ...p, plate: e.target.value }))} />
-              </div>
-              <div>
-                <label className={labelCls}>Combustibil</label>
-                <select className={inputCls} value={newMachine.fuel_type} onChange={e => setNewMachine(p => ({ ...p, fuel_type: e.target.value }))}>
-                  {['motorina','benzina','electric','hibrid'].map(f => <option key={f}>{f}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>Observații</label>
-                <input className={inputCls} value={newMachine.notes} onChange={e => setNewMachine(p => ({ ...p, notes: e.target.value }))} />
-              </div>
-            </div>
-            <button type="submit" disabled={savingMachine}
-              className="mt-3 flex items-center gap-1.5 px-4 py-2 text-sm bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">
-              <Plus className="w-4 h-4" />
-              {savingMachine ? 'Se salvează...' : 'Adaugă utilaj'}
-            </button>
-          </form>
+        <div className="bg-white rounded-lg border border-gray-200 p-8 flex flex-col items-center justify-center gap-4 text-center">
+          <Tractor className="w-10 h-10 text-gray-300" />
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-1">Gestionare Parc Utilaje</p>
+            <p className="text-xs text-gray-500 max-w-xs">
+              Utilajele, implementurile și operatorii se gestionează în secțiunea dedicată,
+              cu jurnal de lucru, consum combustibil și calendar de mentenanță.
+            </p>
+          </div>
+          <a href="/utilaje"
+            className="flex items-center gap-1.5 px-5 py-2 bg-brand-600 text-white text-sm rounded-lg hover:bg-brand-700">
+            Deschide Parc Utilaje →
+          </a>
         </div>
       )}
 
