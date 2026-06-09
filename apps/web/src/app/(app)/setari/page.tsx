@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Plus, Trash2, Building2, Package, Upload, X, FileSpreadsheet, Shield } from 'lucide-react'
+import { Plus, Trash2, Building2, Package, Upload, X, FileSpreadsheet, Shield, Wheat } from 'lucide-react'
 import { VALID_CASA_ANG } from '@/lib/d112Validator'
+import type { Campaign } from '@/lib/campaign-types'
 
 interface CompanySettings {
   name: string; cif: string; reg_com: string
@@ -67,11 +68,14 @@ const EMPTY_D112: D112Settings = {
 }
 
 export default function SetariPage() {
-  const [tab, setTab] = useState<'company' | 'products' | 'd112' | 'asigurator'>('company')
+  const [tab, setTab] = useState<'company' | 'products' | 'd112' | 'asigurator' | 'campanii'>('company')
   const [company, setCompany] = useState<CompanySettings>(EMPTY_COMPANY)
   const [savingCompany, setSavingCompany] = useState(false)
   const [d112, setD112] = useState<D112Settings>(EMPTY_D112)
   const [savingD112, setSavingD112] = useState(false)
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [savingCampaign, setSavingCampaign] = useState(false)
+  const [newCampaign, setNewCampaign] = useState({ name: '', year: new Date().getFullYear(), start_date: '', end_date: '' })
   const [asigurator, setAsigurator] = useState<AsiguratorSettings>({
     asig_cnp: '', asig_cnp_anterior: '',
     asig_nume: '', asig_prenume: '',
@@ -131,12 +135,59 @@ export default function SetariPage() {
       }
     })
     loadProducts(db)
+    loadCampaigns(db)
   }, [])
 
   async function loadProducts(db = createClient()) {
     const { data, error } = await db.from('products').select('*').order('sort_order').order('name')
     if (error) { toast.error('Eroare la încărcarea produselor.'); return }
     if (data) setProducts(data as Product[])
+  }
+
+  async function loadCampaigns(db = createClient()) {
+    const { data } = await db.from('campaigns').select('*').order('year', { ascending: false })
+    if (data) setCampaigns(data as Campaign[])
+  }
+
+  async function addCampaign(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newCampaign.year) return
+    setSavingCampaign(true)
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) { toast.error('Neautentificat.'); setSavingCampaign(false); return }
+    const name = newCampaign.name.trim() || `Campania ${newCampaign.year}`
+    const { error } = await db.from('campaigns').insert({
+      user_id: user.id,
+      name,
+      year: newCampaign.year,
+      start_date: newCampaign.start_date || `${newCampaign.year}-10-01`,
+      end_date: newCampaign.end_date || `${newCampaign.year + 1}-09-30`,
+      is_active: campaigns.length === 0,
+    })
+    setSavingCampaign(false)
+    if (error) { toast.error('Eroare: ' + error.message); return }
+    setNewCampaign({ name: '', year: new Date().getFullYear(), start_date: '', end_date: '' })
+    toast.success(`Campania "${name}" a fost creată.`)
+    loadCampaigns()
+  }
+
+  async function setActiveCampaign(id: string) {
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) return
+    // Deactivate all, then activate selected
+    await db.from('campaigns').update({ is_active: false }).eq('user_id', user.id)
+    await db.from('campaigns').update({ is_active: true }).eq('id', id)
+    toast.success('Campania activă a fost schimbată.')
+    loadCampaigns()
+  }
+
+  async function deleteCampaign(id: string) {
+    const { error } = await createClient().from('campaigns').delete().eq('id', id)
+    if (error) { toast.error(error.message); return }
+    setCampaigns(c => c.filter(x => x.id !== id))
+    toast.success('Campanie ștearsă.')
   }
 
   async function saveCompany(e: React.FormEvent) {
@@ -215,6 +266,7 @@ export default function SetariPage() {
         {([
           ['company', Building2, 'Date firma'],
           ['products', Package, 'Produse arenda'],
+          ['campanii', Wheat, 'Campanii'],
           ['d112', FileSpreadsheet, 'Date Declaratie 112'],
           ['asigurator', Shield, 'Date Asigurator'],
         ] as const).map(([key, Icon, label]) => (
@@ -365,9 +417,109 @@ export default function SetariPage() {
         </div>
       )}
 
+      {/* Campanii Tab */}
+      {tab === 'campanii' && (
+        <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-5">
+          <p className="text-xs text-gray-500">
+            O campanie agricolă reprezintă un sezon de producție (ex: <strong>Toamnă 2024 — Vară 2025</strong>). Toate planurile de cultură, activitățile câmpului și distribuțiile sunt legate de o campanie activă.
+          </p>
+
+          {/* Existing campaigns */}
+          {campaigns.length > 0 && (
+            <div className="space-y-2">
+              {campaigns.map(c => (
+                <div key={c.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-lg bg-gray-50">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-gray-800">{c.name}</span>
+                      {c.is_active && (
+                        <span className="px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded-full font-medium">Activă</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {c.year} · {c.start_date ? new Date(c.start_date).toLocaleDateString('ro-RO') : '—'} — {c.end_date ? new Date(c.end_date).toLocaleDateString('ro-RO') : '—'}
+                    </div>
+                  </div>
+                  {!c.is_active && (
+                    <button
+                      type="button"
+                      onClick={() => void setActiveCampaign(c.id)}
+                      className="text-xs px-2.5 py-1 border border-brand-300 text-brand-600 rounded hover:bg-brand-50 transition-colors"
+                    >
+                      Setează activă
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void deleteCampaign(c.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded transition-colors"
+                    title="Șterge campanie"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Create new campaign */}
+          <form onSubmit={e => void addCampaign(e)} className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-medium text-gray-700 mb-3">Campanie nouă</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Denumire campanie</label>
+                <input
+                  className={inputCls}
+                  placeholder={`Campania ${newCampaign.year}`}
+                  value={newCampaign.name}
+                  onChange={e => setNewCampaign(p => ({ ...p, name: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>An agricol *</label>
+                <input
+                  className={inputCls}
+                  type="number"
+                  min={2000}
+                  max={2100}
+                  required
+                  value={newCampaign.year}
+                  onChange={e => setNewCampaign(p => ({ ...p, year: Number(e.target.value) }))}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Dată început</label>
+                <input
+                  className={inputCls}
+                  type="date"
+                  value={newCampaign.start_date}
+                  onChange={e => setNewCampaign(p => ({ ...p, start_date: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Dată sfârșit</label>
+                <input
+                  className={inputCls}
+                  type="date"
+                  value={newCampaign.end_date}
+                  onChange={e => setNewCampaign(p => ({ ...p, end_date: e.target.value }))}
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={savingCampaign}
+              className="mt-3 flex items-center gap-1.5 px-4 py-2 text-sm bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4" />
+              {savingCampaign ? 'Se salvează...' : 'Adaugă campanie'}
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* D112 Settings Tab */}
-      {tab === 'd112' && (
-        <form onSubmit={saveD112}>
+      {tab === 'd112' && (rm onSubmit={saveD112}>
           <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-5">
             <p className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-2">
               Aceste date sunt utilizate automat la generarea si exportul XML/PDF D112. Completeaza toate campurile marcate cu *.
