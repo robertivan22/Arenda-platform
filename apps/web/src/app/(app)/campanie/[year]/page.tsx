@@ -3,7 +3,7 @@
 export const runtime = 'edge'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { CampaignSelector } from '@/components/CampaignSelector'
@@ -68,6 +68,31 @@ interface EditState {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function CampaignTabs({ year }: { year: number }) {
+  const pathname = usePathname()
+  const isActivitati = pathname.endsWith('/activitati')
+  return (
+    <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
+      <a
+        href={`/campanie/${year}`}
+        className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+          !isActivitati ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+        }`}
+      >
+        Planuri culturi
+      </a>
+      <a
+        href={`/campanie/${year}/activitati`}
+        className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+          isActivitati ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+        }`}
+      >
+        Activități câmp
+      </a>
+    </div>
+  )
+}
 
 function statusInfo(s: CropPlan['status']) {
   return STATUS_OPTS.find(o => o.value === s) ?? STATUS_OPTS[0]
@@ -222,6 +247,8 @@ export default function CampaniePage() {
           }}
         />
       </div>
+
+      <CampaignTabs year={yearParam} />
 
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

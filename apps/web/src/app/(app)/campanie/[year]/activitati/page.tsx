@@ -1,0 +1,508 @@
+'use client'
+
+export const runtime = 'edge'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useParams, useRouter, usePathname } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { CampaignSelector } from '@/components/CampaignSelector'
+import { toast } from 'sonner'
+import {
+  Plus, X, Check, Pencil, Loader2, Tractor, Filter,
+  Calendar, MapPin, ChevronDown,
+} from 'lucide-react'
+import type { Campaign } from '@/lib/campaign-types'
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const OPERATION_TYPES = [
+  { value: 'ARAT',        label: 'Arat' },
+  { value: 'DISCUIT',     label: 'Discuit' },
+  { value: 'GRAPAT',      label: 'Grăpat' },
+  { value: 'SEMANAT',     label: 'Semănat' },
+  { value: 'FERTILIZAT',  label: 'Fertilizat' },
+  { value: 'ERBICIDAT',   label: 'Erbicidat' },
+  { value: 'FUNGICIDAT',  label: 'Fungicidat' },
+  { value: 'INSECTICID',  label: 'Insecticid' },
+  { value: 'IRIGAT',      label: 'Irigat' },
+  { value: 'RECOLTAT',    label: 'Recoltat' },
+  { value: 'TRANSPORT',   label: 'Transport' },
+  { value: 'ALTELE',      label: 'Altele' },
+]
+
+const STATUS_OPTS = [
+  { value: 'PLANIFICAT',   label: 'Planificat',    cls: 'bg-blue-100 text-blue-700' },
+  { value: 'IN_EXECUTIE',  label: 'În execuție',   cls: 'bg-amber-100 text-amber-700' },
+  { value: 'FINALIZAT',    label: 'Finalizat',     cls: 'bg-green-100 text-green-700' },
+  { value: 'ANULAT',       label: 'Anulat',        cls: 'bg-red-100 text-red-500' },
+]
+
+const OP_COLORS: Record<string, string> = {
+  ARAT:       'bg-stone-100 text-stone-700',
+  DISCUIT:    'bg-stone-100 text-stone-600',
+  GRAPAT:     'bg-yellow-50 text-yellow-700',
+  SEMANAT:    'bg-green-100 text-green-700',
+  FERTILIZAT: 'bg-lime-100 text-lime-700',
+  ERBICIDAT:  'bg-orange-100 text-orange-700',
+  FUNGICIDAT: 'bg-purple-100 text-purple-700',
+  INSECTICID: 'bg-red-100 text-red-600',
+  IRIGAT:     'bg-blue-100 text-blue-700',
+  RECOLTAT:   'bg-amber-100 text-amber-700',
+  TRANSPORT:  'bg-gray-100 text-gray-700',
+  ALTELE:     'bg-gray-100 text-gray-500',
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface WorkOrder {
+  id: string
+  campaign_id: string
+  parcel_id: string | null
+  crop_plan_id: string | null
+  operation_type: string
+  planned_date: string | null
+  executed_date: string | null
+  area_ha: number | null
+  status: 'PLANIFICAT' | 'IN_EXECUTIE' | 'FINALIZAT' | 'ANULAT'
+  notes: string | null
+  created_at: string
+  // joined
+  parcel_name?: string | null
+  parcel_surface?: number | null
+}
+
+interface Parcel {
+  id: string
+  bloc_fizic: string | null
+  locality: string | null
+  surface: number
+}
+
+type FormState = Omit<WorkOrder, 'id' | 'campaign_id' | 'created_at' | 'parcel_name' | 'parcel_surface'> & {
+  parcel_id: string
+  area_ha: string
+}
+
+const EMPTY_FORM = (): FormState => ({
+  parcel_id: '',
+  crop_plan_id: null,
+  operation_type: 'SEMANAT',
+  planned_date: null,
+  executed_date: null,
+  area_ha: '',
+  status: 'PLANIFICAT',
+  notes: null,
+})
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function statusInfo(s: string) {
+  return STATUS_OPTS.find(o => o.value === s) ?? STATUS_OPTS[0]
+}
+
+function opLabel(type: string) {
+  return OPERATION_TYPES.find(o => o.value === type)?.label ?? type
+}
+
+function fmtDate(d: string | null) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('ro-RO', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function CampaignTabs({ year }: { year: number }) {
+  const pathname = usePathname()
+  const isActivitati = pathname.endsWith('/activitati')
+  return (
+    <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
+      <a
+        href={`/campanie/${year}`}
+        className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+          !isActivitati ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+        }`}
+      >
+        Planuri culturi
+      </a>
+      <a
+        href={`/campanie/${year}/activitati`}
+        className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+          isActivitati ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+        }`}
+      >
+        Activități câmp
+      </a>
+    </div>
+  )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function ActivitatiPage() {
+  const params = useParams()
+  const router = useRouter()
+  const yearParam = Number(params.year)
+
+  const [campaign, setCampaign] = useState<Campaign | null>(null)
+  const [parcels, setParcels] = useState<Parcel[]>([])
+  const [orders, setOrders] = useState<WorkOrder[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState<FormState>(EMPTY_FORM())
+  const [editId, setEditId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  // Filters
+  const [filterOp, setFilterOp] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const [filterParcel, setFilterParcel] = useState('')
+
+  // ── Load campaign ──
+  useEffect(() => {
+    const db = createClient()
+    db.from('campaigns').select('*').eq('year', yearParam).maybeSingle().then(({ data }) => {
+      if (data) setCampaign(data as Campaign)
+      else toast.error(`Nu există campania ${yearParam}.`)
+    })
+  }, [yearParam])
+
+  // ── Load parcels (for select) ──
+  useEffect(() => {
+    createClient()
+      .from('parcels')
+      .select('id,bloc_fizic,locality,surface')
+      .eq('status', 'ACTIVE')
+      .order('bloc_fizic')
+      .then(({ data }) => { if (data) setParcels(data as Parcel[]) })
+  }, [])
+
+  // ── Load work orders ──
+  const loadOrders = useCallback(async (cam?: Campaign | null) => {
+    const c = cam ?? campaign
+    if (!c) return
+    setLoading(true)
+    const db = createClient()
+    const { data } = await db
+      .from('work_orders')
+      .select('*, parcels(bloc_fizic, locality, surface)')
+      .eq('campaign_id', c.id)
+      .order('planned_date', { ascending: true })
+    if (data) {
+      setOrders(data.map((r: any) => ({
+        ...r,
+        parcel_name: r.parcels?.bloc_fizic ?? null,
+        parcel_surface: r.parcels?.surface ?? null,
+      })))
+    }
+    setLoading(false)
+  }, [campaign])
+
+  useEffect(() => { if (campaign) void loadOrders(campaign) }, [campaign, loadOrders])
+
+  // ── Auto-fill area when parcel changes ──
+  useEffect(() => {
+    if (form.parcel_id && !editId) {
+      const p = parcels.find(x => x.id === form.parcel_id)
+      if (p) setForm(f => ({ ...f, area_ha: String(p.surface) }))
+    }
+  }, [form.parcel_id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── KPIs ──
+  const total     = orders.length
+  const finalizat = orders.filter(o => o.status === 'FINALIZAT').length
+  const planificat = orders.filter(o => o.status === 'PLANIFICAT').length
+  const areaWorked = orders
+    .filter(o => o.status === 'FINALIZAT')
+    .reduce((s, o) => s + (o.area_ha ?? 0), 0)
+
+  // ── Filtered rows ──
+  const filtered = orders.filter(o => {
+    if (filterOp && o.operation_type !== filterOp) return false
+    if (filterStatus && o.status !== filterStatus) return false
+    if (filterParcel && o.parcel_id !== filterParcel) return false
+    return true
+  })
+
+  // ── Save ──
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!campaign) return
+    setSaving(true)
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) { toast.error('Neautentificat.'); setSaving(false); return }
+
+    const payload = {
+      user_id: user.id,
+      campaign_id: campaign.id,
+      parcel_id: form.parcel_id || null,
+      operation_type: form.operation_type,
+      planned_date: form.planned_date || null,
+      executed_date: form.executed_date || null,
+      area_ha: form.area_ha ? parseFloat(form.area_ha) : null,
+      status: form.status,
+      notes: form.notes || null,
+    }
+
+    let error
+    if (editId) {
+      ;({ error } = await db.from('work_orders').update(payload).eq('id', editId))
+    } else {
+      ;({ error } = await db.from('work_orders').insert(payload))
+    }
+
+    setSaving(false)
+    if (error) { toast.error(error.message); return }
+    toast.success(editId ? 'Activitate actualizată.' : 'Activitate adăugată.')
+    setShowForm(false)
+    setEditId(null)
+    setForm(EMPTY_FORM())
+    void loadOrders()
+  }
+
+  function startEdit(o: WorkOrder) {
+    setForm({
+      parcel_id: o.parcel_id ?? '',
+      crop_plan_id: o.crop_plan_id,
+      operation_type: o.operation_type,
+      planned_date: o.planned_date,
+      executed_date: o.executed_date,
+      area_ha: String(o.area_ha ?? ''),
+      status: o.status,
+      notes: o.notes,
+    })
+    setEditId(o.id)
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function handleDelete(id: string) {
+    const { error } = await createClient().from('work_orders').delete().eq('id', id)
+    if (error) { toast.error(error.message); return }
+    toast.success('Activitate ștearsă.')
+    setOrders(o => o.filter(x => x.id !== id))
+  }
+
+  const inputCls = 'w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500'
+  const labelCls = 'block text-xs font-medium text-gray-700 mb-1'
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="max-w-6xl">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <PageHeader
+          title={campaign ? campaign.name : `Campania ${yearParam}`}
+          subtitle="Activități câmp — lucrări planificate și executate"
+        />
+        <CampaignSelector
+          className="mt-1"
+          onChange={c => { if (c && c.year !== yearParam) router.push(`/campanie/${c.year}/activitati`) }}
+        />
+      </div>
+
+      <CampaignTabs year={yearParam} />
+
+      {/* KPI row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        {[
+          { label: 'Total activități', value: total },
+          { label: 'Finalizate', value: finalizat },
+          { label: 'Planificate', value: planificat },
+          { label: 'Ha lucrate', value: `${areaWorked.toFixed(2)} ha` },
+        ].map(k => (
+          <div key={k.label} className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="text-xl font-bold text-gray-800">{k.value}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Add / Edit form */}
+      {showForm && (
+        <form onSubmit={e => void handleSave(e)} className="bg-white rounded-lg border border-brand-200 p-5 mb-5 space-y-4">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm font-semibold text-gray-700">
+              {editId ? 'Editează activitate' : 'Activitate nouă'}
+            </p>
+            <button type="button" onClick={() => { setShowForm(false); setEditId(null); setForm(EMPTY_FORM()) }}
+              className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div>
+              <label className={labelCls}>Parcelă</label>
+              <select className={inputCls} value={form.parcel_id}
+                onChange={e => setForm(f => ({ ...f, parcel_id: e.target.value }))}>
+                <option value="">— Toate parcelele —</option>
+                {parcels.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.bloc_fizic ?? p.id.slice(0, 8)}{p.locality ? ` — ${p.locality}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Tip operație *</label>
+              <select className={inputCls} required value={form.operation_type}
+                onChange={e => setForm(f => ({ ...f, operation_type: e.target.value }))}>
+                {OPERATION_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Status *</label>
+              <select className={inputCls} value={form.status}
+                onChange={e => setForm(f => ({ ...f, status: e.target.value as WorkOrder['status'] }))}>
+                {STATUS_OPTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Dată planificată</label>
+              <input className={inputCls} type="date" value={form.planned_date ?? ''}
+                onChange={e => setForm(f => ({ ...f, planned_date: e.target.value || null }))} />
+            </div>
+            <div>
+              <label className={labelCls}>Dată executată</label>
+              <input className={inputCls} type="date" value={form.executed_date ?? ''}
+                onChange={e => setForm(f => ({ ...f, executed_date: e.target.value || null }))} />
+            </div>
+            <div>
+              <label className={labelCls}>Suprafață lucrată (ha)</label>
+              <input className={inputCls} type="number" step="0.01" min="0" placeholder="ha"
+                value={form.area_ha}
+                onChange={e => setForm(f => ({ ...f, area_ha: e.target.value }))} />
+            </div>
+            <div className="col-span-2 md:col-span-3">
+              <label className={labelCls}>Observații</label>
+              <input className={inputCls} placeholder="Observații opționale..." value={form.notes ?? ''}
+                onChange={e => setForm(f => ({ ...f, notes: e.target.value || null }))} />
+            </div>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button type="submit" disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              {editId ? 'Actualizează' : 'Salvează'}
+            </button>
+            <button type="button" onClick={() => { setShowForm(false); setEditId(null); setForm(EMPTY_FORM()) }}
+              className="px-4 py-2 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
+              Anulează
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {!showForm && (
+          <button onClick={() => setShowForm(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-600 text-white rounded-lg hover:bg-brand-700">
+            <Plus className="w-4 h-4" /> Activitate nouă
+          </button>
+        )}
+        <select className="text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          value={filterOp} onChange={e => setFilterOp(e.target.value)}>
+          <option value="">Toate operațiile</option>
+          {OPERATION_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <select className="text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="">Toate statusurile</option>
+          {STATUS_OPTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+        <select className="text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          value={filterParcel} onChange={e => setFilterParcel(e.target.value)}>
+          <option value="">Toate parcelele</option>
+          {parcels.map(p => (
+            <option key={p.id} value={p.id}>{p.bloc_fizic ?? p.id.slice(0, 8)}</option>
+          ))}
+        </select>
+        {(filterOp || filterStatus || filterParcel) && (
+          <button onClick={() => { setFilterOp(''); setFilterStatus(''); setFilterParcel('') }}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 px-2">
+            <X className="w-3 h-3" /> Resetează filtre
+          </button>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-medium uppercase tracking-wide">
+              <th className="px-4 py-3 text-left">Operație</th>
+              <th className="px-4 py-3 text-left">Parcelă</th>
+              <th className="px-4 py-3 text-left">Dată planif.</th>
+              <th className="px-4 py-3 text-left">Dată exec.</th>
+              <th className="px-4 py-3 text-right">Suprafață</th>
+              <th className="px-4 py-3 text-center">Status</th>
+              <th className="px-4 py-3 text-left">Observații</th>
+              <th className="px-4 py-3 text-center">Acțiuni</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {loading && (
+              <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+                <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />Încarcare...
+              </td></tr>
+            )}
+            {!loading && filtered.length === 0 && (
+              <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+                {orders.length === 0 ? 'Nicio activitate înregistrată pentru această campanie.' : 'Niciun rezultat pentru filtrele aplicate.'}
+              </td></tr>
+            )}
+            {!loading && filtered.map(o => {
+              const st = statusInfo(o.status)
+              const opCls = OP_COLORS[o.operation_type] ?? 'bg-gray-100 text-gray-600'
+              return (
+                <tr key={o.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${opCls}`}>
+                      {opLabel(o.operation_type)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">
+                    {o.parcel_name ?? <span className="text-gray-400 italic">—</span>}
+                    {o.parcel_surface && (
+                      <span className="text-xs text-gray-400 ml-1">({o.parcel_surface} ha)</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(o.planned_date)}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(o.executed_date)}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">
+                    {o.area_ha != null ? `${o.area_ha} ha` : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${st.cls}`}>{st.label}</span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs max-w-[180px] truncate" title={o.notes ?? ''}>
+                    {o.notes || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => startEdit(o)}
+                        className="p-1.5 text-gray-400 hover:text-brand-600 rounded" title="Editează">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => void handleDelete(o.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 rounded" title="Șterge">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {!loading && orders.length > 0 && (
+        <div className="mt-3 text-xs text-gray-400 text-right">
+          {filtered.length} activități{filtered.length !== orders.length ? ` (din ${orders.length} total)` : ''}
+        </div>
+      )}
+    </div>
+  )
+}

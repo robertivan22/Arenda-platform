@@ -57,7 +57,13 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: 'PRODUCȚIE',
     items: [
-      { label: 'Campanie activă', href: '/campanie', icon: Wheat, permKey: 'can_parcele' },
+      {
+        label: 'Campanie', icon: Wheat, permKey: 'can_parcele',
+        children: [
+          { label: 'Planuri culturi', href: '/campanie' },
+          { label: 'Activități câmp', href: '/campanie/activitati' },
+        ],
+      },
     ],
   },
   {
