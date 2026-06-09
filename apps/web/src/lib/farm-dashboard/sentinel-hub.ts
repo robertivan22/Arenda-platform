@@ -140,6 +140,7 @@ function evaluatePixel(samples) {
   var val = index(samples.B08, samples.B04);
   return [val, samples.dataMask];
 }`,
+    },
   }
 
   const res = await fetch(`${baseUrl}/api/v1/statistics`, {
