@@ -1,16 +1,16 @@
-﻿'use client'
+'use client'
 
 export const runtime = 'edge'
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  FileCheck2, RefreshCw, Eye, CheckCircle2, XCircle, Loader2, AlertCircle, Download,
+  FileCheck2, RefreshCw, CheckCircle2, XCircle, Loader2, AlertCircle, Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/PageHeader'
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Types -------------------------------------------------------------------
 
 interface Lessor {
   id: string
@@ -33,14 +33,14 @@ interface Invoice {
   lessors?: Lessor | null
 }
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Helpers -----------------------------------------------------------------
 
 function lessorName(l: Lessor | null | undefined) {
-  if (!l) return 'â€”'
-  return l.type === 'LEGAL' ? (l.company_name ?? 'â€”') : `${l.last_name} ${l.first_name}`.trim()
+  if (!l) return '\u2014'
+  return l.type === 'LEGAL' ? (l.company_name ?? '\u2014') : `${l.last_name} ${l.first_name}`.trim()
 }
 
-// â”€â”€â”€ Validation result badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Validation result badge -------------------------------------------------
 
 type ValidationResult = 'valid' | 'invalid' | null
 
@@ -61,7 +61,7 @@ function ValidationBadge({ result }: { result: ValidationResult }) {
     )
 }
 
-// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Main Page ---------------------------------------------------------------
 
 export default function EFacturaPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -69,7 +69,6 @@ export default function EFacturaPage() {
   const [actionInProgress, setActionInProgress] = useState<string | null>(null)
   const [validationResults, setValidationResults] = useState<Record<string, ValidationResult>>({})
 
-  // â”€â”€ Load invoices â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const loadData = useCallback(async () => {
     const db = createClient()
     const { data: { user } } = await db.auth.getUser()
@@ -93,7 +92,6 @@ export default function EFacturaPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // â”€â”€ Validate XML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async function validateInvoice(inv: Invoice) {
     setActionInProgress(inv.id)
     const res = await fetch(`/api/efactura/xml-preview?invoice_id=${inv.id}`)
@@ -111,21 +109,19 @@ export default function EFacturaPage() {
     }
 
     if (data.valid) {
-      toast.success('Factura este validÄƒ pentru e-Factura âœ“')
+      toast.success('Factura este valid\u0103 pentru e-Factura \u2713')
       setValidationResults(r => ({ ...r, [inv.id]: 'valid' }))
     } else {
-      const msgs = (data.validation_errors ?? []).map(e => `â€¢ ${e.message}`).join('\n')
+      const msgs = (data.validation_errors ?? []).map(e => `\u2022 ${e.message}`).join('\n')
       toast.error(`Erori validare:\n${msgs}`, { duration: 10000 })
       setValidationResults(r => ({ ...r, [inv.id]: 'invalid' }))
     }
   }
 
-  // â”€â”€ Download XML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function downloadXml(inv: Invoice) {
     window.open(`/api/efactura/xml-preview?invoice_id=${inv.id}&format=xml`, '_blank')
   }
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -139,31 +135,36 @@ export default function EFacturaPage() {
       <div className="flex items-start justify-between gap-4">
         <PageHeader
           title="e-Factura ANAF"
-          subtitle="Validare È™i generare XML conform RO_CIUS / UBL 2.1"
+          subtitle="Validare \u0219i generare XML conform RO_CIUS / UBL 2.1"
         />
         <button
           onClick={loadData}
           className="mt-1 p-1.5 border border-gray-200 rounded text-gray-500 hover:text-gray-700"
-          title="ReÃ®ncarcÄƒ"
+          title="Re\u00eencarc\u0103"
         >
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* â”€â”€ Info banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Info banner */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-700 flex items-start gap-2">
         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
         <span>
-          ValidaÈ›i XML-ul fiecÄƒrei facturi, descÄƒrcaÈ›i fiÈ™ierul UBL 2.1 È™i Ã®ncÄƒrcaÈ›i-l manual pe{' '}
-          <a href="https://efactura.mfinante.gov.ro" target="_blank" rel="noopener noreferrer" className="underline font-medium">
+          Valida\u021bi XML-ul fiec\u0103rei facturi, desc\u0103rca\u021bi fi\u0219ierul UBL 2.1 \u0219i \u00eenc\u0103rca\u021bi-l manual pe{' '}
+          <a
+            href="https://efactura.mfinante.gov.ro"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline font-medium"
+          >
             efactura.mfinante.gov.ro
           </a>{' '}
-          (SPV â†’ ÃŽncÄƒrcare facturÄƒ).
+          (SPV \u2192 \u00cencarcare factur\u0103).
           Standardul utilizat: <strong>RO_CIUS / UBL 2.1</strong>
         </span>
       </div>
 
-      {/* â”€â”€ Invoice table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Invoice table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-2">
           <FileCheck2 className="w-4 h-4 text-brand-600" />
@@ -178,7 +179,7 @@ export default function EFacturaPage() {
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Nr.</th>
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">ArendaÈ™</th>
+                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Arenda\u0219</th>
                 <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Total RON</th>
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Validare XML</th>
                 <th className="px-4 py-2 bg-gray-50"></th>
@@ -210,20 +211,18 @@ export default function EFacturaPage() {
                           ? <Loader2 className="w-4 h-4 animate-spin text-brand-600" />
                           : (
                             <>
-                              {/* Validate */}
                               <button
                                 onClick={() => validateInvoice(inv)}
                                 className="flex items-center gap-1 px-2.5 py-1 text-xs border border-gray-300 rounded hover:border-brand-400 hover:text-brand-600 text-gray-600 font-medium transition-colors"
-                                title="ValideazÄƒ structura XML"
+                                title="Valideaz\u0103 structura XML"
                               >
                                 <FileCheck2 className="w-3.5 h-3.5" />
-                                ValideazÄƒ
+                                Valideaz\u0103
                               </button>
-                              {/* Download XML */}
                               <button
                                 onClick={() => downloadXml(inv)}
                                 className="flex items-center gap-1 px-2.5 py-1 text-xs bg-brand-600 hover:bg-brand-700 text-white rounded font-medium transition-colors"
-                                title="DescarcÄƒ XML UBL 2.1"
+                                title="Descarc\u0103 XML UBL 2.1"
                               >
                                 <Download className="w-3.5 h-3.5" />
                                 XML
@@ -238,7 +237,7 @@ export default function EFacturaPage() {
               {invoices.length === 0 && (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-sm text-gray-400">
-                    Nu existÄƒ facturi. CreaÈ›i facturi din pagina Contracte â†’ TranzacÈ›ii.
+                    Nu exist\u0103 facturi. Crea\u021bi facturi din pagina Contracte \u2192 Tranzac\u021bii.
                   </td>
                 </tr>
               )}
@@ -249,5 +248,3 @@ export default function EFacturaPage() {
     </div>
   )
 }
-
-
