@@ -118,10 +118,10 @@ export function buildInvoiceXml(inv: EFacturaInvoice): string {
   <cbc:ID>${xe(invoiceRef)}</cbc:ID>
   <cbc:IssueDate>${inv.issue_date}</cbc:IssueDate>${inv.due_date ? `
   <cbc:DueDate>${inv.due_date}</cbc:DueDate>` : ''}
-  <cbc:InvoiceTypeCode>${typeCode}</cbc:InvoiceTypeCode>
+  <cbc:InvoiceTypeCode>${typeCode}</cbc:InvoiceTypeCode>${inv.note ? `
+  <cbc:Note>${xe(inv.note)}</cbc:Note>` : ''}
+  <cbc:TaxPointDate>${inv.issue_date}</cbc:TaxPointDate>
   <cbc:DocumentCurrencyCode>${cur}</cbc:DocumentCurrencyCode>
-  <cbc:TaxPointDate>${inv.issue_date}</cbc:TaxPointDate>${inv.note ? `
-  <cbc:Note>${xe(inv.note)}</cbc:Note>` : ''}${inv.supplier.iban ? paymentMeansBlock(inv.supplier.iban, inv.supplier.bank_name) : ''}
   <cac:AccountingSupplierParty>
     <cac:Party>
       <cac:PartyName>
@@ -172,7 +172,7 @@ export function buildInvoiceXml(inv: EFacturaInvoice): string {
         <cbc:CompanyID>${xe(inv.customer.cif_cnp)}</cbc:CompanyID>
       </cac:PartyLegalEntity>${contactBlock(inv.customer.phone, inv.customer.email)}
     </cac:Party>
-  </cac:AccountingCustomerParty>
+  </cac:AccountingCustomerParty>${inv.supplier.iban ? paymentMeansBlock(inv.supplier.iban, inv.supplier.bank_name) : ''}
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="${cur}">${m(inv.tax_amount)}</cbc:TaxAmount>
 ${taxSubtotalsXml}
