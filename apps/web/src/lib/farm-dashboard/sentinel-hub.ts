@@ -9,18 +9,19 @@ const SH_TOKEN_URL =
 const SH_BASE_URL = 'https://sh.dataspace.copernicus.eu'
 const SH_STATS_URL = `${SH_BASE_URL}/api/v1/statistics`
 
+// CDSE-compatible evalscript: 2-band output (B0=NDVI, B1=dataMask)
+// index() is a built-in CDSE helper: (a-b)/(a+b)
 const NDVI_EVALSCRIPT = `//VERSION=3
+function evaluatePixel(samples) {
+  let val = index(samples.B08, samples.B04);
+  return [val, samples.dataMask];
+}
+
 function setup() {
   return {
     input: [{ bands: ["B04", "B08", "dataMask"] }],
-    output: [{ id: "ndvi", bands: 1, sampleType: "FLOAT32" }]
+    output: { bands: 2 }
   }
-}
-function evaluatePixel(s) {
-  if (!s.dataMask) return { ndvi: [NaN] }
-  const d = s.B08 + s.B04
-  if (d <= 0) return { ndvi: [NaN] }
-  return { ndvi: [(s.B08 - s.B04) / d] }
 }`
 
 interface ShBandStats {
@@ -32,7 +33,8 @@ interface ShBandStats {
 interface ShInterval {
   interval: { from: string; to: string }
   status: string
-  outputs: { ndvi?: { bands?: { B0?: { stats?: ShBandStats } } } }
+  // CDSE 2-band unnamed output: B0=NDVI value, B1=dataMask mean
+  outputs: { default?: { bands?: { B0?: { stats?: ShBandStats }; B1?: { stats?: ShBandStats } } } }
 }
 
 interface ShStatsEntry {
@@ -112,11 +114,14 @@ export async function fetchNdviStats(
     if (intervals.length === 0) return { current: null, prev: null }
 
     const extract = (item: ShInterval): ShStatsEntry | null => {
-      const stats = item?.outputs?.ndvi?.bands?.B0?.stats
+      const stats = item?.outputs?.default?.bands?.B0?.stats
       if (!stats) return null
+      // Use dataMask band mean to detect cloud blocking (low mean = mostly clouded)
+      const maskMean = item?.outputs?.default?.bands?.B1?.stats?.mean ?? 1
+      const effectiveSampleCount = maskMean < 0.2 ? 0 : stats.sampleCount
       return {
         mean: isNaN(stats.mean) ? null : Math.round(stats.mean * 1000) / 1000,
-        sampleCount: stats.sampleCount,
+        sampleCount: effectiveSampleCount,
         date: item.interval.to,
       }
     }

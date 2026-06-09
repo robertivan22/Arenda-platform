@@ -52,10 +52,10 @@ function alertSeverityStyle(s: Alert['severity']): string {
 
 function ndviTrendLabel(result: ParcelResult): string {
   const { trend, drop_pct } = result.ndvi
-  if (trend === 'up') return `+ ${Math.abs(drop_pct ?? 0).toFixed(1)}%`
-  if (trend === 'down') return `- ${Math.abs(drop_pct ?? 0).toFixed(1)}%`
+  if (trend === 'up') return `+${Math.abs(drop_pct ?? 0).toFixed(1)}%`
+  if (trend === 'down') return `-${Math.abs(drop_pct ?? 0).toFixed(1)}%`
   if (trend === 'stable') return 'stabil'
-  if (result.ndvi.cloud_block) return 'acoperire nori'
+  if (result.ndvi.cloud_block) return 'nori'
   return '—'
 }
 
@@ -147,15 +147,15 @@ function ParcelCard({ result, name, selected, onClick }: {
       <div className="grid grid-cols-5 gap-2 mb-3">
         <ParcelKpiMini label="Temp" icon={Thermometer} iconClass="text-orange-500"
           value={fmt(result.weather.temp_current, '°C', 1)}
-          sub={result.weather.temp_min_48h != null ? `Min 48h: ${result.weather.temp_min_48h}°C` : undefined} />
+          sub={result.weather.temp_min_48h != null ? `Min: ${result.weather.temp_min_48h}°C` : undefined} />
         <ParcelKpiMini label="Sol" icon={Droplets} iconClass="text-blue-500"
           value={fmt(result.soil.moisture_avg, '', 3)} sub={soilStatusLabel(result.soil.status)} />
         <ParcelKpiMini label="NDVI" icon={Leaf} iconClass="text-green-600"
           value={fmt(result.ndvi.current, '', 2)} sub={ndviTrendLabel(result)} />
-        <ParcelKpiMini label="Ploaie 48h" icon={CloudRain} iconClass="text-sky-500"
-          value={fmt(result.weather.forecast_rain_48h, 'mm', 1)} sub="prognozat" />
-        <ParcelKpiMini label="ET0" icon={Sun} iconClass="text-yellow-500"
-          value={fmt(result.weather.et0_today, 'mm', 1)} sub="evapotranspiratie" />
+        <ParcelKpiMini label="Ploaie" icon={CloudRain} iconClass="text-sky-500"
+          value={fmt(result.weather.forecast_rain_48h, 'mm', 1)} sub="48h prog." />
+        <ParcelKpiMini label="ET₀" icon={Sun} iconClass="text-yellow-500"
+          value={fmt(result.weather.et0_today, 'mm', 1)} sub="ET ref." />
       </div>
       {result.alerts.length === 0 ? (
         <p className="text-xs text-green-600 flex items-center gap-1">
