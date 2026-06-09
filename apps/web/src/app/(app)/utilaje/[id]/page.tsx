@@ -172,7 +172,10 @@ export default function MachineDetailPage() {
     e.preventDefault()
     if (!machine) return
     setSavingLog(true)
+    const { data: { user: logUser } } = await createClient().auth.getUser()
+    if (!logUser) { toast.error('Sesiune expirată.'); setSavingLog(false); return }
     const { error } = await createClient().from('machine_work_logs').insert({
+      user_id: logUser.id,
       machine_id: machine.id,
       operator_id: logForm.operator_id || null,
       implement_id: logForm.implement_id || null,
@@ -207,7 +210,10 @@ export default function MachineDetailPage() {
     e.preventDefault()
     if (!machine || !fuelForm.liters) return
     setSavingFuel(true)
+    const { data: { user: fuelUser } } = await createClient().auth.getUser()
+    if (!fuelUser) { toast.error('Sesiune expirată.'); setSavingFuel(false); return }
     const { error } = await createClient().from('fuel_logs').insert({
+      user_id: fuelUser.id,
       machine_id: machine.id,
       log_date: fuelForm.log_date,
       liters: Number(fuelForm.liters),
@@ -238,7 +244,10 @@ export default function MachineDetailPage() {
     e.preventDefault()
     if (!machine || !maintForm.title.trim()) return
     setSavingMaint(true)
+    const { data: { user: maintUser } } = await createClient().auth.getUser()
+    if (!maintUser) { toast.error('Sesiune expirată.'); setSavingMaint(false); return }
     const { error } = await createClient().from('maintenance_tasks').insert({
+      user_id: maintUser.id,
       machine_id: machine.id,
       title: maintForm.title.trim(),
       type: maintForm.type,

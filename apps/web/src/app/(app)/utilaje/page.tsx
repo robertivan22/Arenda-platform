@@ -53,7 +53,10 @@ export default function UtilajePage() {
     e.preventDefault()
     if (!form.name.trim()) return
     setSaving(true)
+    const { data: { user } } = await createClient().auth.getUser()
+    if (!user) { toast.error('Sesiune expirată. Reconectați-vă.'); setSaving(false); return }
     const { error } = await createClient().from('machines').insert({
+      user_id: user.id,
       name: form.name.trim(),
       type: form.type,
       brand: form.brand || null,
