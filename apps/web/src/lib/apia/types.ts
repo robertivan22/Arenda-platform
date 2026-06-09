@@ -100,7 +100,7 @@ export interface ApiaDossierParcel {
   land_right_reference: string | null
   land_right_valid_from: string | null
   land_right_valid_until: string | null
-  land_right_expired: boolean
+  land_right_expired: boolean  // computed in view: valid_until < CURRENT_DATE
   notes: string | null
   created_at: string
 }

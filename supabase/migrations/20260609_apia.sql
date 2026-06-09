@@ -89,15 +89,19 @@ CREATE TABLE IF NOT EXISTS apia_dossier_parcels (
   land_right_type       TEXT,
   -- ARENDA | PROPRIETATE | CONCESIUNE | COMODAT | ASOCIERE | OTHER
   land_right_reference  TEXT,        -- Contract number or deed reference
-  land_right_valid_from DATE,
+  land_right_valid_from  DATE,
   land_right_valid_until DATE,
-  land_right_expired    BOOLEAN GENERATED ALWAYS AS (
-    land_right_valid_until IS NOT NULL AND land_right_valid_until < CURRENT_DATE
-  ) STORED,
 
-  notes                 TEXT,
-  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  notes                  TEXT,
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- View that exposes the computed expiry flag (CURRENT_DATE is STABLE, not IMMUTABLE,
+-- so it cannot be used in a GENERATED ALWAYS AS STORED column).
+CREATE OR REPLACE VIEW apia_dossier_parcels_v AS
+SELECT *,
+  (land_right_valid_until IS NOT NULL AND land_right_valid_until < CURRENT_DATE) AS land_right_expired
+FROM apia_dossier_parcels;
 
 -- 4. Global intervention catalog (seeded below, not per-user)
 -- ────────────────────────────────────────────────────────────

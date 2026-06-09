@@ -152,10 +152,17 @@ function ParceleTab({
                   <td className="px-3 py-2 font-medium">{Number(p.declared_surface_ha).toFixed(4)}</td>
                   <td className="px-3 py-2">{LAND_USE_LABELS[p.land_use_code ?? ''] ?? p.land_use_code ?? '—'}</td>
                   <td className="px-3 py-2">{LAND_RIGHT_LABELS[p.land_right_type ?? ''] ?? '—'}</td>
-                  <td className={`px-3 py-2 ${p.land_right_expired ? 'text-red-600 font-medium' : ''}`}>
-                    {p.land_right_valid_until ?? '—'}
-                    {p.land_right_expired && ' ⚠️'}
-                  </td>
+                  {(() => {
+                    const expired = p.land_right_valid_until
+                      ? new Date(p.land_right_valid_until) < new Date()
+                      : false
+                    return (
+                      <td className={`px-3 py-2 ${expired ? 'text-red-600 font-medium' : ''}`}>
+                        {p.land_right_valid_until ?? '—'}
+                        {expired && ' ⚠️'}
+                      </td>
+                    )
+                  })()}
                   <td className="px-3 py-2">
                     {p.eligible
                       ? <CheckCircle2 className="w-4 h-4 text-green-600" />
