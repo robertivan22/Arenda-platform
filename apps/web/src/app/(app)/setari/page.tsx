@@ -519,7 +519,8 @@ export default function SetariPage() {
       )}
 
       {/* D112 Settings Tab */}
-      {tab === 'd112' && (rm onSubmit={saveD112}>
+      {tab === 'd112' && (
+        <form onSubmit={saveD112}>
           <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-5">
             <p className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-2">
               Aceste date sunt utilizate automat la generarea si exportul XML/PDF D112. Completeaza toate campurile marcate cu *.
