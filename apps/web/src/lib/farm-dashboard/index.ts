@@ -12,7 +12,9 @@ const NULL_WEATHER: WeatherData = {
 }
 const NULL_SOIL: SoilData = { moisture_avg: null, status: null }
 const NULL_NDVI: NdviData = { current: null, prev: null, trend: null, drop_pct: null, cloud_block: true, scene_date: null }
-const TODAY = new Date().toISOString().split('T')[0]
+// NOTE: do NOT compute TODAY at module level — in Cloudflare Workers the
+// Date API may return epoch (0) during cold-start module initialisation.
+// Always derive the current date inside the request handler.
 
 function nullParcel(input: ParcelInput): ParcelResult {
   return {
@@ -47,9 +49,12 @@ async function processParcel(input: ParcelInput): Promise<ParcelResult> {
     return nullParcel(input)
   }
 
+  // Compute inside the request so Cloudflare Workers' Date API is fully live.
+  const today = new Date().toISOString().split('T')[0]
+
   const [weatherSettled, ndviSettled] = await Promise.allSettled([
     fetchOpenMeteo(input.lat, input.lng),
-    getParcelNdviFromLatLng({ lat: input.lat, lng: input.lng, fetchDate: TODAY }),
+    getParcelNdviFromLatLng({ lat: input.lat, lng: input.lng, fetchDate: today }),
   ])
 
   if (weatherSettled.status === 'rejected') {
