@@ -1,6 +1,7 @@
 // ─── Sentinel Hub / CDSE Statistics API client ───────────────────────────────
-// Named-output evalscript pattern required by Statistics API v1.
-// Reads credentials from env: SENTINEL_HUB_CLIENT_ID, SENTINEL_HUB_CLIENT_SECRET
+// Uses unnamed 2-band output evalscript (band 0 = NDVI, band 1 = dataMask),
+// matching the S2L2A NDVI layer configured in the user's CDSE instance.
+// Response parsed from outputs.default.bands.B0/B1 (Statistics API v1).
 
 export type BBox = [number, number, number, number]
 
@@ -24,9 +25,14 @@ type StatsBand = {
 
 type StatsItem = {
   interval?: { from?: string; to?: string }
+  // Unnamed 2-band output: B0 = NDVI value, B1 = dataMask
   outputs?: {
-    ndvi?: { bands?: { B0?: StatsBand } }
-    dataMask?: { bands?: { B0?: StatsBand } }
+    default?: {
+      bands?: {
+        B0?: StatsBand
+        B1?: StatsBand
+      }
+    }
   }
 }
 
@@ -111,6 +117,7 @@ export async function fetchParcelNdviStats(params: {
         {
           type: 'sentinel-2-l2a',
           dataFilter: {
+            maxCloudCoverage: 20,
             timeRange: { from: params.from, to: params.to },
           },
         },
@@ -118,27 +125,21 @@ export async function fetchParcelNdviStats(params: {
     },
     aggregation: {
       timeRange: { from: params.from, to: params.to },
-      aggregationInterval: { of: params.aggregationInterval ?? 'P5D' },
+      aggregationInterval: { of: params.aggregationInterval ?? 'P10D' },
+      // Unnamed 2-band output: B0 = NDVI, B1 = dataMask
+      // Matches the S2L2A NDVI layer evalscript in the CDSE instance configuration.
       evalscript: `//VERSION=3
 function setup() {
   return {
-    input: ["B04", "B08", "dataMask"],
-    output: [
-      { id: "ndvi", bands: 1 },
-      { id: "dataMask", bands: 1 }
-    ]
+    input: [{ bands: ["B04", "B08", "dataMask"] }],
+    output: { bands: 2 }
   };
 }
-function evaluatePixel(sample) {
-  let ndvi = (sample.B08 - sample.B04) / (sample.B08 + sample.B04 + 0.0001);
-  return {
-    ndvi: [ndvi],
-    dataMask: [sample.dataMask]
-  };
+function evaluatePixel(samples) {
+  var denom = samples.B08 + samples.B04;
+  var ndvi = denom > 0.0001 ? (samples.B08 - samples.B04) / denom : 0;
+  return [ndvi, samples.dataMask];
 }`,
-      calculations: {
-        ndvi: { statistics: { default: {} } },
-      },
     },
   }
 
@@ -150,20 +151,27 @@ function evaluatePixel(sample) {
 
   if (!res.ok) {
     const text = await res.text()
+    console.error('[NDVI] Statistics API error', res.status, text)
     throw new Error(`Sentinel Stats API error (${res.status}): ${text}`)
   }
 
-  return (await res.json()) as StatsResponse
+  const json = (await res.json()) as StatsResponse
+  console.info('[NDVI] Stats response intervals:', json.data?.length ?? 0)
+  return json
 }
 
 export function extractParcelNdvi(stats: StatsResponse): ParcelNdviResult {
   const intervals = (stats.data ?? [])
     .map((item) => {
-      const ndviStats = item.outputs?.ndvi?.bands?.B0?.stats
+      // Unnamed output: B0 = NDVI band, B1 = dataMask band
+      const ndviStats = item.outputs?.default?.bands?.B0?.stats
+      const maskMean = item.outputs?.default?.bands?.B1?.stats?.mean ?? 1
       const sampleCount = typeof ndviStats?.sampleCount === 'number' ? ndviStats.sampleCount : null
       const noDataCount = typeof ndviStats?.noDataCount === 'number' ? ndviStats.noDataCount : null
-      const mean = typeof ndviStats?.mean === 'number' ? round(ndviStats.mean, 3) : null
-      const cloudBlock = sampleCount === null ? true : sampleCount < 100
+      const rawMean = ndviStats?.mean
+      const mean = typeof rawMean === 'number' && isFinite(rawMean) ? round(rawMean, 3) : null
+      // Cloud-block: dataMask mean < 0.2 means >80% of pixels are masked/clouded
+      const cloudBlock = maskMean < 0.2 || sampleCount === null || sampleCount < 50
       return {
         from: item.interval?.from ?? null,
         to: item.interval?.to ?? null,
@@ -173,7 +181,7 @@ export function extractParcelNdvi(stats: StatsResponse): ParcelNdviResult {
         cloudBlock,
       }
     })
-    .filter((x) => x.mean !== null)
+    .filter((x) => x.mean !== null && !x.cloudBlock)
 
   const current = intervals.at(-1) ?? null
   const prev = intervals.length > 1 ? intervals[intervals.length - 2] : null
@@ -207,10 +215,11 @@ export async function getParcelNdviFromLatLng(params: {
 }): Promise<ParcelNdviResult> {
   const bbox = parcelToBBox(params.lat, params.lng, params.bboxDelta ?? 0.005)
   const to = `${params.fetchDate}T23:59:59Z`
+  // 30-day lookback with 20% maxCloudCoverage — matches the CDSE layer config (1-month window)
   const fromDate = new Date(`${params.fetchDate}T00:00:00Z`)
-  fromDate.setUTCDate(fromDate.getUTCDate() - 10)
-  const from = fromDate.toISOString()
+  fromDate.setUTCDate(fromDate.getUTCDate() - 30)
+  const from = fromDate.toISOString().replace('.000Z', 'Z')
 
-  const stats = await fetchParcelNdviStats({ bbox, from, to, aggregationInterval: 'P5D' })
+  const stats = await fetchParcelNdviStats({ bbox, from, to, aggregationInterval: 'P10D' })
   return extractParcelNdvi(stats)
 }
