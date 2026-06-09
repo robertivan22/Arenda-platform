@@ -120,7 +120,6 @@ export function buildInvoiceXml(inv: EFacturaInvoice): string {
   <cbc:DueDate>${inv.due_date}</cbc:DueDate>` : ''}
   <cbc:InvoiceTypeCode>${typeCode}</cbc:InvoiceTypeCode>${inv.note ? `
   <cbc:Note>${xe(inv.note)}</cbc:Note>` : ''}
-  <cbc:TaxPointDate>${inv.issue_date}</cbc:TaxPointDate>
   <cbc:DocumentCurrencyCode>${cur}</cbc:DocumentCurrencyCode>
   <cac:AccountingSupplierParty>
     <cac:Party>
