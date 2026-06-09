@@ -2,7 +2,7 @@
 
 export const runtime = 'edge'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -554,7 +554,8 @@ export default function ActivitatiPage() {
               const st = statusInfo(o.status)
               const opCls = OP_COLORS[o.operation_type] ?? 'bg-gray-100 text-gray-600'
               return (
-                <tr key={o.id} className="hover:bg-gray-50 transition-colors">
+                <React.Fragment key={o.id}>
+                <tr className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${opCls}`}>
                       {opLabel(o.operation_type)}
@@ -658,6 +659,7 @@ export default function ActivitatiPage() {
                     </td>
                   </tr>
                 )}
+                </React.Fragment>
               )
             })}
           </tbody>

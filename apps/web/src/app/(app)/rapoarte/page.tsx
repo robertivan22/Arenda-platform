@@ -112,7 +112,7 @@ export default function RapoartePage() {
       db.from('parcels')
         .select('id, parcel_nr, tarla_nr, surface, contract_id, contracts(contract_number, lessors(id, first_name, last_name, company_name, type, status))')
         .order('parcel_nr').limit(1000),
-    ]).then(([{ data: ls, error: e1 }, { data: cs, error: e2 }, { data: ts, error: e3 }, { data: is, error: e4 }, { data: ps, error: e5 }]) => {
+    ]).then(async ([{ data: ls, error: e1 }, { data: cs, error: e2 }, { data: ts, error: e3 }, { data: is, error: e4 }, { data: ps, error: e5 }]) => {
       if (e1 || e2 || e3 || e4 || e5) { toast.error('Eroare la încărcarea datelor.'); setLoading(false); return }
       setLessors((ls ?? []) as Lessor[])
       setContracts((cs ?? []) as unknown as Contract[])
