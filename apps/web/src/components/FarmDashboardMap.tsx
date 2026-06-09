@@ -45,12 +45,16 @@ export default function FarmDashboardMap({ parcels, selectedId, onSelect }: Prop
         attributionControl: false,
       })
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        subdomains: 'abcd',
-        maxZoom: 19,
-      }).addTo(map)
+      L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        { attribution: 'Tiles © Esri — Source: Esri, Maxar, GeoEye, USGS', maxZoom: 19 },
+      ).addTo(map)
 
-      L.control.attribution({ position: 'bottomright', prefix: '©OpenStreetMap ©CartoDB' }).addTo(map)
+      // Labels overlay on top of satellite
+      L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+        { attribution: '', maxZoom: 19, opacity: 0.8 },
+      ).addTo(map)
 
       const group = L.layerGroup().addTo(map)
       map.setView([44.8, 25.0], 8) // Romania centroid fallback
