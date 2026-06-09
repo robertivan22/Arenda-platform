@@ -5,7 +5,7 @@ export const runtime = 'edge'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Save, ChevronDown, ChevronRight, Shield, FileText, Users, Leaf, MessageSquare } from 'lucide-react'
+import { Save, ChevronDown, ChevronRight, Shield, FileText, Users, Leaf, MessageSquare, Tractor, Activity, MapPin, LayoutDashboard, ExternalLink } from 'lucide-react'
 import { CONFIG_FIELDS, getDefaults, DocConfig } from '@/lib/doc-config-fields'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ const tdCls = 'px-3 py-2 text-sm text-gray-800'
 export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [tab, setTab] = useState<'users' | 'templates' | 'fitosanitar' | 'messages'>('users')
+  const [tab, setTab] = useState<'users' | 'templates' | 'fitosanitar' | 'messages' | 'module'>('users')
 
   // Users
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -312,6 +312,12 @@ export default function AdminPage() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setTab('module')}
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+              tab === 'module' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >Module noi</button>
         </div>
       </div>
 
@@ -706,6 +712,82 @@ export default function AdminPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ══ MODULE NOI TAB ═════════════════════════════════════════════════ */}
+        {tab === 'module' && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2 mb-2">
+              <LayoutDashboard className="w-4 h-4 text-gray-500" />
+              <h2 className="font-semibold text-gray-800">Module noi adăugate</h2>
+            </div>
+            <p className="text-sm text-gray-500 -mt-3">Acces rapid la modulele implementate recent în platformă.</p>
+
+            {/* Monitorizare Fermă */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                  <Activity className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Monitorizare Fermă</h3>
+                  <p className="text-xs text-gray-500">Ruta: /ferma</p>
+                </div>
+                <a href="/ferma" target="_blank" className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors">
+                  <ExternalLink className="w-3.5 h-3.5" /> Deschide
+                </a>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <p className="font-medium text-gray-700 mb-1">Surse date</p>
+                  <p className="text-xs text-gray-500">Open-Meteo (meteo + sol, gratuit) + Sentinel Hub CDSE (NDVI satelitar)</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <p className="font-medium text-gray-700 mb-1">Permisiune necesară</p>
+                  <p className="text-xs text-gray-500"><code className="bg-gray-200 px-1 rounded">can_parcele</code> — controlat din tab Utilizatori</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <p className="font-medium text-gray-700 mb-1">Env vars necesare</p>
+                  <p className="text-xs text-gray-500 font-mono">SENTINEL_HUB_CLIENT_ID<br />SENTINEL_HUB_CLIENT_SECRET</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Utilaje */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                  <Tractor className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Parc Utilaje & Flotă</h3>
+                  <p className="text-xs text-gray-500">Rute: /utilaje · /utilaje/implementuri · /utilaje/operatori</p>
+                </div>
+                <a href="/utilaje" target="_blank" className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors">
+                  <ExternalLink className="w-3.5 h-3.5" /> Deschide
+                </a>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { label: 'Parc utilaje', href: '/utilaje', desc: 'Lista mașini, jurnal lucru, combustibil, mentenanță' },
+                  { label: 'Implementuri', href: '/utilaje/implementuri', desc: 'Plug, disc, semănătoare, stropitoare, remorcă etc.' },
+                  { label: 'Operatori', href: '/utilaje/operatori', desc: 'Gestionare conducători și operatori utilaje' },
+                  { label: 'Detaliu utilaj', href: '/utilaje', desc: 'Consum combustibil, program mentenanță, km/ore' },
+                ].map(item => (
+                  <a key={item.href + item.label} href={item.href} target="_blank"
+                    className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100 hover:bg-blue-50 hover:border-blue-200 transition-colors group">
+                    <MapPin className="w-4 h-4 text-gray-400 group-hover:text-blue-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-800 group-hover:text-blue-700">{item.label}</p>
+                      <p className="text-xs text-gray-500">{item.desc}</p>
+                    </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-gray-300 group-hover:text-blue-400 ml-auto flex-shrink-0" />
+                  </a>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-3">Permisiune: <code className="bg-gray-100 px-1 rounded">can_parcele</code> · SQL necesar: supabase-migration-fleet.sql + supabase-fix-rls-defaults.sql</p>
+            </div>
           </div>
         )}
 

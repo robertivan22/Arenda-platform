@@ -86,7 +86,8 @@ export async function fetchNdviStats(
         bbox,
         properties: { crs: 'http://www.opengis.net/def/crs/EPSG/0/4326' },
       },
-      data: [{ type: 'sentinel-2-l2a', dataFilter: { mosaickingOrder: 'leastCC', maxCloudCoverage: 80 } }],
+      // Note: mosaickingOrder is NOT supported by CDSE Statistics API – omit it
+      data: [{ type: 'sentinel-2-l2a', dataFilter: { maxCloudCoverage: 80 } }],
     },
     aggregation: {
       timeRange: { from: fmt(from), to: fmt(to) },
