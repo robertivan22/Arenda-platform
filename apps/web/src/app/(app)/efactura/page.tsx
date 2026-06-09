@@ -10,8 +10,6 @@ import {
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/PageHeader'
 
-// --- Types -------------------------------------------------------------------
-
 interface Lessor {
   id: string
   first_name: string
@@ -33,14 +31,10 @@ interface Invoice {
   lessors?: Lessor | null
 }
 
-// --- Helpers -----------------------------------------------------------------
-
 function lessorName(l: Lessor | null | undefined) {
-  if (!l) return '\u2014'
-  return l.type === 'LEGAL' ? (l.company_name ?? '\u2014') : `${l.last_name} ${l.first_name}`.trim()
+  if (!l) return '-'
+  return l.type === 'LEGAL' ? (l.company_name ?? '-') : `${l.last_name} ${l.first_name}`.trim()
 }
-
-// --- Validation result badge -------------------------------------------------
 
 type ValidationResult = 'valid' | 'invalid' | null
 
@@ -60,8 +54,6 @@ function ValidationBadge({ result }: { result: ValidationResult }) {
       </span>
     )
 }
-
-// --- Main Page ---------------------------------------------------------------
 
 export default function EFacturaPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -109,11 +101,11 @@ export default function EFacturaPage() {
     }
 
     if (data.valid) {
-      toast.success('Factura este valid\u0103 pentru e-Factura \u2713')
+      toast.success('Factura este valida pentru e-Factura')
       setValidationResults(r => ({ ...r, [inv.id]: 'valid' }))
     } else {
-      const msgs = (data.validation_errors ?? []).map(e => `\u2022 ${e.message}`).join('\n')
-      toast.error(`Erori validare:\n${msgs}`, { duration: 10000 })
+      const msgs = (data.validation_errors ?? []).map(e => e.message).join('; ')
+      toast.error(`Erori validare: ${msgs}`, { duration: 10000 })
       setValidationResults(r => ({ ...r, [inv.id]: 'invalid' }))
     }
   }
@@ -135,22 +127,21 @@ export default function EFacturaPage() {
       <div className="flex items-start justify-between gap-4">
         <PageHeader
           title="e-Factura ANAF"
-          subtitle="Validare \u0219i generare XML conform RO_CIUS / UBL 2.1"
+          subtitle="Validare si generare XML conform RO_CIUS / UBL 2.1"
         />
         <button
           onClick={loadData}
           className="mt-1 p-1.5 border border-gray-200 rounded text-gray-500 hover:text-gray-700"
-          title="Re\u00eencarc\u0103"
+          title="Reincarca"
         >
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Info banner */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-700 flex items-start gap-2">
         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
         <span>
-          Valida\u021bi XML-ul fiec\u0103rei facturi, desc\u0103rca\u021bi fi\u0219ierul UBL 2.1 \u0219i \u00eenc\u0103rca\u021bi-l manual pe{' '}
+          Validati XML-ul fiecarei facturi, descarcati fisierul UBL 2.1 si incarcati-l manual pe{' '}
           <a
             href="https://efactura.mfinante.gov.ro"
             target="_blank"
@@ -158,13 +149,12 @@ export default function EFacturaPage() {
             className="underline font-medium"
           >
             efactura.mfinante.gov.ro
-          </a>{' '}
-          (SPV \u2192 \u00cencarcare factur\u0103).
+          </a>
+          {' '}(SPV &rarr; Incarcare factura).
           Standardul utilizat: <strong>RO_CIUS / UBL 2.1</strong>
         </span>
       </div>
 
-      {/* Invoice table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-2">
           <FileCheck2 className="w-4 h-4 text-brand-600" />
@@ -179,7 +169,7 @@ export default function EFacturaPage() {
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Nr.</th>
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Arenda\u0219</th>
+                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Arendas</th>
                 <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Total RON</th>
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Validare XML</th>
                 <th className="px-4 py-2 bg-gray-50"></th>
@@ -214,15 +204,13 @@ export default function EFacturaPage() {
                               <button
                                 onClick={() => validateInvoice(inv)}
                                 className="flex items-center gap-1 px-2.5 py-1 text-xs border border-gray-300 rounded hover:border-brand-400 hover:text-brand-600 text-gray-600 font-medium transition-colors"
-                                title="Valideaz\u0103 structura XML"
                               >
                                 <FileCheck2 className="w-3.5 h-3.5" />
-                                Valideaz\u0103
+                                Valideaza
                               </button>
                               <button
                                 onClick={() => downloadXml(inv)}
                                 className="flex items-center gap-1 px-2.5 py-1 text-xs bg-brand-600 hover:bg-brand-700 text-white rounded font-medium transition-colors"
-                                title="Descarc\u0103 XML UBL 2.1"
                               >
                                 <Download className="w-3.5 h-3.5" />
                                 XML
@@ -237,7 +225,7 @@ export default function EFacturaPage() {
               {invoices.length === 0 && (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-sm text-gray-400">
-                    Nu exist\u0103 facturi. Crea\u021bi facturi din pagina Contracte \u2192 Tranzac\u021bii.
+                    Nu exista facturi. Creati facturi din pagina Contracte &rarr; Tranzactii.
                   </td>
                 </tr>
               )}
