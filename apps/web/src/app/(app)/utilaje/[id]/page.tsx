@@ -401,11 +401,11 @@ export default function MachineDetailPage() {
                 {editing ? (
                   <input type={f.inputType ?? 'text'} required={f.required}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    value={(editForm as Record<string, unknown>)[f.key as string] as string ?? ''}
+                    value={(editForm as unknown as Record<string, unknown>)[f.key as string] as string ?? ''}
                     onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))} />
                 ) : (
                   <div className="text-sm text-gray-800 py-0.5">
-                    {(machine as Record<string, unknown>)[f.key as string] as string ?? '—'}
+                    {(machine as unknown as Record<string, unknown>)[f.key as string] as string ?? '—'}
                   </div>
                 )}
               </div>
