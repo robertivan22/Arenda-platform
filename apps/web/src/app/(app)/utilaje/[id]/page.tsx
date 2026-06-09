@@ -553,8 +553,8 @@ export default function MachineDetailPage() {
                           {OP_TYPES.find(o => o.value === log.operation_type)?.label ?? log.operation_type ?? '—'}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-gray-600 text-xs">{(log as Record<string, unknown> & { operators?: { name: string } }).operators?.name ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-gray-600 text-xs">{(log as Record<string, unknown> & { implements?: { name: string } }).implements?.name ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-gray-600 text-xs">{(log as unknown as Record<string, unknown> & { operators?: { name: string } }).operators?.name ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-gray-600 text-xs">{(log as unknown as Record<string, unknown> & { implements?: { name: string } }).implements?.name ?? '—'}</td>
                       <td className="px-4 py-2.5 text-right text-gray-700">{log.hours_worked != null ? `${log.hours_worked} h` : '—'}</td>
                       <td className="px-4 py-2.5 text-right text-gray-700">{log.area_worked_ha != null ? `${log.area_worked_ha} ha` : '—'}</td>
                       <td className="px-4 py-2.5 text-right text-gray-700">{log.fuel_consumed_l != null ? `${log.fuel_consumed_l} L` : '—'}</td>
