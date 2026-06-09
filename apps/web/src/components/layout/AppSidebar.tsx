@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor, Activity, Receipt,
+  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -81,6 +81,12 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [
       { label: 'Tranzacții', href: '/plati', icon: CreditCard, permKey: 'can_facturi' },
       { label: 'e-Factura ANAF', href: '/efactura', icon: Receipt, permKey: 'can_facturi' },
+    ],
+  },
+  {
+    label: 'SUBVENȚII',
+    items: [
+      { label: 'Dosar APIA', href: '/apia', icon: FolderOpen, permKey: 'can_declaratii' },
     ],
   },
   {
