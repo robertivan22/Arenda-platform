@@ -2,7 +2,7 @@
 
 export const runtime = 'edge'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -39,9 +39,15 @@ interface Parcel {
   surface: number; contract_id: string
   contracts?: { contract_number: string; lessors?: Lessor | null } | null
 }
+interface CampaignReport { id: string; name: string; year: number }
+interface CropPlanRow {
+  parcel_id: string; bloc_fizic: string | null; locality: string | null; surface: number
+  crop: string; planned_area_ha: number | null; planned_yield_t_ha: number | null; status: string
+  actual_yield_t_ha: number | null; actual_area_ha: number | null; total_cost: number
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const TABS = ['Dashboard', 'Arendași', 'Contracte', 'Tranzacții', 'Facturi & Avize', 'Produse', 'Parcele']
+const TABS = ['Dashboard', 'Arendași', 'Contracte', 'Tranzacții', 'Facturi & Avize', 'Produse', 'Parcele', 'Campanie']
 const COLORS = ['#2d6a4f', '#52b788', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899']
 const MONTHS = ['Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const STATUS_LABEL: Record<string, string> = {
@@ -85,6 +91,10 @@ export default function RapoartePage() {
   const [invStatus, setInvStatus] = useState('')
   const [contractStatus, setContractStatus] = useState('')
   const [expandedLessors, setExpandedLessors] = useState<Set<string>>(new Set())
+  const [campaignList, setCampaignList] = useState<CampaignReport[]>([])
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('')
+  const [cropPlanRows, setCropPlanRows] = useState<CropPlanRow[]>([])
+  const [loadingCampaign, setLoadingCampaign] = useState(false)
 
   useEffect(() => {
     const db = createClient()
@@ -110,6 +120,13 @@ export default function RapoartePage() {
       setInvoices((is ?? []) as unknown as Invoice[])
       setParcels((ps ?? []) as unknown as Parcel[])
       setLoading(false)
+      // Load campaigns list for the Campanie tab
+      const db2 = createClient()
+      const { data: camps } = await db2.from('campaigns').select('id,name,year').order('year', { ascending: false })
+      if (camps && camps.length > 0) {
+        setCampaignList(camps as CampaignReport[])
+        setSelectedCampaignId((camps[0] as CampaignReport).id)
+      }
     })
   }, [])
 
@@ -163,6 +180,54 @@ export default function RapoartePage() {
     filteredTxns.forEach(t => { map[t.product_name] = (map[t.product_name] ?? 0) + t.ron_net })
     return Object.entries(map).map(([name, ron]) => ({ name, ron: Math.round(ron * 100) / 100 })).sort((a, b) => b.ron - a.ron)
   }, [filteredTxns])
+
+  async function loadCampaignReport(campaignId: string) {
+    if (!campaignId) return
+    setLoadingCampaign(true)
+    const db = createClient()
+    const [{ data: plans }, { data: harvests }, { data: workOrders }] = await Promise.all([
+      db.from('crop_plans').select('parcel_id,crop,planned_area_ha,planned_yield_t_ha,status').eq('campaign_id', campaignId),
+      db.from('harvest_lots').select('parcel_id,yield_t_ha,area_harvested_ha').eq('campaign_id', campaignId),
+      db.from('work_orders').select('id,parcel_id').eq('campaign_id', campaignId),
+    ])
+    const woIds = (workOrders ?? []).map((w: any) => w.id)
+    let costByParcel = new Map<string, number>()
+    if (woIds.length > 0) {
+      const { data: inputs } = await db.from('work_order_inputs').select('work_order_id,quantity,cost_per_unit').in('work_order_id', woIds)
+      const woParcelMap = new Map((workOrders ?? []).map((w: any) => [w.id, w.parcel_id as string]))
+      for (const inp of (inputs ?? []) as any[]) {
+        if (!inp.cost_per_unit) continue
+        const pid = woParcelMap.get(inp.work_order_id)
+        if (pid) costByParcel.set(pid, (costByParcel.get(pid) ?? 0) + inp.quantity * inp.cost_per_unit)
+      }
+    }
+    const { data: parcelsData } = await db.from('parcels').select('id,bloc_fizic,locality,surface')
+      .in('id', (plans ?? []).map((p: any) => p.parcel_id))
+    const parcelMeta = new Map((parcelsData ?? []).map((p: any) => [p.id, p]))
+    const harvestMap = new Map((harvests ?? []).map((h: any) => [h.parcel_id, h]))
+    setCropPlanRows(
+      (plans ?? []).map((p: any) => {
+        const meta: any = parcelMeta.get(p.parcel_id) ?? {}
+        const h: any = harvestMap.get(p.parcel_id)
+        return {
+          parcel_id: p.parcel_id,
+          bloc_fizic: meta.bloc_fizic ?? null,
+          locality: meta.locality ?? null,
+          surface: meta.surface ?? 0,
+          crop: p.crop,
+          planned_area_ha: p.planned_area_ha,
+          planned_yield_t_ha: p.planned_yield_t_ha,
+          status: p.status,
+          actual_yield_t_ha: h?.yield_t_ha ?? null,
+          actual_area_ha: h?.area_harvested_ha ?? null,
+          total_cost: costByParcel.get(p.parcel_id) ?? 0,
+        } as CropPlanRow
+      })
+    )
+    setLoadingCampaign(false)
+  }
+
+  useEffect(() => { if (selectedCampaignId) void loadCampaignReport(selectedCampaignId) }, [selectedCampaignId])
 
   function toggleLessor(id: string) {
     setExpandedLessors(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -734,6 +799,174 @@ export default function RapoartePage() {
               {parcels.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-sm text-gray-400">Fără parcele</td></tr>}
             </tbody>
           </table>
+        </div>
+      )}
+      {/* ── CAMPANIE ────────────────────────────────────────────────────────────────── */}
+      {tab === 7 && (
+        <div className="space-y-4">
+          {campaignList.length === 0 ? (
+            <div className="py-12 text-center text-sm text-gray-400">Nu există campanii. Creează prima campanie în Setări → Campanii.</div>
+          ) : (
+            <>
+              {/* Campaign selector */}
+              <div className="flex items-center gap-3">
+                <select className={selCls} value={selectedCampaignId} onChange={e => setSelectedCampaignId(e.target.value)}>
+                  {campaignList.map(c => <option key={c.id} value={c.id}>{c.name} ({c.year})</option>)}
+                </select>
+                <button onClick={() => void loadCampaignReport(selectedCampaignId)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                  Reîncarcă
+                </button>
+                {cropPlanRows.length > 0 && (
+                  <button onClick={() => exportXlsx(cropPlanRows.map(r => ({
+                    Parcelă: r.bloc_fizic, Localitate: r.locality, 'Suprafață (ha)': r.surface,
+                    Cultură: r.crop, 'Plan ha': r.planned_area_ha, 'Plan t/ha': r.planned_yield_t_ha,
+                    'Real ha': r.actual_area_ha, 'Real t/ha': r.actual_yield_t_ha,
+                    Status: r.status, 'Cost total (RON)': r.total_cost,
+                    'Cost/ha (RON)': r.surface > 0 ? (r.total_cost / r.surface).toFixed(2) : '',
+                  })), 'campanie-' + (campaignList.find(c => c.id === selectedCampaignId)?.year ?? ''))}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                    <Download className="w-3.5 h-3.5" /> Export Excel
+                  </button>
+                )}
+              </div>
+
+              {loadingCampaign ? (
+                <div className="py-12 text-center text-sm text-gray-400">Se încarcă...</div>
+              ) : cropPlanRows.length === 0 ? (
+                <div className="py-12 text-center text-sm text-gray-400">Niciun plan de cultură înregistrat pentru această campanie.</div>
+              ) : (
+                <>
+                  {/* KPI summary */}
+                  {(() => {
+                    const totalHa = cropPlanRows.reduce((s, r) => s + (r.planned_area_ha ?? r.surface), 0)
+                    const actualHa = cropPlanRows.reduce((s, r) => s + (r.actual_area_ha ?? 0), 0)
+                    const totalPlannedT = cropPlanRows.reduce((s, r) => s + ((r.planned_area_ha ?? r.surface) * (r.planned_yield_t_ha ?? 0)), 0)
+                    const totalActualT = cropPlanRows.reduce((s, r) => s + ((r.actual_area_ha ?? 0) * (r.actual_yield_t_ha ?? 0)), 0)
+                    const totalCost = cropPlanRows.reduce((s, r) => s + r.total_cost, 0)
+                    return (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {[
+                          { label: 'Parcele planificate', value: cropPlanRows.length },
+                          { label: 'Ha totale planificate', value: `${totalHa.toFixed(2)} ha` },
+                          { label: 'Producție planificată', value: totalPlannedT > 0 ? `${totalPlannedT.toFixed(1)} t` : '—' },
+                          { label: 'Producție reală', value: totalActualT > 0 ? `${totalActualT.toFixed(1)} t` : '—' },
+                          { label: 'Cost total inputuri', value: totalCost > 0 ? `${totalCost.toFixed(0)} RON` : '—' },
+                          { label: 'Cost mediu / ha', value: totalHa > 0 && totalCost > 0 ? `${(totalCost / totalHa).toFixed(0)} RON/ha` : '—' },
+                          { label: 'Recoltat', value: `${cropPlanRows.filter(r => r.status === 'RECOLTAT').length} / ${cropPlanRows.length}` },
+                          { label: 'Producție medie reală', value: actualHa > 0 ? `${(totalActualT / actualHa).toFixed(2)} t/ha` : '—' },
+                        ].map(k => (
+                          <div key={k.label} className="bg-white rounded-lg border border-gray-100 p-3 shadow-sm">
+                            <div className="text-lg font-bold text-gray-800">{k.value}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{k.label}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Per-crop summary */}
+                  {(() => {
+                    const byCrop: Record<string, { planned_ha: number; actual_ha: number; planned_t: number; actual_t: number; cost: number; count: number }> = {}
+                    cropPlanRows.forEach(r => {
+                      if (!byCrop[r.crop]) byCrop[r.crop] = { planned_ha: 0, actual_ha: 0, planned_t: 0, actual_t: 0, cost: 0, count: 0 }
+                      const c = byCrop[r.crop]
+                      c.count++
+                      c.planned_ha += r.planned_area_ha ?? r.surface
+                      c.actual_ha  += r.actual_area_ha ?? 0
+                      c.planned_t  += (r.planned_area_ha ?? r.surface) * (r.planned_yield_t_ha ?? 0)
+                      c.actual_t   += (r.actual_area_ha ?? 0) * (r.actual_yield_t_ha ?? 0)
+                      c.cost       += r.total_cost
+                    })
+                    return (
+                      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+                        <div className="px-4 py-3 border-b border-gray-100 text-sm font-semibold text-gray-700">Sumar pe culturi</div>
+                        <table className="w-full text-sm">
+                          <thead><tr>
+                            <th className={thCls}>Cultură</th>
+                            <th className={`${thCls} text-right`}>Parcele</th>
+                            <th className={`${thCls} text-right`}>Ha planif.</th>
+                            <th className={`${thCls} text-right`}>Ha recoltat</th>
+                            <th className={`${thCls} text-right`}>Prod. planif. (t)</th>
+                            <th className={`${thCls} text-right`}>Prod. reală (t)</th>
+                            <th className={`${thCls} text-right`}>Cost (RON)</th>
+                            <th className={`${thCls} text-right`}>RON/ha</th>
+                          </tr></thead>
+                          <tbody>
+                            {Object.entries(byCrop).sort((a,b) => b[1].planned_ha - a[1].planned_ha).map(([crop, v]) => (
+                              <tr key={crop} className="border-b border-gray-50 hover:bg-gray-50">
+                                <td className={tdCls + ' font-medium'}>{crop}</td>
+                                <td className={tdCls + ' text-right'}>{v.count}</td>
+                                <td className={tdCls + ' text-right'}>{v.planned_ha.toFixed(2)}</td>
+                                <td className={tdCls + ' text-right'}>{v.actual_ha > 0 ? v.actual_ha.toFixed(2) : '—'}</td>
+                                <td className={tdCls + ' text-right'}>{v.planned_t > 0 ? v.planned_t.toFixed(1) : '—'}</td>
+                                <td className={`${tdCls} text-right font-medium ${v.actual_t > 0 ? 'text-green-700' : ''}`}>
+                                  {v.actual_t > 0 ? v.actual_t.toFixed(1) : '—'}
+                                </td>
+                                <td className={tdCls + ' text-right'}>{v.cost > 0 ? v.cost.toFixed(0) : '—'}</td>
+                                <td className={tdCls + ' text-right'}>{v.planned_ha > 0 && v.cost > 0 ? (v.cost / v.planned_ha).toFixed(0) : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Per-parcel detail */}
+                  <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+                    <div className="px-4 py-3 border-b border-gray-100 text-sm font-semibold text-gray-700">Detaliu per parcelă</div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead><tr>
+                          <th className={thCls}>Parcelă</th>
+                          <th className={thCls}>Localitate</th>
+                          <th className={`${thCls} text-right`}>Ha</th>
+                          <th className={thCls}>Cultură</th>
+                          <th className={`${thCls} text-right`}>Plan t/ha</th>
+                          <th className={`${thCls} text-right`}>Real t/ha</th>
+                          <th className={`${thCls} text-right`}>Δ t/ha</th>
+                          <th className={`${thCls} text-right`}>Cost (RON)</th>
+                          <th className={`${thCls} text-right`}>RON/ha</th>
+                          <th className={thCls}>Status</th>
+                        </tr></thead>
+                        <tbody>
+                          {cropPlanRows.map(r => {
+                            const delta = r.actual_yield_t_ha != null && r.planned_yield_t_ha != null
+                              ? r.actual_yield_t_ha - r.planned_yield_t_ha : null
+                            return (
+                              <tr key={r.parcel_id} className="border-b border-gray-50 hover:bg-gray-50">
+                                <td className={tdCls + ' font-medium'}>{r.bloc_fizic ?? r.parcel_id.slice(0,8)}</td>
+                                <td className={tdCls + ' text-gray-500 text-xs'}>{r.locality ?? '—'}</td>
+                                <td className={tdCls + ' text-right'}>{(r.planned_area_ha ?? r.surface).toFixed(2)}</td>
+                                <td className={tdCls}>{r.crop}</td>
+                                <td className={tdCls + ' text-right text-gray-500'}>{r.planned_yield_t_ha ?? '—'}</td>
+                                <td className={`${tdCls} text-right font-medium ${r.actual_yield_t_ha ? 'text-green-700' : ''}`}>
+                                  {r.actual_yield_t_ha ?? '—'}
+                                </td>
+                                <td className={`${tdCls} text-right text-xs font-medium ${delta != null ? (delta >= 0 ? 'text-green-600' : 'text-red-500') : ''}`}>
+                                  {delta != null ? `${delta >= 0 ? '+' : ''}${delta.toFixed(2)}` : '—'}
+                                </td>
+                                <td className={tdCls + ' text-right'}>{r.total_cost > 0 ? r.total_cost.toFixed(0) : '—'}</td>
+                                <td className={tdCls + ' text-right'}>{r.surface > 0 && r.total_cost > 0 ? (r.total_cost / r.surface).toFixed(0) : '—'}</td>
+                                <td className={tdCls}>
+                                  <span className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${
+                                    r.status === 'RECOLTAT' ? 'bg-green-100 text-green-700' :
+                                    r.status === 'IN_PRODUCTIE' ? 'bg-amber-100 text-amber-700' :
+                                    r.status === 'ABANDONAT' ? 'bg-red-100 text-red-500' :
+                                    'bg-blue-100 text-blue-700'}`}>{r.status}</span>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

@@ -10,7 +10,7 @@ import { CampaignSelector } from '@/components/CampaignSelector'
 import { toast } from 'sonner'
 import {
   Plus, X, Check, Pencil, Loader2, Tractor, Filter,
-  Calendar, MapPin, ChevronDown,
+  Calendar, MapPin, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import type { Campaign } from '@/lib/campaign-types'
 
@@ -78,6 +78,27 @@ interface Parcel {
   locality: string | null
   surface: number
 }
+
+interface WorkOrderInput {
+  id: string
+  work_order_id: string
+  input_type: string
+  product_name: string
+  quantity: number
+  unit: string
+  cost_per_unit: number | null
+  notes: string | null
+}
+
+const INPUT_TYPES = [
+  { value: 'SAMANTA',     label: 'Sămânță' },
+  { value: 'INGRASAMANT', label: 'Îngrăşământ' },
+  { value: 'ERBICID',     label: 'Erbicid' },
+  { value: 'FUNGICID',    label: 'Fungicid' },
+  { value: 'INSECTICID',  label: 'Insecticid' },
+  { value: 'CARBURANT',   label: 'Carburant' },
+  { value: 'ALTELE',      label: 'Altele' },
+]
 
 type FormState = Omit<WorkOrder, 'id' | 'campaign_id' | 'created_at' | 'parcel_name' | 'parcel_surface' | 'area_ha'> & {
   parcel_id: string
@@ -152,6 +173,10 @@ export default function ActivitatiPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM())
   const [editId, setEditId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [inputsCache, setInputsCache] = useState<Map<string, WorkOrderInput[]>>(new Map())
+  const [addInputForm, setAddInputForm] = useState({ input_type: 'SAMANTA', product_name: '', quantity: '', unit: 'kg', cost_per_unit: '', notes: '' })
+  const [savingInput, setSavingInput] = useState(false)
 
   // Filters
   const [filterOp, setFilterOp] = useState('')
@@ -178,7 +203,7 @@ export default function ActivitatiPage() {
   }, [])
 
   // ── Load work orders ──
-  const loadOrders = useCallback(async (cam?: Campaign | null) => {
+  async function loadOrders(cam?: Campaign | null) {
     const c = cam ?? campaign
     if (!c) return
     setLoading(true)
@@ -196,9 +221,54 @@ export default function ActivitatiPage() {
       })))
     }
     setLoading(false)
-  }, [campaign])
+  }
 
-  useEffect(() => { if (campaign) void loadOrders(campaign) }, [campaign, loadOrders])
+  async function toggleExpand(workOrderId: string) {
+    if (expandedId === workOrderId) { setExpandedId(null); return }
+    setExpandedId(workOrderId)
+    if (inputsCache.has(workOrderId)) return
+    const { data } = await createClient().from('work_order_inputs').select('*').eq('work_order_id', workOrderId).order('created_at')
+    setInputsCache(m => new Map(m).set(workOrderId, (data ?? []) as WorkOrderInput[]))
+  }
+
+  async function saveInput(workOrderId: string) {
+    if (!addInputForm.product_name.trim() || !addInputForm.quantity) return
+    setSavingInput(true)
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) { setSavingInput(false); return }
+    const { data, error } = await db.from('work_order_inputs').insert({
+      user_id: user.id,
+      work_order_id: workOrderId,
+      input_type: addInputForm.input_type,
+      product_name: addInputForm.product_name.trim(),
+      quantity: parseFloat(addInputForm.quantity),
+      unit: addInputForm.unit,
+      cost_per_unit: addInputForm.cost_per_unit ? parseFloat(addInputForm.cost_per_unit) : null,
+      notes: addInputForm.notes || null,
+    }).select().single()
+    setSavingInput(false)
+    if (error) { toast.error(error.message); return }
+    setInputsCache(m => {
+      const n = new Map(m)
+      n.set(workOrderId, [...(n.get(workOrderId) ?? []), data as WorkOrderInput])
+      return n
+    })
+    setAddInputForm({ input_type: 'SAMANTA', product_name: '', quantity: '', unit: 'kg', cost_per_unit: '', notes: '' })
+    toast.success('Input adăugat.')
+  }
+
+  async function deleteInput(workOrderId: string, inputId: string) {
+    const { error } = await createClient().from('work_order_inputs').delete().eq('id', inputId)
+    if (error) { toast.error(error.message); return }
+    setInputsCache(m => {
+      const n = new Map(m)
+      n.set(workOrderId, (n.get(workOrderId) ?? []).filter(x => x.id !== inputId))
+      return n
+    })
+  }
+
+  useEffect(() => { if (campaign) void loadOrders(campaign) }, [campaign])
 
   // ── Auto-fill area when parcel changes ──
   useEffect(() => {
@@ -224,7 +294,6 @@ export default function ActivitatiPage() {
     return true
   })
 
-  // ── Save ──
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!campaign) return
@@ -481,6 +550,11 @@ export default function ActivitatiPage() {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => void toggleExpand(o.id)}
+                        className={`p-1.5 rounded transition-colors ${expandedId === o.id ? 'text-brand-600 bg-brand-50' : 'text-gray-400 hover:text-brand-600'}`}
+                        title="Inputuri / materiale">
+                        <ChevronRight className={`w-3.5 h-3.5 transition-transform ${expandedId === o.id ? 'rotate-90' : ''}`} />
+                      </button>
                       <button onClick={() => startEdit(o)}
                         className="p-1.5 text-gray-400 hover:text-brand-600 rounded" title="Editează">
                         <Pencil className="w-3.5 h-3.5" />
@@ -492,6 +566,66 @@ export default function ActivitatiPage() {
                     </div>
                   </td>
                 </tr>
+
+                {/* ── Inputs sub-row ── */}
+                {expandedId === o.id && (
+                  <tr key={o.id + '_inputs'} className="bg-gray-50">
+                    <td colSpan={8} className="px-6 py-3">
+                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Materiale / Inputuri consumate</div>
+                      {(inputsCache.get(o.id) ?? []).length > 0 && (
+                        <table className="w-full text-xs mb-3">
+                          <thead>
+                            <tr className="text-gray-400 border-b border-gray-200">
+                              <th className="text-left py-1 pr-3">Tip</th>
+                              <th className="text-left py-1 pr-3">Produs</th>
+                              <th className="text-right py-1 pr-3">Cantitate</th>
+                              <th className="text-right py-1 pr-3">Preț/UM</th>
+                              <th className="text-right py-1 pr-3">Total</th>
+                              <th className="py-1"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(inputsCache.get(o.id) ?? []).map(inp => (
+                              <tr key={inp.id} className="border-b border-gray-100">
+                                <td className="py-1 pr-3 text-gray-500">{INPUT_TYPES.find(t => t.value === inp.input_type)?.label ?? inp.input_type}</td>
+                                <td className="py-1 pr-3 font-medium text-gray-700">{inp.product_name}</td>
+                                <td className="py-1 pr-3 text-right">{inp.quantity} {inp.unit}</td>
+                                <td className="py-1 pr-3 text-right">{inp.cost_per_unit != null ? `${inp.cost_per_unit} RON/${inp.unit}` : '—'}</td>
+                                <td className="py-1 pr-3 text-right font-semibold">
+                                  {inp.cost_per_unit != null ? `${(inp.quantity * inp.cost_per_unit).toFixed(2)} RON` : '—'}
+                                </td>
+                                <td className="py-1">
+                                  <button onClick={() => void deleteInput(o.id, inp.id)} className="text-gray-300 hover:text-red-500"><X className="w-3 h-3" /></button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                      {/* Add input form */}
+                      <div className="flex flex-wrap items-end gap-2 pt-1">
+                        <select className="text-xs border border-gray-300 rounded px-2 py-1"
+                          value={addInputForm.input_type} onChange={e => setAddInputForm(f => ({ ...f, input_type: e.target.value }))}>
+                          {INPUT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                        <input className="text-xs border border-gray-300 rounded px-2 py-1 w-32" placeholder="Produs *"
+                          value={addInputForm.product_name} onChange={e => setAddInputForm(f => ({ ...f, product_name: e.target.value }))} />
+                        <input className="text-xs border border-gray-300 rounded px-2 py-1 w-16" placeholder="Cant. *" type="number" step="0.01"
+                          value={addInputForm.quantity} onChange={e => setAddInputForm(f => ({ ...f, quantity: e.target.value }))} />
+                        <select className="text-xs border border-gray-300 rounded px-2 py-1"
+                          value={addInputForm.unit} onChange={e => setAddInputForm(f => ({ ...f, unit: e.target.value }))}>
+                          {['kg','L','t','buc'].map(u => <option key={u}>{u}</option>)}
+                        </select>
+                        <input className="text-xs border border-gray-300 rounded px-2 py-1 w-24" placeholder="Preț/UM (RON)" type="number" step="0.01"
+                          value={addInputForm.cost_per_unit} onChange={e => setAddInputForm(f => ({ ...f, cost_per_unit: e.target.value }))} />
+                        <button onClick={() => void saveInput(o.id)} disabled={savingInput}
+                          className="flex items-center gap-1 text-xs px-2.5 py-1 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">
+                          {savingInput ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />} Adăugă
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               )
             })}
           </tbody>

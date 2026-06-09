@@ -69,6 +69,7 @@ interface HarvestLot {
 interface Row extends Parcel {
   plan: CropPlan | null
   harvest: HarvestLot | null
+  totalCost: number | null   // sum of work_order_inputs cost for this parcel this campaign
 }
 
 interface EditState {
@@ -153,17 +154,38 @@ export default function CampaniePage() {
     if (!c) return
     setLoading(true)
     const db = createClient()
-    const [{ data: parcels }, { data: plans }, { data: harvests }] = await Promise.all([
+    const [{ data: parcels }, { data: plans }, { data: harvests }, { data: workOrders }, { data: rawInputs }] = await Promise.all([
       db.from('parcels').select('id,bloc_fizic,tarla_nr,parcel_nr,locality,county,surface,status,culture').eq('status', 'ACTIVE').order('bloc_fizic'),
       db.from('crop_plans').select('*').eq('campaign_id', c.id),
       db.from('harvest_lots').select('*').eq('campaign_id', c.id),
+      db.from('work_orders').select('id,parcel_id').eq('campaign_id', c.id),
+      db.from('work_order_inputs').select('work_order_id,quantity,cost_per_unit').in(
+        'work_order_id',
+        // placeholder list; replaced below after workOrders loads — use a two-step approach
+        ['00000000-0000-0000-0000-000000000000']
+      ).limit(0), // will be overridden
     ])
+
+    // Build cost map: parcel_id → total RON
+    const woIds = (workOrders ?? []).map((w: any) => w.id)
+    let costMap = new Map<string, number>()
+    if (woIds.length > 0) {
+      const { data: inputs } = await db.from('work_order_inputs').select('work_order_id,quantity,cost_per_unit').in('work_order_id', woIds)
+      const woParcelMap = new Map((workOrders ?? []).map((w: any) => [w.id, w.parcel_id as string]))
+      for (const inp of (inputs ?? []) as any[]) {
+        if (!inp.cost_per_unit) continue
+        const pid = woParcelMap.get(inp.work_order_id)
+        if (!pid) continue
+        costMap.set(pid, (costMap.get(pid) ?? 0) + inp.quantity * inp.cost_per_unit)
+      }
+    }
     const planMap    = new Map((plans    ?? []).map(p => [p.parcel_id, p as CropPlan]))
     const harvestMap = new Map((harvests ?? []).map(h => [h.parcel_id, h as HarvestLot]))
     setRows((parcels ?? []).map(p => ({
       ...(p as Parcel),
-      plan:    planMap.get(p.id)    ?? null,
-      harvest: harvestMap.get(p.id) ?? null,
+      plan:      planMap.get(p.id)    ?? null,
+      harvest:   harvestMap.get(p.id) ?? null,
+      totalCost: costMap.get(p.id)   ?? null,
     })))
     setLoading(false)
   }, [campaign])
@@ -319,7 +341,8 @@ export default function CampaniePage() {
           { label: 'Total parcele', value: rows.length, icon: MapPin, color: 'text-brand-600' },
           { label: 'Suprafață totală', value: `${totalHa.toFixed(2)} ha`, icon: Leaf, color: 'text-green-600' },
           { label: 'Parcele planificate', value: `${plannedRows.length} / ${rows.length}`, icon: Wheat, color: 'text-amber-600' },
-          { label: 'Recoltat', value: recoltate, icon: TrendingUp, color: 'text-teal-600' },
+        { label: 'Recoltat', value: recoltate, icon: TrendingUp, color: 'text-teal-600' },
+          { label: 'Cost total', value: rows.reduce((s, r) => s + (r.totalCost ?? 0), 0) > 0 ? `${rows.reduce((s, r) => s + (r.totalCost ?? 0), 0).toFixed(0)} RON` : '—', icon: BarChart3, color: 'text-purple-600' },
         ].map(k => (
           <div key={k.label} className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-3">
             <k.icon className={`w-8 h-8 ${k.color}`} />
@@ -370,18 +393,19 @@ export default function CampaniePage() {
               <th className="px-4 py-3 text-left">Cultură planificată</th>
               <th className="px-4 py-3 text-left">Soi / Varietate</th>
               <th className="px-4 py-3 text-right">Plan / Recoltat</th>
+              <th className="px-4 py-3 text-right">Cost</th>
               <th className="px-4 py-3 text-center">Status</th>
               <th className="px-4 py-3 text-center">Acțiuni</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading && (
-              <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+              <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-400">
                 <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />Încarcare...
               </td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+              <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-400">
                 {rows.length === 0 ? 'Nu există parcele active în registru.' : 'Niciun rezultat pentru filtrul aplicat.'}
               </td></tr>
             )}
@@ -460,7 +484,7 @@ export default function CampaniePage() {
               if (harvesting === row.id) {
                 return (
                   <tr key={row.id + '_harvest'} className="bg-green-50">
-                    <td colSpan={8} className="px-4 py-4">
+                    <td colSpan={10} className="px-4 py-4">
                       <div className="flex flex-wrap items-end gap-3">
                         <div className="text-xs font-semibold text-green-700 w-full mb-1">
                           Înregistrează recoltare — {row.bloc_fizic ?? ''} {row.plan?.crop ? `· ${row.plan.crop}` : ''}
@@ -536,6 +560,14 @@ export default function CampaniePage() {
                     {row.harvest?.yield_t_ha != null && (
                       <div className="text-green-600 font-medium">{row.harvest.yield_t_ha} t/ha ✓</div>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-right text-xs text-gray-600">
+                    {row.totalCost != null ? (
+                      <div>
+                        <div className="font-medium">{row.totalCost.toFixed(0)} RON</div>
+                        {row.surface > 0 && <div className="text-gray-400">{(row.totalCost / row.surface).toFixed(0)} RON/ha</div>}
+                      </div>
+                    ) : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {st ? (
