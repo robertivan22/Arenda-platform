@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor,
+  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor, Activity,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -73,6 +73,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
           { label: 'Operatori', href: '/utilaje/operatori' },
         ],
       },
+      { label: 'Monitorizare Fermă', href: '/ferma', icon: Activity, permKey: 'can_parcele' },
     ],
   },
   {
