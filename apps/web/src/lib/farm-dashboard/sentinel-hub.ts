@@ -3,9 +3,11 @@
 // Gracefully returns null NDVI data when credentials are absent or on any error.
 import type { NdviData } from './types'
 
+// Copernicus Data Space Ecosystem (CDSE) endpoints
 const SH_TOKEN_URL =
-  'https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/token'
-const SH_STATS_URL = 'https://services.sentinel-hub.com/api/v1/statistics'
+  'https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token'
+const SH_BASE_URL = 'https://sh.dataspace.copernicus.eu'
+const SH_STATS_URL = `${SH_BASE_URL}/api/v1/statistics`
 
 const NDVI_EVALSCRIPT = `//VERSION=3
 function setup() {

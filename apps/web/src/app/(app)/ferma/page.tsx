@@ -107,13 +107,13 @@ function ParcelKpiMini({ label, icon: Icon, value, sub, iconClass }: {
   label: string; icon: React.ElementType; value: string; sub?: string; iconClass: string
 }) {
   return (
-    <div className="bg-gray-50 rounded-lg p-2.5 flex flex-col gap-0.5 min-w-0 border border-gray-100">
+    <div className="bg-gray-50 rounded-lg p-2.5 flex flex-col gap-0.5 min-w-0 border border-gray-100 overflow-hidden">
       <div className="flex items-center gap-1.5 mb-0.5">
         <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${iconClass}`} />
         <span className="text-[10px] text-gray-500 truncate">{label}</span>
       </div>
       <span className="text-sm font-semibold text-gray-900 leading-tight">{value}</span>
-      {sub && <span className="text-[10px] text-gray-400 leading-tight">{sub}</span>}
+      {sub && <span className="text-[10px] text-gray-400 leading-tight truncate block w-full">{sub}</span>}
     </div>
   )
 }
