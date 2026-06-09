@@ -58,7 +58,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
     label: 'PRODUCȚIE',
     items: [
       {
-        label: 'Campanie', icon: Wheat, permKey: 'can_parcele',
+        label: 'Campanie', icon: Wheat, permKey: 'can_utilaje',
         children: [
           { label: 'Planuri culturi', href: '/campanie' },
           { label: 'Activități câmp', href: '/campanie/activitati' },
@@ -66,14 +66,14 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
         ],
       },
       {
-        label: 'Utilaje', icon: Tractor, permKey: 'can_parcele',
+        label: 'Utilaje', icon: Tractor, permKey: 'can_utilaje',
         children: [
           { label: 'Parc utilaje', href: '/utilaje' },
           { label: 'Implementuri', href: '/utilaje/implementuri' },
           { label: 'Operatori', href: '/utilaje/operatori' },
         ],
       },
-      { label: 'Monitorizare Fermă', href: '/ferma', icon: Activity, permKey: 'can_parcele' },
+      { label: 'Monitorizare Fermă', href: '/ferma', icon: Activity, permKey: 'can_ferma' },
     ],
   },
   {

@@ -1,7 +1,7 @@
 // ─── Main pipeline orchestrator ──────────────────────────────────────────────
 import type { ParcelInput, ParcelResult, FarmDashboardResult, WeatherData, SoilData, NdviData } from './types'
 import { fetchOpenMeteo, normalizeWeather, normalizeSoil } from './open-meteo'
-import { fetchNdviStats, normalizeNdvi } from './sentinel-hub'
+import { getParcelNdviFromLatLng } from './sentinel-hub'
 import { computeAlerts } from './alerts'
 import { computeHealthScore } from './scoring'
 import { computeSummary } from './summary'
@@ -12,6 +12,7 @@ const NULL_WEATHER: WeatherData = {
 }
 const NULL_SOIL: SoilData = { moisture_avg: null, status: null }
 const NULL_NDVI: NdviData = { current: null, prev: null, trend: null, drop_pct: null, cloud_block: true, scene_date: null }
+const TODAY = new Date().toISOString().split('T')[0]
 
 function nullParcel(input: ParcelInput): ParcelResult {
   return {
@@ -38,22 +39,20 @@ function validCoords(lat: number, lng: number): boolean {
   )
 }
 
-async function processParcel(input: ParcelInput, shToken: string | null): Promise<ParcelResult> {
+async function processParcel(input: ParcelInput): Promise<ParcelResult> {
   if (!validCoords(input.lat, input.lng)) return nullParcel(input)
 
   const [weatherSettled, ndviSettled] = await Promise.allSettled([
     fetchOpenMeteo(input.lat, input.lng),
-    shToken ? fetchNdviStats(shToken, input.lat, input.lng) : Promise.resolve(null),
+    getParcelNdviFromLatLng({ lat: input.lat, lng: input.lng, fetchDate: TODAY }),
   ])
 
   const rawWeather = weatherSettled.status === 'fulfilled' ? weatherSettled.value : null
   const weather = normalizeWeather(rawWeather)
   const soil = normalizeSoil(rawWeather)
 
-  const ndviRaw = ndviSettled.status === 'fulfilled' ? ndviSettled.value : null
-  const ndvi = ndviRaw
-    ? normalizeNdvi(ndviRaw.current, ndviRaw.prev)
-    : { ...NULL_NDVI }
+  const ndviResult = ndviSettled.status === 'fulfilled' ? ndviSettled.value : null
+  const ndvi: NdviData = ndviResult ?? { ...NULL_NDVI }
 
   const alerts = computeAlerts({ weather, soil, ndvi, bbch_stage: input.bbch_stage ?? null })
   const { score: health_score, label: health_label } = computeHealthScore(ndvi, soil, alerts)
@@ -74,11 +73,11 @@ async function processParcel(input: ParcelInput, shToken: string | null): Promis
 }
 
 /** Process in batches to stay well within Cloudflare Worker concurrent fetch limits */
-async function processBatched(inputs: ParcelInput[], shToken: string | null, batchSize = 4): Promise<ParcelResult[]> {
+async function processBatched(inputs: ParcelInput[], batchSize = 4): Promise<ParcelResult[]> {
   const results: ParcelResult[] = []
   for (let i = 0; i < inputs.length; i += batchSize) {
     const batch = inputs.slice(i, i + batchSize)
-    const settled = await Promise.allSettled(batch.map(p => processParcel(p, shToken)))
+    const settled = await Promise.allSettled(batch.map(p => processParcel(p)))
     for (let j = 0; j < batch.length; j++) {
       const r = settled[j]
       results.push(r.status === 'fulfilled' ? r.value : nullParcel(batch[j]))
@@ -89,10 +88,9 @@ async function processBatched(inputs: ParcelInput[], shToken: string | null, bat
 
 export async function computeFarmDashboard(
   inputs: ParcelInput[],
-  shToken: string | null,
 ): Promise<FarmDashboardResult> {
   const valid = inputs.filter(p => p.lat != null && p.lng != null)
-  const parcels = await processBatched(valid, shToken)
+  const parcels = await processBatched(valid)
   return {
     fetched_at: new Date().toISOString(),
     parcels,

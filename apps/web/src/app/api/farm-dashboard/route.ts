@@ -2,7 +2,6 @@ export const runtime = 'edge'
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { computeFarmDashboard } from '@/lib/farm-dashboard'
-import { getSentinelToken } from '@/lib/farm-dashboard/sentinel-hub'
 import type { ParcelInput } from '@/lib/farm-dashboard/types'
 
 // Optional env vars for Sentinel Hub NDVI (if absent, NDVI data will be null):
@@ -19,20 +18,7 @@ export async function POST(req: NextRequest) {
     // Limit request size
     const inputs = body.parcels.slice(0, 50)
 
-    // Sentinel Hub credentials are kept server-side only
-    const shClientId = (process.env.SENTINEL_HUB_CLIENT_ID ?? '').trim()
-    const shClientSecret = (process.env.SENTINEL_HUB_CLIENT_SECRET ?? '').trim()
-
-    let shToken: string | null = null
-    if (shClientId && shClientSecret) {
-      try {
-        shToken = await getSentinelToken(shClientId, shClientSecret)
-      } catch {
-        // Non-fatal: NDVI will be null for all parcels
-      }
-    }
-
-    const result = await computeFarmDashboard(inputs, shToken)
+    const result = await computeFarmDashboard(inputs)
 
     return NextResponse.json(result, {
       headers: { 'Cache-Control': 'no-store, max-age=0' },

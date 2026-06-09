@@ -22,6 +22,8 @@ interface Permissions {
   can_arendasi: boolean
   can_contracte: boolean
   can_parcele: boolean
+  can_utilaje: boolean
+  can_ferma: boolean
   can_tranzactii: boolean
   can_facturi: boolean
   can_rapoarte: boolean
@@ -57,7 +59,9 @@ const PERM_FIELDS: { key: keyof Omit<Permissions, 'user_id'>; label: string }[] 
   { key: 'can_dashboard',    label: 'Dashboard' },
   { key: 'can_arendasi',     label: 'Arendași' },
   { key: 'can_contracte',    label: 'Contracte' },
-  { key: 'can_parcele',      label: 'Parcele / Utilaje / Ferma' },
+  { key: 'can_parcele',      label: 'Parcele & Hartă' },
+  { key: 'can_utilaje',      label: 'Utilaje & Campanie' },
+  { key: 'can_ferma',        label: 'Monitorizare Fermă' },
   { key: 'can_tranzactii',   label: 'Tranzacții' },
   { key: 'can_facturi',      label: 'Facturi & Avize' },
   { key: 'can_rapoarte',     label: 'Rapoarte' },
@@ -68,7 +72,8 @@ const PERM_FIELDS: { key: keyof Omit<Permissions, 'user_id'>; label: string }[] 
 
 const DEFAULT_PERMS: Omit<Permissions, 'user_id'> = {
   can_dashboard: true, can_arendasi: true, can_contracte: true,
-  can_parcele: true, can_tranzactii: true, can_facturi: true,
+  can_parcele: true, can_utilaje: true, can_ferma: true,
+  can_tranzactii: true, can_facturi: true,
   can_rapoarte: true, can_declaratii: true, can_fitosanitar: true, can_setari: true,
 }
 
