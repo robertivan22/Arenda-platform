@@ -110,24 +110,32 @@ export async function fetchParcelNdviStats(params: {
   const baseUrl =
     process.env.SENTINEL_HUB_BASE_URL || 'https://sh.dataspace.copernicus.eu'
 
+  console.info('[NDVI] Request bbox=', params.bbox, 'from=', params.from, 'to=', params.to)
+
   const payload = {
     input: {
-      bounds: { bbox: params.bbox },
+      bounds: {
+        bbox: params.bbox,
+        // Explicitly declare WGS84 so CDSE interprets lon/lat coordinates correctly.
+        properties: { crs: 'http://www.opengis.net/def/crs/EPSG/0/4326' },
+      },
       data: [
         {
           type: 'sentinel-2-l2a',
-          // maxCloudCoverage filters scenes at acquisition time.
-          // Do NOT include timeRange here — it belongs only in aggregation.timeRange.
-          dataFilter: { maxCloudCoverage: 20 },
+          // maxCloudCoverage filters which Sentinel-2 scenes are included in the mosaic.
+          // 35% gives a good balance: rejects very cloudy scenes while still finding
+          // several cloud-free acquisitions over a 90-day window in central Europe.
+          dataFilter: { maxCloudCoverage: 35 },
         },
       ],
     },
     aggregation: {
       timeRange: { from: params.from, to: params.to },
       aggregationInterval: { of: params.aggregationInterval ?? 'P10D' },
-      // Numeric analytics evalscript — NOT a color-ramp visualization script.
-      // Band 0 (B0) = NDVI value (finite float), Band 1 (B1) = dataMask.
-      // Explicit formula — avoids relying on index() helper availability in Stats API.
+      // resx/resy are required by the Statistics API to know the processing grid.
+      // 10m matches the native resolution of S2 bands B04 and B08.
+      resx: 10,
+      resy: 10,
       evalscript: `//VERSION=3
 function setup() {
   return {
@@ -148,18 +156,32 @@ function evaluatePixel(samples) {
     body: JSON.stringify(payload),
   })
 
+  // Always read as text first so we can log the raw body on failure or empty data.
+  const rawText = await res.text()
+
   if (!res.ok) {
-    const text = await res.text()
-    console.error('[NDVI] Statistics API error', res.status, text)
-    throw new Error(`Sentinel Stats API error (${res.status}): ${text}`)
+    console.error('[NDVI] Statistics API error', res.status, rawText.slice(0, 500))
+    throw new Error(`Sentinel Stats API error (${res.status}): ${rawText.slice(0, 200)}`)
   }
 
-  const json = (await res.json()) as StatsResponse
+  let json: StatsResponse
+  try {
+    json = JSON.parse(rawText) as StatsResponse
+  } catch {
+    console.error('[NDVI] Failed to parse Stats API response:', rawText.slice(0, 500))
+    throw new Error('Failed to parse Statistics API response')
+  }
+
+  const intervalCount = json.data?.length ?? 0
   const validCount = (json.data ?? []).filter(d => {
     const m = d.outputs?.default?.bands?.B0?.stats?.mean
     return typeof m === 'number' && isFinite(m)
   }).length
-  console.info('[NDVI] Stats response: total intervals =', json.data?.length ?? 0, 'valid =', validCount)
+  if (intervalCount === 0) {
+    console.warn('[NDVI] Empty data. Full response body:', rawText.slice(0, 1000))
+  } else {
+    console.info('[NDVI] Stats response: total intervals =', intervalCount, 'valid =', validCount)
+  }
   return json
 }
 
@@ -218,10 +240,10 @@ export async function getParcelNdviFromLatLng(params: {
 }): Promise<ParcelNdviResult> {
   const bbox = parcelToBBox(params.lat, params.lng, params.bboxDelta ?? 0.01)
   const to = `${params.fetchDate}T23:59:59Z`
-  // 60-day lookback: at 20% maxCloudCoverage in central/eastern Europe we need
-  // a wider window to guarantee ≥2 valid P10D intervals for trend computation.
+  // 90-day lookback: gives 9 × P10D intervals; with maxCloudCoverage 35% this
+  // reliably yields ≥2 cloud-free intervals over Romania in any season.
   const fromDate = new Date(`${params.fetchDate}T00:00:00Z`)
-  fromDate.setUTCDate(fromDate.getUTCDate() - 60)
+  fromDate.setUTCDate(fromDate.getUTCDate() - 90)
   const from = fromDate.toISOString().replace('.000Z', 'Z')
 
   const stats = await fetchParcelNdviStats({ bbox, from, to, aggregationInterval: 'P10D' })
