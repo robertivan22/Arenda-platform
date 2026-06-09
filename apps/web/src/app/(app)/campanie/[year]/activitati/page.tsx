@@ -79,7 +79,7 @@ interface Parcel {
   surface: number
 }
 
-type FormState = Omit<WorkOrder, 'id' | 'campaign_id' | 'created_at' | 'parcel_name' | 'parcel_surface'> & {
+type FormState = Omit<WorkOrder, 'id' | 'campaign_id' | 'created_at' | 'parcel_name' | 'parcel_surface' | 'area_ha'> & {
   parcel_id: string
   area_ha: string
 }
