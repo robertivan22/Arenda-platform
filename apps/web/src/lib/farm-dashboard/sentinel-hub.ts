@@ -141,12 +141,18 @@ export async function fetchParcelNdviStats(params: {
 function setup() {
   return {
     input: [{ bands: ["B04", "B08", "dataMask"] }],
-    output: { bands: 2 }
+    output: [
+      { id: "default", bands: 1 },
+      { id: "dataMask", bands: 1 }
+    ]
   };
 }
 function evaluatePixel(samples) {
   var ndvi = (samples.B08 - samples.B04) / (samples.B08 + samples.B04 + 0.0001);
-  return [ndvi, samples.dataMask];
+  return {
+    default: [ndvi],
+    dataMask: [samples.dataMask]
+  };
 }`,
     },
   }
