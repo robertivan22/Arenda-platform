@@ -20,7 +20,6 @@ interface MvtRow {
   unit: string
   category: InputCategory
   supplier_name: string | null
-  campaign_name: string | null
 }
 
 const MVT_ICONS: Record<StockMovementType, React.ElementType> = {
@@ -48,9 +47,8 @@ export default function MiscariPage() {
     const { data, error } = await createClient()
       .from('input_stock_mvt')
       .select(`
-        id, mvt_type, quantity, mvt_date, notes, created_at,
-        input_lots(product_name, unit, category, suppliers(name)),
-        campaigns(name)
+        id, mvt_type, quantity, mvt_date, notes, created_at, campaign_id,
+        input_lots(product_name, unit, category, suppliers(name))
       `)
       .order('mvt_date', { ascending: false })
       .order('created_at', { ascending: false })
@@ -67,7 +65,6 @@ export default function MiscariPage() {
       unit: r.input_lots?.unit ?? '',
       category: r.input_lots?.category ?? 'OTHER',
       supplier_name: r.input_lots?.suppliers?.name ?? null,
-      campaign_name: r.campaigns?.name ?? null,
     })))
     setLoading(false)
   }, [])
@@ -127,7 +124,6 @@ export default function MiscariPage() {
                 <th className={th}>Produs</th>
                 <th className={th}>Tip</th>
                 <th className={th}>Cantitate</th>
-                <th className={th}>Campanie</th>
                 <th className={th}>Note</th>
               </tr>
             </thead>
@@ -155,9 +151,6 @@ export default function MiscariPage() {
                       <span className={`font-semibold ${r.mvt_type === 'OUT' ? 'text-red-600' : r.mvt_type === 'IN' ? 'text-green-600' : 'text-gray-700'}`}>
                         {r.mvt_type === 'OUT' ? '−' : r.mvt_type === 'IN' ? '+' : ''}{Number(r.quantity).toFixed(3)} {r.unit}
                       </span>
-                    </td>
-                    <td className={td}>
-                      <span className="text-gray-600 text-xs">{r.campaign_name ?? '—'}</span>
                     </td>
                     <td className={td}>
                       <span className="text-gray-500 text-xs">{r.notes ?? '—'}</span>
