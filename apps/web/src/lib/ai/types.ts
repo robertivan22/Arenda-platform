@@ -60,29 +60,6 @@ export interface FacturaAlert {
   actiune_recomandata: string
 }
 
-export interface ApiaAlert {
-  campaign_year: number
-  status: string
-  priority: Priority
-  total_declared_ha: number
-  mesaj: string
-  actiune_recomandata: string
-}
-
-export interface FitosanitarAlert {
-  produs: string
-  parcela: string | null
-  priority: Priority
-  data_aplicarii: string | null
-  mesaj: string
-  actiune_recomandata: string
-}
-
-export interface ArendasiSumar {
-  total: number
-  total_suprafata_ha: number
-}
-
 export interface AnalysisResult {
   sumar: string
   scor_risc: number
@@ -92,9 +69,6 @@ export interface AnalysisResult {
   stocuri: StockAlert[]
   utilaje: UtilajeAlert[]
   facturi: FacturaAlert[]
-  apia: ApiaAlert[]
-  fitosanitar: FitosanitarAlert[]
-  arendasi_sumar: ArendasiSumar
 }
 
 // ─── Mode ────────────────────────────────────────────────────────────────────

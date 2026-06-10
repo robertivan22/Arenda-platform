@@ -4,11 +4,11 @@ import { useState, useCallback, useEffect } from 'react'
 import {
   AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown,
   Loader2, RefreshCw, ChevronDown, ChevronRight, Zap,
-  FileText, Tractor, Package, Shield, Wrench, Receipt, Leaf, Users,
+  FileText, Tractor, Package, Shield, Wrench, Receipt,
 } from 'lucide-react'
 import type {
   AnalysisResult, ContractAlert, FarmAlert, StockAlert,
-  UtilajeAlert, FacturaAlert, ApiaAlert, FitosanitarAlert,
+  UtilajeAlert, FacturaAlert,
 } from '@/lib/ai/types'
 
 const LS_KEY = 'arenda_ai_analysis'
@@ -200,39 +200,6 @@ function FacturaRow({ a }: { a: FacturaAlert }) {
   )
 }
 
-function ApiaRow({ a }: { a: ApiaAlert }) {
-  return (
-    <AlertRow priority={a.priority}
-      label={`Dosar APIA ${a.campaign_year}`}
-      badge={
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-          a.status === 'SUBMITTED' || a.status === 'ACCEPTED' ? 'bg-green-100 text-green-700' :
-          a.status === 'DRAFT' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
-        }`}>{a.status}</span>
-      }>
-      <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
-      <p className="text-xs text-gray-400">{a.total_declared_ha} ha declarate</p>
-    </AlertRow>
-  )
-}
-
-function FitosanitarRow({ a }: { a: FitosanitarAlert }) {
-  return (
-    <AlertRow priority={a.priority}
-      label={`${a.produs}${a.parcela ? ` \u2014 ${a.parcela}` : ''}`}
-      badge={
-        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${P[a.priority as keyof typeof P]?.badge ?? ''}`}>
-          {P[a.priority as keyof typeof P]?.label ?? a.priority}
-        </span>
-      }>
-      <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
-      {a.data_aplicarii && <p className="text-xs text-gray-400">Aplicat: {a.data_aplicarii}</p>}
-    </AlertRow>
-  )
-}
-
-// â”€â”€â”€ Section wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 function Section({ icon, title, count, high, children }: {
   icon: React.ReactNode; title: string; count: number; high: number; children: React.ReactNode
 }) {
@@ -314,8 +281,6 @@ export default function AlertsDashboard() {
     ...(result?.stocuri ?? []),
     ...(result?.utilaje ?? []),
     ...(result?.facturi ?? []),
-    ...(result?.apia ?? []),
-    ...(result?.fitosanitar ?? []),
   ].filter(a => a.priority === 'inalta').length
 
   const highOf = (arr?: { priority: string }[]) => (arr ?? []).filter(a => a.priority === 'inalta').length
@@ -390,15 +355,15 @@ export default function AlertsDashboard() {
               <div className={`text-3xl font-bold ${totalHigh > 0 ? 'text-red-600' : 'text-green-600'}`}>{totalHigh}</div>
               <p className="text-xs text-gray-400 mt-1">din {
                 (result.contracte?.length ?? 0) + (result.ferma?.length ?? 0) + (result.stocuri?.length ?? 0) +
-                (result.utilaje?.length ?? 0) + (result.facturi?.length ?? 0) + (result.apia?.length ?? 0) + (result.fitosanitar?.length ?? 0)
+                (result.utilaje?.length ?? 0) + (result.facturi?.length ?? 0)
               } total</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-                <Users className="w-3.5 h-3.5" /> Arendasi
+                <Receipt className="w-3.5 h-3.5" /> Facturi neplatite
               </div>
-              <div className="text-3xl font-bold text-gray-800">{result.arendasi_sumar?.total ?? '—'}</div>
-              <p className="text-xs text-gray-400 mt-1">{(result.arendasi_sumar?.total_suprafata_ha ?? 0).toFixed(0)} ha total</p>
+              <div className={`text-3xl font-bold ${(result.facturi?.length ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'}`}>{result.facturi?.length ?? 0}</div>
+              <p className="text-xs text-gray-400 mt-1">din totalul de facturi</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
               {result.scor_risc < 40
@@ -433,18 +398,12 @@ export default function AlertsDashboard() {
           </div>
 
           {/* Alert grid row 2 */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <Section icon={<Wrench className="w-5 h-5" />} title="Utilaje" count={result.utilaje?.length ?? 0} high={highOf(result.utilaje)}>
               {result.utilaje?.map((a, i) => <UtilajeRow key={i} a={a} />)}
             </Section>
             <Section icon={<Receipt className="w-5 h-5" />} title="Facturi" count={result.facturi?.length ?? 0} high={highOf(result.facturi)}>
               {result.facturi?.map((a, i) => <FacturaRow key={i} a={a} />)}
-            </Section>
-            <Section icon={<Shield className="w-5 h-5" />} title="APIA" count={result.apia?.length ?? 0} high={highOf(result.apia)}>
-              {result.apia?.map((a, i) => <ApiaRow key={i} a={a} />)}
-            </Section>
-            <Section icon={<Leaf className="w-5 h-5" />} title="Fitosanitar" count={result.fitosanitar?.length ?? 0} high={highOf(result.fitosanitar)}>
-              {result.fitosanitar?.map((a, i) => <FitosanitarRow key={i} a={a} />)}
             </Section>
           </div>
 

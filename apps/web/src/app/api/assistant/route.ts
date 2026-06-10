@@ -27,244 +27,53 @@ async function fetchLiveData() {
   const today = new Date().toISOString().split('T')[0]
   const yearStart = `${new Date().getFullYear()}-01-01`
 
-  const [
-    contractsRes,
-    ordersRes,
-    stockRes,
-    txnRes,
-    machinesRes,
-    maintenanceRes,
-    invoicesRes,
-    fitosanitarRes,
-    apiaRes,
-    lessorsRes,
-    parcelsRes,
-    cropPlansRes,
-    harvestRes,
-    fuelRes,
-  ] = await Promise.all([
-    // Contracte
-    db.from('contracts')
-      .select('id, contract_number, sign_date, end_date, status, lessors(first_name, last_name, company_name), parcels(surface)')
-      .limit(100),
-
-    // Ordine de lucru (monitorizare ferma)
-    db.from('work_orders')
-      .select('id, operation_type, status, planned_date, execution_date, area_ha, parcels(bloc_fizic, surface)')
-      .gte('planned_date', yearStart)
-      .order('planned_date')
-      .limit(100),
-
-    // Stocuri
-    db.from('input_lots')
-      .select('product_name, category, quantity_available, quantity, unit, unit_price, expiry_date, received_date')
-      .order('category')
-      .limit(100),
-
-    // Tranzactii
-    db.from('transactions')
-      .select('ron_net, is_paid, transaction_date')
-      .gte('transaction_date', yearStart)
-      .limit(500),
-
-    // Utilaje
-    db.from('machines')
-      .select('*')
-      .order('name')
-      .limit(50),
-
-    // Sarcini de mentenanta
-    db.from('maintenance_tasks')
-      .select('title, due_date, status, machine_id, priority')
-      .in('status', ['PENDING', 'OVERDUE'])
-      .order('due_date')
-      .limit(30),
-
-    // Facturi
-    db.from('invoices')
-      .select('*')
-      .order('due_date', { ascending: true, nullsFirst: false })
-      .limit(50),
-
-    // Registru fitosanitar
-    db.from('registru_fitosanitar')
-      .select('*')
-      .gte('created_at', new Date(Date.now() - 90 * 86400_000).toISOString())
-      .order('created_at', { ascending: false })
-      .limit(50),
-
-    // Dosare APIA
-    db.from('apia_dossiers')
-      .select('campaign_year, status, total_declared_ha, total_eligible_ha, submission_date, correction_deadline')
-      .order('campaign_year', { ascending: false })
-      .limit(5),
-
-    // Arendasi
-    db.from('lessors')
-      .select('id, first_name, last_name, company_name, is_active')
-      .limit(200),
-
-    // Parcele
-    db.from('parcels')
-      .select('id, bloc_fizic, surface, status, culture')
-      .eq('status', 'ACTIVE')
-      .limit(200),
-
-    // Planuri cultura
-    db.from('crop_plans')
-      .select('culture, total_ha, status, campaign_id')
-      .limit(50),
-
-    // Recolte
-    db.from('harvest_lots')
-      .select('culture, total_quantity, unit, campaign_id')
-      .limit(50),
-
-    // Consum carburant
-    db.from('fuel_logs')
-      .select('quantity, fuel_type, log_date, machine_id')
-      .gte('log_date', yearStart)
-      .limit(100),
+  const [contractsRes, ordersRes, stockRes, machinesRes, maintenanceRes, invoicesRes] = await Promise.all([
+    db.from('contracts').select('contract_number, end_date, status, lessors(first_name, last_name, company_name)').limit(50),
+    db.from('work_orders').select('operation_type, status, planned_date, execution_date, parcels(bloc_fizic)').gte('planned_date', yearStart).order('planned_date').limit(40),
+    db.from('input_lots').select('product_name, category, quantity_available, quantity, unit, expiry_date').order('category').limit(60),
+    db.from('machines').select('*').order('name').limit(30),
+    db.from('maintenance_tasks').select('title, due_date, status, machine_id').in('status', ['PENDING', 'OVERDUE']).order('due_date').limit(20),
+    db.from('invoices').select('invoice_number, total_amount, status, due_date').order('due_date', { ascending: true, nullsFirst: false }).limit(30),
   ])
 
-  // Collect query errors for diagnostics
   const _errors: string[] = []
   if (contractsRes.error) _errors.push(`Contracte: ${contractsRes.error.message}`)
   if (ordersRes.error) _errors.push(`Activitati: ${ordersRes.error.message}`)
+  if (stockRes.error) _errors.push(`Stocuri: ${stockRes.error.message}`)
   if (machinesRes.error) _errors.push(`Utilaje: ${machinesRes.error.message}`)
   if (invoicesRes.error) _errors.push(`Facturi: ${invoicesRes.error.message}`)
-  if (apiaRes.error) _errors.push(`APIA: ${apiaRes.error.message}`)
-  if (fitosanitarRes.error) _errors.push(`Fitosanitar: ${fitosanitarRes.error.message}`)
-  if (stockRes.error) _errors.push(`Stocuri: ${stockRes.error.message}`)
 
-  // Log query results for debugging
-  console.log('[AI] Query results:', {
-    contracts: contractsRes.data?.length ?? `ERR:${contractsRes.error?.message}`,
-    orders: ordersRes.data?.length ?? `ERR:${ordersRes.error?.message}`,
-    stock: stockRes.data?.length ?? `ERR:${stockRes.error?.message}`,
-    machines: machinesRes.data?.length ?? `ERR:${machinesRes.error?.message}`,
-    invoices: invoicesRes.data?.length ?? `ERR:${invoicesRes.error?.message}`,
-    apia: apiaRes.data?.length ?? `ERR:${apiaRes.error?.message}`,
-    fitosanitar: fitosanitarRes.data?.length ?? `ERR:${fitosanitarRes.error?.message}`,
-  })
+  console.log('[AI]', { c: contractsRes.data?.length, o: ordersRes.data?.length, s: stockRes.data?.length, m: machinesRes.data?.length, f: invoicesRes.data?.length })
 
-  const txns = txnRes.data ?? []
-  const totalNet = txns.reduce((s: number, t: any) => s + Number(t.ron_net ?? 0), 0)
-  const unpaidNet = txns.filter((t: any) => !t.is_paid).reduce((s: number, t: any) => s + Number(t.ron_net ?? 0), 0)
-  const paidCount = txns.filter((t: any) => t.is_paid).length
-  const rataAchitare = txns.length > 0 ? Math.round((paidCount / txns.length) * 100) : 0
+  const today_d = new Date(today)
 
   const contracts = (contractsRes.data ?? []).map((c: any) => {
-    const lessor = c.lessors
-    const lessorName = lessor
-      ? (lessor.company_name ?? `${lessor.last_name ?? ''} ${lessor.first_name ?? ''}`.trim())
-      : 'N/A'
-    const daysLeft = c.end_date
-      ? Math.round((new Date(c.end_date).getTime() - new Date(today).getTime()) / 86400000)
-      : null
-    const suprafata = Array.isArray(c.parcels)
-      ? c.parcels.reduce((sum: number, p: any) => sum + Number(p.surface ?? 0), 0)
-      : null
-    return { contract_number: c.contract_number, lessor_name: lessorName, status: c.status, end_date: c.end_date, days_until_expiry: daysLeft, suprafata_ha: suprafata }
+    const l = c.lessors
+    const arendas = l ? (l.company_name ?? `${l.last_name ?? ''} ${l.first_name ?? ''}`.trim()) : ''
+    const zile = c.end_date ? Math.round((new Date(c.end_date).getTime() - today_d.getTime()) / 86400000) : null
+    return { nr: c.contract_number, arendas, status: c.status, exp: c.end_date, zile }
   })
 
-  const parcels = parcelsRes.data ?? []
-  const totalHa = parcels.reduce((s: number, p: any) => s + Number(p.surface ?? 0), 0)
-
-  const fuelLogs = fuelRes.data ?? []
-  const totalFuel = fuelLogs.reduce((s: number, f: any) => s + Number(f.quantity ?? 0), 0)
-
-  const lessors = lessorsRes.data ?? []
-
   return {
-    generat_la: new Date().toISOString(),
-    ferma: {
-      total_parcele: parcels.length,
-      total_ha: Math.round(totalHa * 100) / 100,
-      an_campanie: new Date().getFullYear(),
-      consum_carburant_litri_an: Math.round(totalFuel),
-    },
+    azi: today,
     contracte: contracts,
-    activitati_ferma: (ordersRes.data ?? [])
+    activitati: (ordersRes.data ?? [])
       .filter((o: any) => o.status !== 'DONE' && o.status !== 'COMPLETED')
-      .slice(0, 40)
-      .map((o: any) => ({
-        operatie: o.operation_type,
-        parcela: o.parcels?.bloc_fizic ?? null,
-        status: o.status,
-        data_planificata: o.planned_date,
-        data_executie: o.execution_date,
-      })),
-    stocuri: (stockRes.data ?? []).map((s: any) => ({
-      produs: s.product_name,
-      categorie: s.category,
-      cantitate_disponibila: s.quantity_available,
-      cantitate_initiala: s.quantity,
-      unitate: s.unit,
-      data_expirare: s.expiry_date,
-    })),
+      .map((o: any) => ({ op: o.operation_type, parc: o.parcels?.bloc_fizic ?? null, st: o.status, plan: o.planned_date, exec: o.execution_date })),
+    stocuri: (stockRes.data ?? []).map((s: any) => ({ prod: s.product_name, cat: s.category, disp: s.quantity_available, ini: s.quantity, unit: s.unit, exp: s.expiry_date })),
     utilaje: (machinesRes.data ?? []).map((m: any) => {
-      const rcaExpiry = m.rca_expiry_date ? new Date(m.rca_expiry_date) : null
-      const rcaDaysLeft = rcaExpiry
-        ? Math.round((rcaExpiry.getTime() - new Date(today).getTime()) / 86400000)
-        : null
-      const rcaStatus = !rcaExpiry ? 'NECUNOSCUT'
-        : rcaDaysLeft! < 0 ? 'EXPIRAT'
-        : rcaDaysLeft! <= 30 ? 'EXPIRA_CURAND'
-        : rcaDaysLeft! <= 60 ? 'ATENTIE'
-        : 'OK'
-      return {
-        nume: m.name,
-        tip: m.type,
-        marca: m.brand,
-        model: m.model,
-        an: m.year,
-        numar_inmatriculare: m.plate,
-        activ: m.is_active,
-        rca_activ: m.rca_active,
-        rca_pret: m.rca_price,
-        rca_expira: m.rca_expiry_date,
-        rca_status: rcaStatus,
-        rca_zile_ramase: rcaDaysLeft,
-      }
+      const rcaExp = m.rca_expiry_date ? new Date(m.rca_expiry_date) : null
+      const rcaZile = rcaExp ? Math.round((rcaExp.getTime() - today_d.getTime()) / 86400000) : null
+      const rca = !rcaExp ? 'NECUNOSCUT' : rcaZile! < 0 ? 'EXPIRAT' : rcaZile! <= 30 ? 'EXPIRA_CURAND' : rcaZile! <= 60 ? 'ATENTIE' : 'OK'
+      return { utilaj: m.name, tip: m.type, rca, rca_zile: rcaZile, rca_data: m.rca_expiry_date }
     }),
-    sarcini_mentenanta: (maintenanceRes.data ?? []),
+    mentenanta: (maintenanceRes.data ?? []).map((t: any) => ({ titlu: t.title, scad: t.due_date, st: t.status, masina: t.machine_id })),
     facturi: (invoicesRes.data ?? []).map((i: any) => {
-      const dueDate = i.due_date ? new Date(i.due_date) : null
-      const daysOverdue = dueDate
-        ? Math.round((new Date(today).getTime() - dueDate.getTime()) / 86400000)
-        : null
-      const isUnpaid = i.status !== 'PAID' && i.status !== 'PLATITA'
-      return {
-        numar: i.invoice_number,
-        total: i.total_amount,
-        status: i.status,
-        data_emitere: i.issue_date,
-        scadenta: i.due_date,
-        efactura_status: i.efactura_status,
-        neplatita: isUnpaid,
-        zile_depasit: daysOverdue && daysOverdue > 0 ? daysOverdue : 0,
-        scadenta_depasita: daysOverdue !== null && daysOverdue > 0 && isUnpaid,
-      }
-    }),
-    fitosanitar_recent: (fitosanitarRes.data ?? []).slice(0, 20).map((f: any) => ({
-      produs: f.product_name ?? f.produs ?? f.substance,
-      parcela: f.parcel_id ?? f.parcela,
-      data_aplicarii: f.application_date ?? f.data_aplicarii ?? f.created_at?.split('T')[0],
-      cantitate: f.quantity ?? f.cantitate,
-      unitate: f.unit ?? f.unitate,
-    })),
-    apia: (apiaRes.data ?? []),
-    arendasi: {
-      total: lessors.length,
-      activi: lessors.filter((l: any) => l.is_active !== false).length,
-    },
-    tranzactii: {
-      total_ron_net: Math.round(totalNet),
-      neplatit_ron: Math.round(unpaidNet),
-      rata_achitare_pct: rataAchitare,
-      total_tranzactii: txns.length,
-    },
+      const due = i.due_date ? new Date(i.due_date) : null
+      const dep = due ? Math.round((today_d.getTime() - due.getTime()) / 86400000) : null
+      const unpaid = i.status !== 'PAID' && i.status !== 'PLATITA'
+      return { nr: i.invoice_number, suma: i.total_amount, st: i.status, scad: i.due_date, unpaid, dep: dep && dep > 0 ? dep : 0 }
+    }).filter((i: any) => i.unpaid),
     _errors,
   }
 }
@@ -310,9 +119,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
     result.stocuri ??= []
     result.utilaje ??= []
     result.facturi ??= []
-    result.apia ??= []
-    result.fitosanitar ??= []
-    result.arendasi_sumar ??= { total: 0, total_suprafata_ha: 0 }
 
     return NextResponse.json({ ok: true, mode, result, model, tokens_used: tokens, data_errors: queryErrors.length > 0 ? queryErrors : undefined })
   } catch (err: unknown) {

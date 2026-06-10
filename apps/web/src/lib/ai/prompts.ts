@@ -2,21 +2,7 @@
 
 // --- System prompt -----------------------------------------------------------
 
-export const SYSTEM_PROMPT = `Esti ArendaAI, asistentul inteligent al platformei ArendaPro.
-
-Rolul tau:
-- Analizezi date complete din toata baza de date a fermei: contracte, operatiuni, stocuri, utilaje, facturi, APIA, fitosanitar
-- Raspunzi exclusiv in limba romana
-- Esti concis, precis si orientat spre actiune
-- Prioritizezi termenele limita, riscurile si actiunile recomandate
-- Nu inventezi date lipsa - mentionezi clar cand informatiile sunt incomplete
-- Cand esti instruit explicit sa produci JSON, returnezi STRICT JSON valid, fara text suplimentar, fara marcaje markdown
-
-Reguli:
-- Daca datele sunt insuficiente, spune "Date insuficiente pentru aceasta analiza."
-- Nu specula dincolo de datele furnizate
-- Scorul de risc este un numar intreg de la 0 (fara risc) la 100 (risc maxim)
-- Alertele goale sunt permise (array vid [] daca nu exista probleme)`
+export const SYSTEM_PROMPT = `Esti ArendaAI. Analizezi date agricole si produci alerte JSON. Raspunde in romana. Returneaza STRICT JSON valid fara markdown cand esti instruit sa faci analiza.`
 
 // --- Prompt dispatcher -------------------------------------------------------
 
@@ -28,71 +14,23 @@ export function buildPrompt(mode: AssistantMode, data: unknown, question?: strin
 // --- Full analysis -----------------------------------------------------------
 
 function buildFullAnalysisPrompt(data: unknown): string {
-  return `Data de azi: ${new Date().toISOString().split('T')[0]}
+  return `Azi:${new Date().toISOString().split('T')[0]}. Returneaza STRICT JSON:
+{"sumar":"string","scor_risc":0,"generat_la":"ISO","contracte":[{"contract_number":"","lessor_name":"","status":"expirat|critic|atentie|ok|draft","priority":"inalta|medie|scazuta","end_date":null,"days_until_expiry":null,"mesaj":"","actiune_recomandata":""}],"ferma":[{"activitate":"","parcela":null,"status":"","priority":"inalta|medie|scazuta","data_planificata":null,"intarziere_zile":null,"mesaj":"","actiune_recomandata":""}],"stocuri":[{"produs":"","categorie":"","status":"critic|scazut|ok","priority":"inalta|medie|scazuta","cantitate_disponibila":0,"unitate":"","mesaj":"","actiune_recomandata":""}],"utilaje":[{"utilaj":"","tip":"","status":"critic|atentie|ok|necunoscut","priority":"inalta|medie|scazuta","rca_expiry":null,"mesaj":"","actiune_recomandata":""}],"facturi":[{"invoice_number":"","status":"","priority":"inalta|medie|scazuta","total_amount":0,"due_date":null,"mesaj":"","actiune_recomandata":""}]}
 
-Analizeaza TOATE datele de mai jos din baza de date a fermei si returneaza STRICT un obiect JSON valid cu aceasta structura:
+Reguli:
+- CONTRACTE: alerta pt fiecare contract. DRAFT/null exp->atentie/medie; expirat->expirat/inalta; <30z->critic/inalta; 30-90z->atentie/medie; >90z->ok/scazuta
+- ACTIVITATI("ferma" in output): alerta pt fiecare activitate necompletata. intarziat->inalta; executie->medie; planificat->scazuta
+- STOCURI: disp=0->critic/inalta; disp<20%ini->scazut/medie; ok->ok/scazuta
+- UTILAJE: alerta pt FIECARE utilaj. rca=EXPIRAT->critic/inalta; EXPIRA_CURAND->atentie/inalta; ATENTIE->atentie/medie; NECUNOSCUT->atentie/medie("RCA nedocumentat"); OK->ok/scazuta. Verifica mentenanta
+- FACTURI: alerta pt fiecare cu unpaid=true. dep>0->inalta; scad<30z->medie; altfel->scazuta
+- Campurile pre-calc(rca,dep) sunt corecte. Nu inventa date.
 
-{
-  "sumar": "rezumat executiv 3-4 propozitii care acopera starea generala a fermei",
-  "scor_risc": number,
-  "generat_la": "ISO timestamp",
-  "contracte": [
-    { "contract_number": string, "lessor_name": string, "status": "expirat"|"critic"|"atentie"|"ok",
-      "priority": "inalta"|"medie"|"scazuta", "end_date": string|null, "days_until_expiry": number|null,
-      "suprafata_ha": number|null, "mesaj": string, "actiune_recomandata": string }
-  ],
-  "ferma": [
-    { "activitate": string, "parcela": string|null, "status": string,
-      "priority": "inalta"|"medie"|"scazuta", "data_planificata": string|null,
-      "intarziere_zile": number|null, "mesaj": string, "actiune_recomandata": string }
-  ],
-  "stocuri": [
-    { "produs": string, "categorie": string, "status": "critic"|"scazut"|"ok",
-      "priority": "inalta"|"medie"|"scazuta", "cantitate_disponibila": number, "unitate": string,
-      "valoare_estimata": number|null, "mesaj": string, "actiune_recomandata": string }
-  ],
-  "utilaje": [
-    { "utilaj": string, "tip": string, "status": "critic"|"atentie"|"ok",
-      "priority": "inalta"|"medie"|"scazuta", "rca_expiry": string|null,
-      "mesaj": string, "actiune_recomandata": string }
-  ],
-  "facturi": [
-    { "invoice_number": string, "status": string, "priority": "inalta"|"medie"|"scazuta",
-      "total_amount": number, "due_date": string|null, "mesaj": string, "actiune_recomandata": string }
-  ],
-  "apia": [
-    { "campaign_year": number, "status": string, "priority": "inalta"|"medie"|"scazuta",
-      "total_declared_ha": number, "mesaj": string, "actiune_recomandata": string }
-  ],
-  "fitosanitar": [
-    { "produs": string, "parcela": string|null, "priority": "inalta"|"medie"|"scazuta",
-      "data_aplicarii": string|null, "mesaj": string, "actiune_recomandata": string }
-  ],
-  "arendasi_sumar": { "total": number, "total_suprafata_ha": number }
-}
-
-Reguli de prioritizare:
-- Contracte: status=DRAFT sau end_date=null->status=atentie, priority=medie (contract nedefinitivat); expirat (end_date in trecut)->status=expirat, priority=inalta; <30 zile pana la expirare->status=critic, priority=inalta; 30-90 zile->status=atentie, priority=medie; >90 zile->status=ok, priority=scazuta. GENEREAZA ALERTA PENTRU FIECARE CONTRACT indiferent de status.
-- Ferma: intarziat + neexecutat->inalta, in executie->medie, planificat viitor->scazuta
-- Stocuri: 0 cantitate sau expirat->critic/inalta, <20% din initial->scazut/medie
-- Utilaje: GENEREAZA O ALERTA PENTRU FIECARE UTILAJ DIN DATE (activ sau nu). Mapare rca_status: EXPIRAT->status=critic, priority=inalta; EXPIRA_CURAND->status=atentie, priority=inalta; ATENTIE->status=atentie, priority=medie; NECUNOSCUT->status=atentie, priority=medie (mesaj: "RCA nedocumentat - verifica documentele"); OK->status=ok, priority=scazuta. Verifica si sarcini_mentenanta. Nu omite nicun utilaj - returneaza FIECARE utilaj ca o alerta.
-- Facturi: GENEREAZA O ALERTA PENTRU FIECARE FACTURA NEPLATITA (neplatita=true). scadenta_depasita=true->priority=inalta; scadenta in urmatoarele 30 de zile->priority=medie; alte neplatite->priority=scazuta. Daca nu exista facturi neplatite, returneaza array vid.
-- APIA: GENEREAZA O ALERTA PENTRU FIECARE DOSAR APIA. DRAFT->priority=inalta; IN_PROGRESS->priority=medie; SUBMITTED/ACCEPTED->priority=scazuta. Nu omite nicun dosar.
-- Fitosanitar: GENEREAZA O ALERTA PENTRU FIECARE INTRARE din registru_fitosanitar (indiferent de data). priority=medie pentru toate. Daca nu exista intrari, returneaza array vid.
-
-IMPORTANT: Campurile pre-calculate din date (rca_status, rca_zile_ramase, scadenta_depasita, zile_depasit, neplatita) sunt calculate de server si sunt corecte. Foloseste-le direct fara recalcul.
-IMPORTANT: Daca un camp lipsa din date (ex: rca_expiry_date nu exista), nu incerca sa il calculezi - foloseste valoarea disponibila (ex: rca_status din date).
-IMPORTANT: Chiar daca toate campurile au valori normale/ok, tot genereaza alerta cu status=ok si priority=scazuta pentru completitudine.
-
-Date ferma (JSON compact):
-${JSON.stringify(data)}
-
-Returneaza NUMAI JSON, fara comentarii, fara markdown.`
+Date:${JSON.stringify(data)}`
 }
 
 // --- Q&A ---------------------------------------------------------------------
 
 function buildQAPrompt(question: string, context: unknown): string {
-  const ctxStr = context ? `\nDate disponibile:\n${JSON.stringify(context)}` : ''
-  return `${ctxStr}\n\nIntrebare: ${question}\n\nRaspunde concis si util in romana. Daca nu ai suficiente date, spune clar.`
+  const ctxStr = context ? `\nDate:\n${JSON.stringify(context)}` : ''
+  return `${ctxStr}\n\nIntrebare: ${question}\n\nRaspunde concis in romana.`
 }
