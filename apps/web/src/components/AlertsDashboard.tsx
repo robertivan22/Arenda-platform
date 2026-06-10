@@ -106,7 +106,7 @@ function AlertDetail({ mesaj, actiune }: { mesaj: string; actiune: string }) {
 function ContractRow({ a }: { a: ContractAlert }) {
   return (
     <AlertRow priority={a.priority}
-      label={`#${a.contract_number} â€” ${a.lessor_name}`}
+      label={`#${a.contract_number} \u2014 ${a.lessor_name}`}
       badge={
         <>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CONTRACT_STATUS_STYLE[a.status] ?? ''}`}>
@@ -127,7 +127,7 @@ function ContractRow({ a }: { a: ContractAlert }) {
 function FarmRow({ a }: { a: FarmAlert }) {
   return (
     <AlertRow priority={a.priority}
-      label={`${a.activitate}${a.parcela ? ` â€” ${a.parcela}` : ''}`}
+      label={`${a.activitate}${a.parcela ? ` \u2014 ${a.parcela}` : ''}`}
       badge={
         <>
           <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${P[a.priority as keyof typeof P]?.badge ?? ''}`}>
@@ -172,7 +172,7 @@ function UtilajeRow({ a }: { a: UtilajeAlert }) {
         </span>
       }>
       <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
-      {a.rca_expiry && <p className="text-xs text-gray-400">RCA expirÄƒ: {a.rca_expiry}</p>}
+      {a.rca_expiry && <p className="text-xs text-gray-400">RCA expira: {a.rca_expiry}</p>}
     </AlertRow>
   )
 }
@@ -215,7 +215,7 @@ function ApiaRow({ a }: { a: ApiaAlert }) {
 function FitosanitarRow({ a }: { a: FitosanitarAlert }) {
   return (
     <AlertRow priority={a.priority}
-      label={`${a.produs}${a.parcela ? ` â€” ${a.parcela}` : ''}`}
+      label={`${a.produs}${a.parcela ? ` \u2014 ${a.parcela}` : ''}`}
       badge={
         <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${P[a.priority as keyof typeof P]?.badge ?? ''}`}>
           {P[a.priority as keyof typeof P]?.label ?? a.priority}
@@ -248,7 +248,7 @@ function Section({ icon, title, count, high, children }: {
       </div>
       <div className="p-4">
         {count === 0
-          ? <p className="text-sm text-gray-400 text-center py-3">Nicio alertÄƒ.</p>
+          ? <p className="text-sm text-gray-400 text-center py-3">Nicio alerta.</p>
           : children}
       </div>
     </div>
