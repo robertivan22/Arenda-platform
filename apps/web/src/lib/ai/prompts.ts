@@ -75,11 +75,14 @@ Reguli de prioritizare:
 - Contracte: expirat->inalta, <30 zile->inalta, 30-90 zile->medie, >90 zile->scazuta
 - Ferma: intarziat + neexecutat->inalta, in executie->medie, planificat viitor->scazuta
 - Stocuri: 0 cantitate sau expirat->critic/inalta, <20% din initial->scazut/medie
-- Utilaje: GENEREAZA O ALERTA PENTRU FIECARE UTILAJ cu rca_status=EXPIRAT (critic/inalta) sau EXPIRA_CURAND (atentie/inalta) sau ATENTIE (atentie/medie). Utilajele cu rca_status=OK sau NECUNOSCUT pot fi omise. Verifica si sarcini_mentenanta pentru utilaje cu intretinere scadenta.
-- Facturi: GENEREAZA O ALERTA PENTRU FIECARE FACTURA cu scadenta_depasita=true (priority inalta) sau neplatita=true si scadenta in viitorul apropiat (priority medie). Facturile platite pot fi omise.
-- APIA: dosar DRAFT aproape de deadline->inalta
+- Utilaje: GENEREAZA O ALERTA PENTRU FIECARE UTILAJ DIN DATE (activ sau nu). Mapare rca_status: EXPIRAT->status=critic, priority=inalta; EXPIRA_CURAND->status=atentie, priority=inalta; ATENTIE->status=atentie, priority=medie; NECUNOSCUT->status=atentie, priority=medie (mesaj: "RCA nedocumentat - verifica documentele"); OK->status=ok, priority=scazuta. Verifica si sarcini_mentenanta. Nu omite nicun utilaj - returneaza FIECARE utilaj ca o alerta.
+- Facturi: GENEREAZA O ALERTA PENTRU FIECARE FACTURA NEPLATITA (neplatita=true). scadenta_depasita=true->priority=inalta; scadenta in urmatoarele 30 de zile->priority=medie; alte neplatite->priority=scazuta. Daca nu exista facturi neplatite, returneaza array vid.
+- APIA: GENEREAZA O ALERTA PENTRU FIECARE DOSAR APIA. DRAFT->priority=inalta; IN_PROGRESS->priority=medie; SUBMITTED/ACCEPTED->priority=scazuta. Nu omite nicun dosar.
+- Fitosanitar: GENEREAZA O ALERTA PENTRU FIECARE INTRARE din registru_fitosanitar (indiferent de data). priority=medie pentru toate. Daca nu exista intrari, returneaza array vid.
 
 IMPORTANT: Campurile pre-calculate din date (rca_status, rca_zile_ramase, scadenta_depasita, zile_depasit, neplatita) sunt calculate de server si sunt corecte. Foloseste-le direct fara recalcul.
+IMPORTANT: Daca un camp lipsa din date (ex: rca_expiry_date nu exista), nu incerca sa il calculezi - foloseste valoarea disponibila (ex: rca_status din date).
+IMPORTANT: Chiar daca toate campurile au valori normale/ok, tot genereaza alerta cu status=ok si priority=scazuta pentru completitudine.
 
 Date complete ferma:
 ${JSON.stringify(data, null, 2)}

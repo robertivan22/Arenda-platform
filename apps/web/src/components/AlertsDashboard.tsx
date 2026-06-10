@@ -134,7 +134,7 @@ function FarmRow({ a }: { a: FarmAlert }) {
             {P[a.priority as keyof typeof P]?.label ?? a.priority}
           </span>
           {a.intarziere_zile != null && a.intarziere_zile > 0 && (
-            <span className="text-xs text-red-500">{a.intarziere_zile}z Ã®ntÃ¢rziere</span>
+            <span className="text-xs text-red-500">{a.intarziere_zile}z intarziere</span>
           )}
         </>
       }>
