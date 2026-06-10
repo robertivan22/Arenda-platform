@@ -16,9 +16,9 @@ const LS_KEY = 'arenda_ai_analysis'
 // â”€â”€â”€ Priority / status helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const P = {
-  inalta:  { badge: 'bg-red-100 text-red-700 border-red-200',     dot: 'bg-red-500',    label: 'ÃŽnalnÄƒ' },
+  inalta:  { badge: 'bg-red-100 text-red-700 border-red-200',     dot: 'bg-red-500',    label: 'Inalta' },
   medie:   { badge: 'bg-amber-100 text-amber-700 border-amber-200', dot: 'bg-amber-400',  label: 'Medie' },
-  scazuta: { badge: 'bg-gray-100 text-gray-600 border-gray-200',   dot: 'bg-gray-400',   label: 'ScÄƒzutÄƒ' },
+  scazuta: { badge: 'bg-gray-100 text-gray-600 border-gray-200',   dot: 'bg-gray-400',   label: 'Scazuta' },
 }
 
 const CONTRACT_STATUS_STYLE: Record<string, string> = {
@@ -27,21 +27,21 @@ const CONTRACT_STATUS_STYLE: Record<string, string> = {
   atentie: 'bg-amber-100 text-amber-700',
   ok:      'bg-green-100 text-green-700',
 }
-const CONTRACT_STATUS_LABEL: Record<string, string> = { expirat: 'Expirat', critic: 'Critic', atentie: 'AtenÈ›ie', ok: 'OK' }
+const CONTRACT_STATUS_LABEL: Record<string, string> = { expirat: 'Expirat', critic: 'Critic', atentie: 'Atentie', ok: 'OK' }
 
 const STOCK_STATUS_STYLE: Record<string, string> = {
   critic: 'bg-red-100 text-red-700',
   scazut: 'bg-amber-100 text-amber-700',
   ok:     'bg-green-100 text-green-700',
 }
-const STOCK_STATUS_LABEL: Record<string, string> = { critic: 'Critic', scazut: 'ScÄƒzut', ok: 'OK' }
+const STOCK_STATUS_LABEL: Record<string, string> = { critic: 'Critic', scazut: 'Scazut', ok: 'OK' }
 
 const UTILAJ_STATUS_STYLE: Record<string, string> = {
   critic:  'bg-red-100 text-red-700',
   atentie: 'bg-amber-100 text-amber-700',
   ok:      'bg-green-100 text-green-700',
 }
-const UTILAJ_STATUS_LABEL: Record<string, string> = { critic: 'Critic', atentie: 'AtenÈ›ie', ok: 'OK' }
+const UTILAJ_STATUS_LABEL: Record<string, string> = { critic: 'Critic', atentie: 'Atentie', ok: 'OK' }
 
 // â”€â”€â”€ Risk gauge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -118,8 +118,8 @@ function ContractRow({ a }: { a: ContractAlert }) {
         </>
       }>
       <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
-      {a.suprafata_ha != null && <p className="text-xs text-gray-400">SuprafaÈ›Äƒ: {a.suprafata_ha} ha</p>}
-      {a.end_date && <p className="text-xs text-gray-400">ExpirÄƒ: {a.end_date}</p>}
+      {a.suprafata_ha != null && <p className="text-xs text-gray-400">Suprafata: {a.suprafata_ha} ha</p>}
+      {a.end_date && <p className="text-xs text-gray-400">Expira: {a.end_date}</p>}
     </AlertRow>
   )
 }
@@ -191,7 +191,7 @@ function FacturaRow({ a }: { a: FacturaAlert }) {
         </>
       }>
       <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
-      {a.due_date && <p className="text-xs text-gray-400">ScadenÈ›Äƒ: {a.due_date}</p>}
+      {a.due_date && <p className="text-xs text-gray-400">Scadenta: {a.due_date}</p>}
     </AlertRow>
   )
 }
@@ -289,7 +289,7 @@ export default function AlertsDashboard() {
         body: JSON.stringify({ mode: 'full_analysis' }),
       })
       const json = await res.json()
-      if (!json.ok) { setError(json.error ?? 'Eroare necunoscutÄƒ.'); return }
+      if (!json.ok) { setError(json.error ?? 'Eroare necunoscuta.'); return }
       setResult(json.result)
       setModel(json.model ?? '')
       setTokens(json.tokens_used ?? 0)
@@ -319,14 +319,14 @@ export default function AlertsDashboard() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Alerte &amp; AnalizÄƒ AI</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Monitorizare inteligentÄƒ â€” toatÄƒ ferma ta</p>
+          <h1 className="text-2xl font-bold text-gray-900">Alerte &amp; Analiza AI</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Monitorizare inteligenta &mdash; toata ferma ta</p>
         </div>
         <button onClick={run} disabled={loading}
           className="flex items-center gap-1.5 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors">
           {loading
-            ? <><Loader2 className="w-4 h-4 animate-spin" /> Analizezâ€¦</>
-            : <><RefreshCw className="w-4 h-4" /> RuleazÄƒ analiza</>}
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Analizez...</>
+            : <><RefreshCw className="w-4 h-4" /> Ruleaza analiza</>}
         </button>
       </div>
 
@@ -343,9 +343,9 @@ export default function AlertsDashboard() {
           <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mb-4">
             <Shield className="w-8 h-8 text-brand-600" />
           </div>
-          <h2 className="text-lg font-semibold text-gray-800 mb-1">Asistentul AI este pregÄƒtit</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mb-1">Asistentul AI este pregatit</h2>
           <p className="text-sm text-gray-400 max-w-md">
-            ApasÄƒ <strong>RuleazÄƒ analiza</strong> pentru a primi o analizÄƒ completÄƒ a fermei â€” contracte, utilaje, stocuri, facturi, APIA È™i fitosanitar.
+            Apasa <strong>Ruleaza analiza</strong> pentru a primi o analiza completa a fermei &mdash; contracte, utilaje, stocuri, facturi, APIA si fitosanitar.
           </p>
         </div>
       )}
@@ -354,7 +354,7 @@ export default function AlertsDashboard() {
       {loading && (
         <div className="flex flex-col items-center justify-center py-24">
           <Loader2 className="w-10 h-10 animate-spin text-brand-600 mb-4" />
-          <p className="text-sm text-gray-500">Analizez toate datele fermei taleâ€¦</p>
+          <p className="text-sm text-gray-500">Analizez toate datele fermei tale...</p>
         </div>
       )}
 
@@ -379,16 +379,16 @@ export default function AlertsDashboard() {
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-                <Users className="w-3.5 h-3.5" /> ArendaÈ™i
+                <Users className="w-3.5 h-3.5" /> Arendasi
               </div>
-              <div className="text-3xl font-bold text-gray-800">{result.arendasi_sumar?.total ?? 'â€”'}</div>
+              <div className="text-3xl font-bold text-gray-800">{result.arendasi_sumar?.total ?? '—'}</div>
               <p className="text-xs text-gray-400 mt-1">{(result.arendasi_sumar?.total_suprafata_ha ?? 0).toFixed(0)} ha total</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
               {result.scor_risc < 40
-                ? <><CheckCircle className="w-6 h-6 text-green-500 mb-1" /><p className="text-sm font-semibold text-green-700">SituaÈ›ie bunÄƒ</p></>
+                ? <><CheckCircle className="w-6 h-6 text-green-500 mb-1" /><p className="text-sm font-semibold text-green-700">Situatie buna</p></>
                 : result.scor_risc < 70
-                ? <><Clock className="w-6 h-6 text-amber-500 mb-1" /><p className="text-sm font-semibold text-amber-700">NecesitÄƒ atenÈ›ie</p></>
+                ? <><Clock className="w-6 h-6 text-amber-500 mb-1" /><p className="text-sm font-semibold text-amber-700">Necesita atentie</p></>
                 : <><TrendingDown className="w-6 h-6 text-red-500 mb-1" /><p className="text-sm font-semibold text-red-700">Risc ridicat</p></>}
               <p className="text-xs text-gray-400 mt-1">{new Date(result.generat_la).toLocaleString('ro-RO')}</p>
             </div>
@@ -408,7 +408,7 @@ export default function AlertsDashboard() {
             <Section icon={<FileText className="w-5 h-5" />} title="Contracte" count={result.contracte?.length ?? 0} high={highOf(result.contracte)}>
               {result.contracte?.map((a, i) => <ContractRow key={i} a={a} />)}
             </Section>
-            <Section icon={<Tractor className="w-5 h-5" />} title="ActivitÄƒÈ›i FermÄƒ" count={result.ferma?.length ?? 0} high={highOf(result.ferma)}>
+            <Section icon={<Tractor className="w-5 h-5" />} title="Activitati Ferma" count={result.ferma?.length ?? 0} high={highOf(result.ferma)}>
               {result.ferma?.map((a, i) => <FarmRow key={i} a={a} />)}
             </Section>
             <Section icon={<Package className="w-5 h-5" />} title="Stocuri" count={result.stocuri?.length ?? 0} high={highOf(result.stocuri)}>
@@ -433,7 +433,7 @@ export default function AlertsDashboard() {
           </div>
 
           <p className="text-xs text-gray-300 text-right">
-            Model: {model} Â· {tokens} tokens Â· {new Date(result.generat_la).toLocaleString('ro-RO')}
+            Model: {model} · {tokens} tokens · {new Date(result.generat_la).toLocaleString('ro-RO')}
           </p>
         </>
       )}
@@ -442,26 +442,3 @@ export default function AlertsDashboard() {
 }
 
 // â”€â”€â”€ Priority / status helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-const PRIORITY_STYLES = {
-  inalta:  { badge: 'bg-red-100 text-red-700 border-red-200',   dot: 'bg-red-500',    label: 'ÃŽnaltÄƒ' },
-  medie:   { badge: 'bg-amber-100 text-amber-700 border-amber-200', dot: 'bg-amber-400', label: 'Medie' },
-  scazuta: { badge: 'bg-gray-100 text-gray-600 border-gray-200',  dot: 'bg-gray-400',   label: 'ScÄƒzutÄƒ' },
-}
-
-const CONTRACT_STATUS_STYLES = {
-  expirat: 'bg-red-100 text-red-700',
-  critic:  'bg-orange-100 text-orange-700',
-  atentie: 'bg-amber-100 text-amber-700',
-  ok:      'bg-green-100 text-green-700',
-}
-const CONTRACT_STATUS_LABELS = { expirat: 'Expirat', critic: 'Critic', atentie: 'AtenÈ›ie', ok: 'OK' }
-
-const STOCK_STATUS_STYLES = {
-  critic: 'bg-red-100 text-red-700',
-  scazut: 'bg-amber-100 text-amber-700',
-  ok:     'bg-green-100 text-green-700',
-}
-const STOCK_STATUS_LABELS = { critic: 'Critic', scazut: 'ScÄƒzut', ok: 'OK' }
-
-// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

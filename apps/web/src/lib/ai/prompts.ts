@@ -75,9 +75,11 @@ Reguli de prioritizare:
 - Contracte: expirat->inalta, <30 zile->inalta, 30-90 zile->medie, >90 zile->scazuta
 - Ferma: intarziat + neexecutat->inalta, in executie->medie, planificat viitor->scazuta
 - Stocuri: 0 cantitate sau expirat->critic/inalta, <20% din initial->scazut/medie
-- Utilaje: RCA expirat sau expira <30 zile->critic/inalta, 30-60 zile->atentie/medie
-- Facturi: scadente depasite->inalta, scadente in <7 zile->medie
+- Utilaje: GENEREAZA O ALERTA PENTRU FIECARE UTILAJ cu rca_status=EXPIRAT (critic/inalta) sau EXPIRA_CURAND (atentie/inalta) sau ATENTIE (atentie/medie). Utilajele cu rca_status=OK sau NECUNOSCUT pot fi omise. Verifica si sarcini_mentenanta pentru utilaje cu intretinere scadenta.
+- Facturi: GENEREAZA O ALERTA PENTRU FIECARE FACTURA cu scadenta_depasita=true (priority inalta) sau neplatita=true si scadenta in viitorul apropiat (priority medie). Facturile platite pot fi omise.
 - APIA: dosar DRAFT aproape de deadline->inalta
+
+IMPORTANT: Campurile pre-calculate din date (rca_status, rca_zile_ramase, scadenta_depasita, zile_depasit, neplatita) sunt calculate de server si sunt corecte. Foloseste-le direct fara recalcul.
 
 Date complete ferma:
 ${JSON.stringify(data, null, 2)}

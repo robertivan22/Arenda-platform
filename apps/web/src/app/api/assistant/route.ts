@@ -137,7 +137,7 @@ async function fetchLiveData() {
     const lessor = c.lessors
     const lessorName = lessor
       ? (lessor.company_name ?? `${lessor.last_name ?? ''} ${lessor.first_name ?? ''}`.trim())
-      : 'â€”'
+      : 'N/A'
     const daysLeft = c.end_date
       ? Math.round((new Date(c.end_date).getTime() - new Date(today).getTime()) / 86400000)
       : null
@@ -183,27 +183,50 @@ async function fetchLiveData() {
       pret_unitar: s.unit_price,
       data_expirare: s.expiry_date,
     })),
-    utilaje: (machinesRes.data ?? []).map((m: any) => ({
-      nume: m.name,
-      tip: m.type,
-      marca: m.brand,
-      model: m.model,
-      an: m.year,
-      numar_inmatriculare: m.plate,
-      activ: m.is_active,
-      rca_activ: m.rca_active,
-      rca_pret: m.rca_price,
-      rca_expira: m.rca_expiry_date,
-    })),
+    utilaje: (machinesRes.data ?? []).map((m: any) => {
+      const rcaExpiry = m.rca_expiry_date ? new Date(m.rca_expiry_date) : null
+      const rcaDaysLeft = rcaExpiry
+        ? Math.round((rcaExpiry.getTime() - new Date(today).getTime()) / 86400000)
+        : null
+      const rcaStatus = !rcaExpiry ? 'NECUNOSCUT'
+        : rcaDaysLeft! < 0 ? 'EXPIRAT'
+        : rcaDaysLeft! <= 30 ? 'EXPIRA_CURAND'
+        : rcaDaysLeft! <= 60 ? 'ATENTIE'
+        : 'OK'
+      return {
+        nume: m.name,
+        tip: m.type,
+        marca: m.brand,
+        model: m.model,
+        an: m.year,
+        numar_inmatriculare: m.plate,
+        activ: m.is_active,
+        rca_activ: m.rca_active,
+        rca_pret: m.rca_price,
+        rca_expira: m.rca_expiry_date,
+        rca_status: rcaStatus,
+        rca_zile_ramase: rcaDaysLeft,
+      }
+    }),
     sarcini_mentenanta: (maintenanceRes.data ?? []),
-    facturi: (invoicesRes.data ?? []).map((i: any) => ({
-      numar: i.invoice_number,
-      total: i.total_amount,
-      status: i.status,
-      data_emitere: i.issue_date,
-      scadenta: i.due_date,
-      efactura_status: i.efactura_status,
-    })),
+    facturi: (invoicesRes.data ?? []).map((i: any) => {
+      const dueDate = i.due_date ? new Date(i.due_date) : null
+      const daysOverdue = dueDate
+        ? Math.round((new Date(today).getTime() - dueDate.getTime()) / 86400000)
+        : null
+      const isUnpaid = i.status !== 'PAID' && i.status !== 'PLATITA'
+      return {
+        numar: i.invoice_number,
+        total: i.total_amount,
+        status: i.status,
+        data_emitere: i.issue_date,
+        scadenta: i.due_date,
+        efactura_status: i.efactura_status,
+        neplatita: isUnpaid,
+        zile_depasit: daysOverdue && daysOverdue > 0 ? daysOverdue : 0,
+        scadenta_depasita: daysOverdue !== null && daysOverdue > 0 && isUnpaid,
+      }
+    }),
     fitosanitar_recent: (fitosanitarRes.data ?? []),
     apia: (apiaRes.data ?? []),
     arendasi: {
