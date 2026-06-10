@@ -1,15 +1,18 @@
 import Groq from 'groq-sdk'
 
 // ─── Client (server-side only) ────────────────────────────────────────────────
-// This file must NEVER be imported in client components.
+// Lazy singleton — not instantiated at module load so the build doesn't fail
+// when GROQ_API_KEY is absent from the build environment.
 
-if (!process.env.GROQ_API_KEY) {
-  throw new Error('GROQ_API_KEY env var is missing. Add it to .env.local.')
+let _groq: Groq | null = null
+
+function getGroqClient(): Groq {
+  if (_groq) return _groq
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) throw new Error('GROQ_API_KEY env var is missing.')
+  _groq = new Groq({ apiKey })
+  return _groq
 }
-
-export const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-})
 
 // Default model – fast and capable
 export const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
@@ -39,7 +42,7 @@ export async function chat(
     json = false,
   } = options
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroqClient().chat.completions.create({
     model,
     messages,
     temperature,
