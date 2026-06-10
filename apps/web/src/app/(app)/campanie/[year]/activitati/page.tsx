@@ -356,7 +356,7 @@ export default function ActivitatiPage() {
   const finalizat = orders.filter(o => o.status === 'FINALIZAT').length
   const planificat = orders.filter(o => o.status === 'PLANIFICAT').length
   const areaWorked = orders
-    .filter(o => o.status === 'FINALIZAT')
+    .filter(o => o.status === 'FINALIZAT' || o.status === 'IN_EXECUTIE')
     .reduce((s, o) => s + (o.area_ha ?? 0), 0)
 
   // ── Filtered rows ──
