@@ -82,7 +82,11 @@ function ParceleTab({
       .select('*')
       .eq('dossier_id', dossierId)
       .order('created_at')
-    setParcels((data ?? []) as ApiaDossierParcel[])
+    const rows = (data ?? []) as ApiaDossierParcel[]
+    setParcels(rows)
+    // sync total back to dossier
+    const total = rows.reduce((s, p) => s + Number(p.declared_surface_ha), 0)
+    await db.from('apia_dossiers').update({ total_declared_ha: total }).eq('id', dossierId)
     setLoading(false)
   }, [dossierId, db])
 
@@ -1037,7 +1041,7 @@ export default function ApiaDetailPage() {
             {/* AGI Online quick link */}
             <div className="pt-2 border-t border-gray-100">
               <a
-                href="https://agi.apia.org.ro"
+                href="https://agi.apia.org.ro/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline"

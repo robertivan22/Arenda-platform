@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import {
   FolderOpen, Plus, ChevronRight, CheckCircle2, AlertCircle,
-  Clock, Archive, Loader2, FileText, Wheat, BarChart3, RefreshCw,
+  Clock, Archive, Loader2, FileText, Wheat, BarChart3, RefreshCw, Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ApiaDossier } from '@/lib/apia/types'
@@ -18,6 +18,7 @@ import { DOSSIER_STATUS_CFG } from '@/lib/apia/interventions'
 
 interface DossierRow extends ApiaDossier {
   parcel_count?: number
+  real_declared_ha?: number
   intervention_count?: number
   doc_missing_count?: number
 }
@@ -226,7 +227,7 @@ export default function ApiaPage() {
     const ids = data.map(d => d.id)
     const [parcelRes, interventionRes, docRes] = await Promise.all([
       ids.length
-        ? db.from('apia_dossier_parcels').select('dossier_id', { count: 'exact', head: false }).in('dossier_id', ids)
+        ? db.from('apia_dossier_parcels').select('dossier_id, declared_surface_ha').in('dossier_id', ids)
         : { data: [] },
       ids.length
         ? db.from('apia_dossier_interventions').select('dossier_id', { count: 'exact', head: false }).in('dossier_id', ids)
@@ -237,12 +238,15 @@ export default function ApiaPage() {
     ])
 
     const parcelCount = new Map<string, number>()
+    const parcelHa = new Map<string, number>()
     const interventionCount = new Map<string, number>()
     const missingDocCount = new Map<string, number>()
 
     for (const r of (parcelRes.data ?? [])) {
-      const k = (r as Record<string, unknown>).dossier_id as string
+      const rec = r as Record<string, unknown>
+      const k = rec.dossier_id as string
       parcelCount.set(k, (parcelCount.get(k) ?? 0) + 1)
+      parcelHa.set(k, (parcelHa.get(k) ?? 0) + (Number(rec.declared_surface_ha) || 0))
     }
     for (const r of (interventionRes.data ?? [])) {
       const k = (r as Record<string, unknown>).dossier_id as string
@@ -260,6 +264,7 @@ export default function ApiaPage() {
       data.map(d => ({
         ...(d as ApiaDossier),
         parcel_count: parcelCount.get(d.id) ?? 0,
+        real_declared_ha: parcelHa.get(d.id) ?? 0,
         intervention_count: interventionCount.get(d.id) ?? 0,
         doc_missing_count: missingDocCount.get(d.id) ?? 0,
       })),
@@ -269,8 +274,16 @@ export default function ApiaPage() {
 
   useEffect(() => { setLoading(true); loadDossiers() }, [loadDossiers])
 
+  async function deleteDossier(id: string) {
+    if (!confirm('Sterge dosarul si toate parcelele, interventiile si documentele asociate?\n\nAceasta actiune este ireversibila.')) return
+    const db = createClient()
+    const { error } = await db.from('apia_dossiers').delete().eq('id', id)
+    if (error) toast.error(error.message)
+    else { toast.success('Dosar sters'); loadDossiers() }
+  }
+
   // Stats
-  const totalHa = dossiers.reduce((s, d) => s + (d.total_declared_ha ?? 0), 0)
+  const totalHa = dossiers.reduce((s, d) => s + (d.real_declared_ha ?? 0), 0)
   const readyCount = dossiers.filter(d => d.status === 'READY' || d.status === 'SUBMITTED' || d.status === 'ACCEPTED').length
 
   if (loading) {
@@ -406,7 +419,7 @@ export default function ApiaPage() {
                       <StatusBadge status={d.status} />
                     </div>
                     <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
-                      <span><strong className="text-gray-700">{Number(d.total_declared_ha).toFixed(2)}</strong> ha declarate</span>
+                      <span><strong className="text-gray-700">{(d.real_declared_ha ?? 0).toFixed(2)}</strong> ha declarate</span>
                       <span><strong className="text-gray-700">{d.parcel_count ?? 0}</strong> parcele</span>
                       <span><strong className="text-gray-700">{d.intervention_count ?? 0}</strong> intervenții</span>
                       {missCount > 0 && (
@@ -429,6 +442,15 @@ export default function ApiaPage() {
                       <div className="text-xs text-gray-400">nedepus</div>
                     )}
                   </div>
+
+                  {/* Delete */}
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteDossier(d.id) }}
+                    className="shrink-0 p-1.5 text-gray-300 hover:text-red-500 transition-colors rounded"
+                    title="Sterge dosarul"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
 
                   <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
                 </div>
