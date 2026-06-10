@@ -14,8 +14,8 @@ function getGroqClient(): Groq {
   return _groq
 }
 
-// Default model – fast and capable
-export const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
+// Default model – fast, free tier
+export const DEFAULT_MODEL = 'llama-3.1-8b-instant'
 
 // ─── Chat completion helper ───────────────────────────────────────────────────
 

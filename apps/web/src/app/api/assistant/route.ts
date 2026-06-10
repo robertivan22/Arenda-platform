@@ -286,7 +286,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
-      { json: mode !== 'qa', temperature: mode === 'qa' ? 0.4 : 0.15, max_tokens: 6000 }
+      { json: mode !== 'qa', temperature: mode === 'qa' ? 0.4 : 0.15, max_tokens: 4000 }
     )
 
     if (mode === 'qa') {
