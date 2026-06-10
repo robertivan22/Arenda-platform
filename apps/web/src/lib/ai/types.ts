@@ -3,6 +3,7 @@
 export type Priority = 'inalta' | 'medie' | 'scazuta'
 export type ContractStatus = 'expirat' | 'critic' | 'atentie' | 'ok'
 export type StockStatus = 'critic' | 'scazut' | 'ok'
+export type UtilajeStatus = 'critic' | 'atentie' | 'ok'
 
 export interface ContractAlert {
   contract_number: string
@@ -39,37 +40,80 @@ export interface StockAlert {
   actiune_recomandata: string
 }
 
+export interface UtilajeAlert {
+  utilaj: string
+  tip: string
+  status: UtilajeStatus
+  priority: Priority
+  rca_expiry: string | null
+  mesaj: string
+  actiune_recomandata: string
+}
+
+export interface FacturaAlert {
+  invoice_number: string
+  status: string
+  priority: Priority
+  total_amount: number
+  due_date: string | null
+  mesaj: string
+  actiune_recomandata: string
+}
+
+export interface ApiaAlert {
+  campaign_year: number
+  status: string
+  priority: Priority
+  total_declared_ha: number
+  mesaj: string
+  actiune_recomandata: string
+}
+
+export interface FitosanitarAlert {
+  produs: string
+  parcela: string | null
+  priority: Priority
+  data_aplicarii: string | null
+  mesaj: string
+  actiune_recomandata: string
+}
+
+export interface ArendasiSumar {
+  total: number
+  total_suprafata_ha: number
+}
+
 export interface AnalysisResult {
   sumar: string
-  scor_risc: number          // 0–100
-  generat_la: string         // ISO timestamp
+  scor_risc: number
+  generat_la: string
   contracte: ContractAlert[]
   ferma: FarmAlert[]
   stocuri: StockAlert[]
+  utilaje: UtilajeAlert[]
+  facturi: FacturaAlert[]
+  apia: ApiaAlert[]
+  fitosanitar: FitosanitarAlert[]
+  arendasi_sumar: ArendasiSumar
 }
 
 // ─── Mode ────────────────────────────────────────────────────────────────────
 
-export type AssistantMode =
-  | 'full_analysis'
-  | 'contract_alerts'
-  | 'farm_alerts'
-  | 'inventory_alerts'
-  | 'qa'
+export type AssistantMode = 'full_analysis' | 'qa'
 
 // ─── API request / response ───────────────────────────────────────────────────
 
 export interface AssistantRequest {
   mode: AssistantMode
-  question?: string          // used in 'qa' mode
-  context?: Record<string, unknown>  // optional structured data to inject
+  question?: string
+  context?: Record<string, unknown>
 }
 
 export interface AssistantResponse {
   ok: boolean
   mode: AssistantMode
   result?: AnalysisResult
-  answer?: string            // for 'qa' mode
+  answer?: string
   error?: string
   model?: string
   tokens_used?: number

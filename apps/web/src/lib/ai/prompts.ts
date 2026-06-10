@@ -1,161 +1,93 @@
-import type { AssistantMode } from './types'
+﻿import type { AssistantMode } from './types'
 
-// ─── System prompt (Romanian, agricultural domain) ────────────────────────────
+// --- System prompt -----------------------------------------------------------
 
-export const SYSTEM_PROMPT = `Ești ArendaAI, asistentul inteligent al platformei ArendaPro — un sistem de management agricol românesc.
+export const SYSTEM_PROMPT = `Esti ArendaAI, asistentul inteligent al platformei ArendaPro.
 
-Rolul tău:
-- Analizezi date despre contracte de arendă, operațiuni agricole și stocuri de inputuri
-- Răspunzi exclusiv în limba română
-- Ești concis, precis și orientat spre acțiune
-- Prioritizezi termenele limită, riscurile și acțiunile recomandate
-- Nu inventezi date lipsă — menționezi clar când informațiile sunt incomplete
-- Când ești instruit explicit să produci JSON, returnezi STRICT JSON valid, fără text suplimentar, fără marcaje markdown
-
-Domeniu:
-- Contracte de arendă (termene, suprafețe, arendatori, tarife)
-- Operațiuni agricole pe câmp (semănat, fertilizat, erbicidat, recoltat)
-- Gestionarea stocurilor de semințe, îngrășăminte, pesticide și carburant
-- Alertare proactivă și recomandări de prioritizare
+Rolul tau:
+- Analizezi date complete din toata baza de date a fermei: contracte, operatiuni, stocuri, utilaje, facturi, APIA, fitosanitar
+- Raspunzi exclusiv in limba romana
+- Esti concis, precis si orientat spre actiune
+- Prioritizezi termenele limita, riscurile si actiunile recomandate
+- Nu inventezi date lipsa - mentionezi clar cand informatiile sunt incomplete
+- Cand esti instruit explicit sa produci JSON, returnezi STRICT JSON valid, fara text suplimentar, fara marcaje markdown
 
 Reguli:
-- Dacă datele sunt insuficiente, spune "Date insuficiente pentru această analiză."
+- Daca datele sunt insuficiente, spune "Date insuficiente pentru aceasta analiza."
 - Nu specula dincolo de datele furnizate
-- Scorul de risc este un număr întreg de la 0 (fără risc) la 100 (risc maxim)`
+- Scorul de risc este un numar intreg de la 0 (fara risc) la 100 (risc maxim)
+- Alertele goale sunt permise (array vid [] daca nu exista probleme)`
 
-// ─── Prompt builders ──────────────────────────────────────────────────────────
+// --- Prompt dispatcher -------------------------------------------------------
 
 export function buildPrompt(mode: AssistantMode, data: unknown, question?: string): string {
-  switch (mode) {
-    case 'full_analysis':
-      return buildFullAnalysisPrompt(data)
-    case 'contract_alerts':
-      return buildContractAlertsPrompt(data)
-    case 'farm_alerts':
-      return buildFarmAlertsPrompt(data)
-    case 'inventory_alerts':
-      return buildInventoryAlertsPrompt(data)
-    case 'qa':
-      return buildQAPrompt(question ?? '', data)
-    default:
-      return buildFullAnalysisPrompt(data)
-  }
+  if (mode === 'qa') return buildQAPrompt(question ?? '', data)
+  return buildFullAnalysisPrompt(data)
 }
 
-// ─── Full analysis ────────────────────────────────────────────────────────────
+// --- Full analysis -----------------------------------------------------------
 
 function buildFullAnalysisPrompt(data: unknown): string {
-  return `Analizează datele de mai jos și returnează STRICT un obiect JSON valid cu această structură exactă:
+  return `Data de azi: ${new Date().toISOString().split('T')[0]}
+
+Analizeaza TOATE datele de mai jos din baza de date a fermei si returneaza STRICT un obiect JSON valid cu aceasta structura:
+
 {
-  "sumar": "string — rezumat executiv în 2-3 propoziții",
-  "scor_risc": number (0-100),
+  "sumar": "rezumat executiv 3-4 propozitii care acopera starea generala a fermei",
+  "scor_risc": number,
   "generat_la": "ISO timestamp",
-  "contracte": [ ...ContractAlert ],
-  "ferma": [ ...FarmAlert ],
-  "stocuri": [ ...StockAlert ]
+  "contracte": [
+    { "contract_number": string, "lessor_name": string, "status": "expirat"|"critic"|"atentie"|"ok",
+      "priority": "inalta"|"medie"|"scazuta", "end_date": string|null, "days_until_expiry": number|null,
+      "suprafata_ha": number|null, "mesaj": string, "actiune_recomandata": string }
+  ],
+  "ferma": [
+    { "activitate": string, "parcela": string|null, "status": string,
+      "priority": "inalta"|"medie"|"scazuta", "data_planificata": string|null,
+      "intarziere_zile": number|null, "mesaj": string, "actiune_recomandata": string }
+  ],
+  "stocuri": [
+    { "produs": string, "categorie": string, "status": "critic"|"scazut"|"ok",
+      "priority": "inalta"|"medie"|"scazuta", "cantitate_disponibila": number, "unitate": string,
+      "valoare_estimata": number|null, "mesaj": string, "actiune_recomandata": string }
+  ],
+  "utilaje": [
+    { "utilaj": string, "tip": string, "status": "critic"|"atentie"|"ok",
+      "priority": "inalta"|"medie"|"scazuta", "rca_expiry": string|null,
+      "mesaj": string, "actiune_recomandata": string }
+  ],
+  "facturi": [
+    { "invoice_number": string, "status": string, "priority": "inalta"|"medie"|"scazuta",
+      "total_amount": number, "due_date": string|null, "mesaj": string, "actiune_recomandata": string }
+  ],
+  "apia": [
+    { "campaign_year": number, "status": string, "priority": "inalta"|"medie"|"scazuta",
+      "total_declared_ha": number, "mesaj": string, "actiune_recomandata": string }
+  ],
+  "fitosanitar": [
+    { "produs": string, "parcela": string|null, "priority": "inalta"|"medie"|"scazuta",
+      "data_aplicarii": string|null, "mesaj": string, "actiune_recomandata": string }
+  ],
+  "arendasi_sumar": { "total": number, "total_suprafata_ha": number }
 }
 
-Fiecare ContractAlert:
-{ "contract_number": string, "lessor_name": string, "status": "expirat"|"critic"|"atentie"|"ok",
-  "priority": "inalta"|"medie"|"scazuta", "end_date": string|null, "days_until_expiry": number|null,
-  "suprafata_ha": number|null, "mesaj": string, "actiune_recomandata": string }
+Reguli de prioritizare:
+- Contracte: expirat->inalta, <30 zile->inalta, 30-90 zile->medie, >90 zile->scazuta
+- Ferma: intarziat + neexecutat->inalta, in executie->medie, planificat viitor->scazuta
+- Stocuri: 0 cantitate sau expirat->critic/inalta, <20% din initial->scazut/medie
+- Utilaje: RCA expirat sau expira <30 zile->critic/inalta, 30-60 zile->atentie/medie
+- Facturi: scadente depasite->inalta, scadente in <7 zile->medie
+- APIA: dosar DRAFT aproape de deadline->inalta
 
-Fiecare FarmAlert:
-{ "activitate": string, "parcela": string|null, "status": string, "priority": "inalta"|"medie"|"scazuta",
-  "data_planificata": string|null, "intarziere_zile": number|null, "mesaj": string, "actiune_recomandata": string }
-
-Fiecare StockAlert:
-{ "produs": string, "categorie": string, "status": "critic"|"scazut"|"ok", "priority": "inalta"|"medie"|"scazuta",
-  "cantitate_disponibila": number, "unitate": string, "valoare_estimata": number|null,
-  "mesaj": string, "actiune_recomandata": string }
-
-Date fermă:
+Date complete ferma:
 ${JSON.stringify(data, null, 2)}
 
-Returnează NUMAI JSON, fără comentarii sau text suplimentar.`
+Returneaza NUMAI JSON, fara comentarii, fara markdown.`
 }
 
-// ─── Contract alerts ──────────────────────────────────────────────────────────
-
-function buildContractAlertsPrompt(data: unknown): string {
-  return `Analizează contractele de arendă de mai jos și returnează STRICT JSON:
-{
-  "sumar": string,
-  "scor_risc": number,
-  "generat_la": string,
-  "contracte": [ ...ContractAlert ],
-  "ferma": [],
-  "stocuri": []
-}
-
-Priorități pentru contracte:
-- "expirat": contract deja expirat → prioritate "inalta"
-- "critic": expiră în < 30 zile → prioritate "inalta"  
-- "atentie": expiră în 30-90 zile → prioritate "medie"
-- "ok": > 90 zile sau nedeterminat → prioritate "scazuta"
-
-Date contracte:
-${JSON.stringify(data, null, 2)}
-
-Returnează NUMAI JSON.`
-}
-
-// ─── Farm alerts ──────────────────────────────────────────────────────────────
-
-function buildFarmAlertsPrompt(data: unknown): string {
-  const today = new Date().toISOString().split('T')[0]
-  return `Data de azi: ${today}
-
-Analizează activitățile agricole de mai jos și returnează STRICT JSON:
-{
-  "sumar": string,
-  "scor_risc": number,
-  "generat_la": string,
-  "contracte": [],
-  "ferma": [ ...FarmAlert ],
-  "stocuri": []
-}
-
-Identifică:
-- activități întârziate (data planificată a trecut, status PLANIFICAT)
-- activități în execuție de prea mult timp (> 7 zile)
-- parcele fără activitate planificată în sezon curent
-
-Date activități:
-${JSON.stringify(data, null, 2)}
-
-Returnează NUMAI JSON.`
-}
-
-// ─── Inventory alerts ─────────────────────────────────────────────────────────
-
-function buildInventoryAlertsPrompt(data: unknown): string {
-  return `Analizează stocurile de inputuri agricole de mai jos și returnează STRICT JSON:
-{
-  "sumar": string,
-  "scor_risc": number,
-  "generat_la": string,
-  "contracte": [],
-  "ferma": [],
-  "stocuri": [ ...StockAlert ]
-}
-
-Criterii de alertă:
-- "critic": cantitate_disponibila = 0 sau produs expirat → prioritate "inalta"
-- "scazut": stoc < 20% din cantitate inițiala sau dată expirare < 30 zile → prioritate "medie"
-- "ok": stoc suficient → prioritate "scazuta"
-
-Date stocuri:
-${JSON.stringify(data, null, 2)}
-
-Returnează NUMAI JSON.`
-}
-
-// ─── Q&A ─────────────────────────────────────────────────────────────────────
+// --- Q&A ---------------------------------------------------------------------
 
 function buildQAPrompt(question: string, context: unknown): string {
-  const ctxStr = context ? `\nContext disponibil:\n${JSON.stringify(context, null, 2)}` : ''
-  return `${ctxStr ? ctxStr + '\n\n' : ''}Întrebare utilizator: ${question}
-
-Răspunde concis și util în română. Dacă nu ai suficiente date, spune clar.`
+  const ctxStr = context ? `\nDate disponibile din baza de date:\n${JSON.stringify(context, null, 2)}` : ''
+  return `${ctxStr}\n\nIntrebare: ${question}\n\nRaspunde concis si util in romana. Daca nu ai suficiente date, spune clar.`
 }

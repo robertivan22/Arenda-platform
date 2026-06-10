@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { chat, safeParseJSON } from '@/lib/groq'
 import { SYSTEM_PROMPT, buildPrompt } from '@/lib/ai/prompts'
@@ -8,69 +8,165 @@ import type { AssistantResponse, AnalysisResult } from '@/lib/ai/types'
 
 export const runtime = 'edge'
 
-// ─── Request schema ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Request schema â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const RequestSchema = z.object({
-  mode: z.enum(['full_analysis', 'contract_alerts', 'farm_alerts', 'inventory_alerts', 'qa']),
+  mode: z.enum(['full_analysis', 'qa']),
   question: z.string().optional(),
   context: z.record(z.unknown()).optional(),
 })
 
-// ─── Fetch live data from Supabase (server-side, uses service role key) ───────
+// â”€â”€â”€ Fetch ALL live data from Supabase â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-async function fetchLiveData(mode: string) {
+async function fetchLiveData() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) return MOCK_FARM_DATA
 
   const db = createClient(url, key)
   const today = new Date().toISOString().split('T')[0]
+  const yearStart = `${new Date().getFullYear()}-01-01`
 
-  const [contractsRes, ordersRes, stockRes, txnRes] = await Promise.all([
+  const [
+    contractsRes,
+    ordersRes,
+    stockRes,
+    txnRes,
+    machinesRes,
+    maintenanceRes,
+    invoicesRes,
+    fitosanitarRes,
+    apiaRes,
+    lessorsRes,
+    parcelsRes,
+    cropPlansRes,
+    harvestRes,
+    fuelRes,
+  ] = await Promise.all([
+    // Contracte
     db.from('contracts')
-      .select('id, contract_number, sign_date, end_date, status, lessors(first_name, last_name, company_name)')
-      .limit(50),
-    mode === 'contract_alerts' ? { data: [], error: null } :
-      db.from('work_orders')
-        .select('id, operation_type, status, planned_date, execution_date, area_ha, parcels(bloc_fizic)')
-        .gte('planned_date', `${new Date().getFullYear()}-01-01`)
-        .order('planned_date')
-        .limit(50),
-    mode === 'contract_alerts' ? { data: [], error: null } :
-      db.from('input_lots')
-        .select('product_name, category, quantity_available, quantity, unit, unit_price, expiry_date')
-        .order('category')
-        .limit(50),
+      .select('id, contract_number, sign_date, end_date, status, lessors(first_name, last_name, company_name), parcels(surface)')
+      .limit(100),
+
+    // Ordine de lucru (monitorizare ferma)
+    db.from('work_orders')
+      .select('id, operation_type, status, planned_date, execution_date, area_ha, parcels(bloc_fizic, surface)')
+      .gte('planned_date', yearStart)
+      .order('planned_date')
+      .limit(100),
+
+    // Stocuri
+    db.from('input_lots')
+      .select('product_name, category, quantity_available, quantity, unit, unit_price, expiry_date, received_date')
+      .order('category')
+      .limit(100),
+
+    // Tranzactii
     db.from('transactions')
-      .select('ron_net, is_paid')
-      .gte('transaction_date', `${new Date().getFullYear()}-01-01`)
+      .select('ron_net, is_paid, transaction_date')
+      .gte('transaction_date', yearStart)
       .limit(500),
+
+    // Utilaje
+    db.from('machines')
+      .select('name, type, brand, model, year, plate, is_active, rca_active, rca_price, rca_expiry_date, fuel_type')
+      .order('name')
+      .limit(50),
+
+    // Sarcini de mentenanta
+    db.from('maintenance_tasks')
+      .select('title, due_date, status, machine_id, priority')
+      .in('status', ['PENDING', 'OVERDUE'])
+      .order('due_date')
+      .limit(30),
+
+    // Facturi
+    db.from('invoices')
+      .select('invoice_number, total_amount, status, issue_date, due_date, efactura_status')
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .limit(50),
+
+    // Registru fitosanitar
+    db.from('registru_fitosanitar')
+      .select('*')
+      .gte('created_at', new Date(Date.now() - 90 * 86400_000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(50),
+
+    // Dosare APIA
+    db.from('apia_dossiers')
+      .select('campaign_year, status, total_declared_ha, total_eligible_ha, submission_date, correction_deadline')
+      .order('campaign_year', { ascending: false })
+      .limit(5),
+
+    // Arendasi
+    db.from('lessors')
+      .select('id, first_name, last_name, company_name, is_active')
+      .limit(200),
+
+    // Parcele
+    db.from('parcels')
+      .select('id, bloc_fizic, surface, status, culture')
+      .eq('status', 'ACTIVE')
+      .limit(200),
+
+    // Planuri cultura
+    db.from('crop_plans')
+      .select('culture, total_ha, status, campaign_id')
+      .limit(50),
+
+    // Recolte
+    db.from('harvest_lots')
+      .select('culture, total_quantity, unit, campaign_id')
+      .limit(50),
+
+    // Consum carburant
+    db.from('fuel_logs')
+      .select('quantity, fuel_type, log_date, machine_id')
+      .gte('log_date', yearStart)
+      .limit(100),
   ])
 
   const txns = txnRes.data ?? []
   const totalNet = txns.reduce((s: number, t: any) => s + Number(t.ron_net ?? 0), 0)
   const unpaidNet = txns.filter((t: any) => !t.is_paid).reduce((s: number, t: any) => s + Number(t.ron_net ?? 0), 0)
-  const paid = txns.filter((t: any) => t.is_paid).length
-  const rataAchitare = txns.length > 0 ? Math.round((paid / txns.length) * 100) : 0
+  const paidCount = txns.filter((t: any) => t.is_paid).length
+  const rataAchitare = txns.length > 0 ? Math.round((paidCount / txns.length) * 100) : 0
 
-  // Enrich contracts with days_until_expiry
-  const contracte = (contractsRes.data ?? []).map((c: any) => {
+  const contracts = (contractsRes.data ?? []).map((c: any) => {
     const lessor = c.lessors
     const lessorName = lessor
-      ? (lessor.company_name ?? `${lessor.last_name} ${lessor.first_name}`.trim())
-      : '—'
-    const endDate = c.end_date
-    const daysLeft = endDate
-      ? Math.round((new Date(endDate).getTime() - new Date(today).getTime()) / 86400000)
+      ? (lessor.company_name ?? `${lessor.last_name ?? ''} ${lessor.first_name ?? ''}`.trim())
+      : 'â€”'
+    const daysLeft = c.end_date
+      ? Math.round((new Date(c.end_date).getTime() - new Date(today).getTime()) / 86400000)
       : null
-    return { ...c, lessor_name: lessorName, days_until_expiry: daysLeft }
+    const suprafata = Array.isArray(c.parcels)
+      ? c.parcels.reduce((sum: number, p: any) => sum + Number(p.surface ?? 0), 0)
+      : null
+    return { contract_number: c.contract_number, lessor_name: lessorName, status: c.status, end_date: c.end_date, days_until_expiry: daysLeft, suprafata_ha: suprafata }
   })
 
+  const parcels = parcelsRes.data ?? []
+  const totalHa = parcels.reduce((s: number, p: any) => s + Number(p.surface ?? 0), 0)
+
+  const fuelLogs = fuelRes.data ?? []
+  const totalFuel = fuelLogs.reduce((s: number, f: any) => s + Number(f.quantity ?? 0), 0)
+
+  const lessors = lessorsRes.data ?? []
+
   return {
-    generatedAt: new Date().toISOString(),
-    farm: { total_ha: null, campaign_year: new Date().getFullYear() },
-    contracte,
-    activitati: (ordersRes.data ?? []).map((o: any) => ({
+    generat_la: new Date().toISOString(),
+    ferma: {
+      total_parcele: parcels.length,
+      total_ha: Math.round(totalHa * 100) / 100,
+      an_campanie: new Date().getFullYear(),
+      planuri_cultura: (cropPlansRes.data ?? []),
+      recolte: (harvestRes.data ?? []),
+      consum_carburant_litri_an: Math.round(totalFuel),
+    },
+    contracte: contracts,
+    activitati_ferma: (ordersRes.data ?? []).map((o: any) => ({
       operatie: o.operation_type,
       parcela: o.parcels?.bloc_fizic ?? null,
       suprafata_ha: o.area_ha,
@@ -87,15 +183,43 @@ async function fetchLiveData(mode: string) {
       pret_unitar: s.unit_price,
       data_expirare: s.expiry_date,
     })),
+    utilaje: (machinesRes.data ?? []).map((m: any) => ({
+      nume: m.name,
+      tip: m.type,
+      marca: m.brand,
+      model: m.model,
+      an: m.year,
+      numar_inmatriculare: m.plate,
+      activ: m.is_active,
+      rca_activ: m.rca_active,
+      rca_pret: m.rca_price,
+      rca_expira: m.rca_expiry_date,
+    })),
+    sarcini_mentenanta: (maintenanceRes.data ?? []),
+    facturi: (invoicesRes.data ?? []).map((i: any) => ({
+      numar: i.invoice_number,
+      total: i.total_amount,
+      status: i.status,
+      data_emitere: i.issue_date,
+      scadenta: i.due_date,
+      efactura_status: i.efactura_status,
+    })),
+    fitosanitar_recent: (fitosanitarRes.data ?? []),
+    apia: (apiaRes.data ?? []),
+    arendasi: {
+      total: lessors.length,
+      activi: lessors.filter((l: any) => l.is_active !== false).length,
+    },
     tranzactii: {
-      total_ron_net: totalNet,
-      neplatit_ron: unpaidNet,
+      total_ron_net: Math.round(totalNet),
+      neplatit_ron: Math.round(unpaidNet),
       rata_achitare_pct: rataAchitare,
+      total_tranzactii: txns.length,
     },
   }
 }
 
-// ─── POST /api/assistant ──────────────────────────────────────────────────────
+// â”€â”€â”€ POST /api/assistant â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function POST(req: NextRequest): Promise<NextResponse<AssistantResponse>> {
   try {
@@ -103,14 +227,11 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
     const parsed = RequestSchema.safeParse(body)
 
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, mode: 'qa', error: 'Cerere invalidă.' }, { status: 400 })
+      return NextResponse.json({ ok: false, mode: 'full_analysis', error: 'Cerere invalidÄƒ.' }, { status: 400 })
     }
 
     const { mode, question, context } = parsed.data
-
-    // For qa mode with no DB context, use provided context or mock
-    const data = context ?? await fetchLiveData(mode)
-
+    const data = context ?? await fetchLiveData()
     const userPrompt = buildPrompt(mode, data, question)
 
     const { text, model, tokens } = await chat(
@@ -118,7 +239,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
-      { json: mode !== 'qa', temperature: mode === 'qa' ? 0.4 : 0.15 }
+      { json: mode !== 'qa', temperature: mode === 'qa' ? 0.4 : 0.15, max_tokens: 6000 }
     )
 
     if (mode === 'qa') {
@@ -127,14 +248,24 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
 
     const result = safeParseJSON<AnalysisResult>(text)
     if (!result) {
-      return NextResponse.json({ ok: false, mode, error: 'Răspuns AI invalid (nu e JSON).', model }, { status: 500 })
+      return NextResponse.json({ ok: false, mode, error: 'RÄƒspuns AI invalid (nu e JSON).', model }, { status: 500 })
     }
 
     result.generat_la = result.generat_la || new Date().toISOString()
+    // Ensure all arrays exist
+    result.contracte ??= []
+    result.ferma ??= []
+    result.stocuri ??= []
+    result.utilaje ??= []
+    result.facturi ??= []
+    result.apia ??= []
+    result.fitosanitar ??= []
+    result.arendasi_sumar ??= { total: 0, total_suprafata_ha: 0 }
 
     return NextResponse.json({ ok: true, mode, result, model, tokens_used: tokens })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Eroare necunoscută.'
+    const message = err instanceof Error ? err.message : 'Eroare necunoscutÄƒ.'
     return NextResponse.json({ ok: false, mode: 'full_analysis', error: message }, { status: 500 })
   }
 }
+
