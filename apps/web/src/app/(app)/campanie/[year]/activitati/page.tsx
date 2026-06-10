@@ -184,7 +184,7 @@ export default function ActivitatiPage() {
   const [inputsCache, setInputsCache] = useState<Map<string, WorkOrderInput[]>>(new Map())
   const [addInputForm, setAddInputForm] = useState({ input_type: 'SAMANTA', product_name: '', quantity: '', unit: 'kg', cost_per_unit: '', notes: '', lot_id: '' })
   const [savingInput, setSavingInput] = useState(false)
-  const [inventoryLots, setInventoryLots] = useState<{id:string;product_name:string;unit:string;category:string;quantity_available:number}[]>([])
+  const [inventoryLots, setInventoryLots] = useState<{id:string;product_name:string;unit:string;category:string;quantity_available:number;unit_price:number|null}[]>([])
 
   // Filters
   const [filterOp, setFilterOp] = useState('')
@@ -224,7 +224,7 @@ export default function ActivitatiPage() {
   useEffect(() => {
     createClient()
       .from('input_lots')
-      .select('id,product_name,unit,category,quantity_available')
+      .select('id,product_name,unit,category,quantity_available,unit_price')
       .gt('quantity_available', 0)
       .order('product_name')
       .then(({ data }) => { if (data) setInventoryLots(data as any[]) })
@@ -295,7 +295,7 @@ export default function ActivitatiPage() {
       if (mvtErr) toast.error(`Input salvat, dar eroare la miscare stoc: ${mvtErr.message}`)
       else {
         // Refresh inventory lots so balances stay up to date
-        createClient().from('input_lots').select('id,product_name,unit,category,quantity_available').gt('quantity_available', 0).order('product_name')
+        createClient().from('input_lots').select('id,product_name,unit,category,quantity_available,unit_price').gt('quantity_available', 0).order('product_name')
           .then(({ data: ld }) => { if (ld) setInventoryLots(ld as any[]) })
       }
     }
@@ -328,7 +328,7 @@ export default function ActivitatiPage() {
           mvt_date: new Date().toISOString().split('T')[0],
           notes: `Revenire stoc: stergere input campanie`,
         })
-        createClient().from('input_lots').select('id,product_name,unit,category,quantity_available').gt('quantity_available', 0).order('product_name')
+        createClient().from('input_lots').select('id,product_name,unit,category,quantity_available,unit_price').gt('quantity_available', 0).order('product_name')
           .then(({ data: ld }) => { if (ld) setInventoryLots(ld as any[]) })
       }
     }
@@ -704,7 +704,7 @@ export default function ActivitatiPage() {
                               const lot = inventoryLots.find(l => l.id === e.target.value)
                               if (lot) {
                                 const catToType: Record<string,string> = { SEED:'SAMANTA', FERTILIZER:'INGRASAMANT', PPP:'ERBICID', FUEL:'CARBURANT', OTHER:'ALTELE' }
-                                setAddInputForm(f => ({ ...f, lot_id: lot.id, product_name: lot.product_name, unit: lot.unit, input_type: catToType[lot.category] ?? 'ALTELE' }))
+                                setAddInputForm(f => ({ ...f, lot_id: lot.id, product_name: lot.product_name, unit: lot.unit, input_type: catToType[lot.category] ?? 'ALTELE', cost_per_unit: lot.unit_price != null ? String(lot.unit_price) : f.cost_per_unit }))
                               } else {
                                 setAddInputForm(f => ({ ...f, lot_id: '' }))
                               }
