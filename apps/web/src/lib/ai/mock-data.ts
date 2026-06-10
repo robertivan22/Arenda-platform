@@ -1,0 +1,100 @@
+// Mock data used when no live Supabase data is available
+// (dev/demo mode). Replace with real DB queries in production.
+
+export const MOCK_FARM_DATA = {
+  generatedAt: new Date().toISOString(),
+  farm: {
+    total_ha: 1903,
+    active_parcels: 7,
+    campaign_year: 2026,
+  },
+  contracte: [
+    {
+      contract_number: '1231',
+      lessor_name: 'Ivan Robert',
+      status: 'ACTIVE',
+      sign_date: '2026-04-08',
+      end_date: '2026-12-31',
+      suprafata_ha: 386,
+      taxa_arenda: '100 Porumb/ha NET',
+    },
+    {
+      contract_number: '121-12',
+      lessor_name: 'Ivan Robert',
+      status: 'ACTIVE',
+      sign_date: '2026-05-16',
+      end_date: '2026-07-01',
+      suprafata_ha: null,
+      taxa_arenda: null,
+    },
+  ],
+  activitati: [
+    {
+      operatie: 'Fertilizat',
+      parcela: 'AB-12',
+      suprafata_ha: 12,
+      status: 'PLANIFICAT',
+      data_planificata: '2026-05-01',
+      data_executie: null,
+    },
+    {
+      operatie: 'Discuit',
+      parcela: 'IF321',
+      suprafata_ha: 122,
+      status: 'PLANIFICAT',
+      data_planificata: '2026-06-01',
+      data_executie: null,
+    },
+    {
+      operatie: 'Fertilizat',
+      parcela: 'AB-12',
+      suprafata_ha: 14,
+      status: 'IN_EXECUTIE',
+      data_planificata: '2026-06-05',
+      data_executie: null,
+    },
+  ],
+  stocuri: [
+    {
+      produs: 'Pioneer O29',
+      categorie: 'SEED',
+      cantitate_disponibila: 50,
+      cantitate_initiala: 200,
+      unitate: 'kg',
+      pret_unitar: 12,
+      data_expirare: null,
+    },
+    {
+      produs: 'Azot 46%',
+      categorie: 'FERTILIZER',
+      cantitate_disponibila: 0,
+      cantitate_initiala: 500,
+      unitate: 'kg',
+      pret_unitar: 2.5,
+      data_expirare: null,
+    },
+    {
+      produs: 'Motorina',
+      categorie: 'FUEL',
+      cantitate_disponibila: 300,
+      cantitate_initiala: 1000,
+      unitate: 'L',
+      pret_unitar: 6.5,
+      data_expirare: null,
+    },
+    {
+      produs: 'Erbicid Mustang',
+      categorie: 'PPP',
+      cantitate_disponibila: 15,
+      cantitate_initiala: 50,
+      unitate: 'L',
+      pret_unitar: 85,
+      data_expirare: '2026-08-01',
+    },
+  ],
+  tranzactii: {
+    total_ron_net: 49966.12,
+    neplatit_ron: 1611.64,
+    rata_achitare_pct: 90,
+  },
+}

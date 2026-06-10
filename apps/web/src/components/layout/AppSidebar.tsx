@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen, Package,
+  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen, Package, Bot,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -24,6 +24,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
     label: 'GENERAL',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permKey: 'can_dashboard' },
+      { label: 'Alerte AI', href: '/alerte', icon: Bot, permKey: 'can_dashboard' },
       { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3, permKey: 'can_rapoarte' },
     ],
   },
