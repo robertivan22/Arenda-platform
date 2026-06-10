@@ -69,7 +69,7 @@ async function fetchLiveData() {
 
     // Utilaje
     db.from('machines')
-      .select('name, type, brand, model, year, plate, is_active, rca_active, rca_price, rca_expiry_date, fuel_type')
+      .select('*')
       .order('name')
       .limit(50),
 
@@ -82,7 +82,7 @@ async function fetchLiveData() {
 
     // Facturi
     db.from('invoices')
-      .select('invoice_number, total_amount, status, issue_date, due_date, efactura_status')
+      .select('*')
       .order('due_date', { ascending: true, nullsFirst: false })
       .limit(50),
 
@@ -126,6 +126,17 @@ async function fetchLiveData() {
       .gte('log_date', yearStart)
       .limit(100),
   ])
+
+  // Log query results for debugging
+  console.log('[AI] Query results:', {
+    contracts: contractsRes.data?.length ?? `ERR:${contractsRes.error?.message}`,
+    orders: ordersRes.data?.length ?? `ERR:${ordersRes.error?.message}`,
+    stock: stockRes.data?.length ?? `ERR:${stockRes.error?.message}`,
+    machines: machinesRes.data?.length ?? `ERR:${machinesRes.error?.message}`,
+    invoices: invoicesRes.data?.length ?? `ERR:${invoicesRes.error?.message}`,
+    apia: apiaRes.data?.length ?? `ERR:${apiaRes.error?.message}`,
+    fitosanitar: fitosanitarRes.data?.length ?? `ERR:${fitosanitarRes.error?.message}`,
+  })
 
   const txns = txnRes.data ?? []
   const totalNet = txns.reduce((s: number, t: any) => s + Number(t.ron_net ?? 0), 0)
