@@ -39,7 +39,7 @@ interface TranzactieRow {
   tax_amount: number
   payment_type: string
   pv_number: string | null
-  is_previzionata: boolean
+  is_paid: boolean
   impozit_aplicat: boolean
   notes: string | null
   lessor_name: string
@@ -84,7 +84,7 @@ export default function TranzactiiArendaPage() {
       .select(`
         id, contract_id, transaction_date, campaign_year, product_name,
         kg_brut, kg_net, price_per_unit, ron_brut, ron_net, tax_amount,
-        payment_type, pv_number, is_previzionata, impozit_aplicat, notes,
+        payment_type, pv_number, is_paid, impozit_aplicat, notes,
         lessors(first_name, last_name, company_name, type),
         contracts(contract_number)
       `)
@@ -123,9 +123,9 @@ export default function TranzactiiArendaPage() {
   const totalNet     = filtered.reduce((s, r) => s + Number(r.ron_net  ?? 0), 0)
   const totalBrut    = filtered.reduce((s, r) => s + Number(r.ron_brut ?? 0), 0)
   const totalImpozit = filtered.reduce((s, r) => s + Number(r.tax_amount ?? 0), 0)
-  const unpaidNet    = filtered.filter(r => r.is_previzionata).reduce((s, r) => s + Number(r.ron_net ?? 0), 0)
-  const unpaidCount  = filtered.filter(r => r.is_previzionata).length
-  const paidCount    = filtered.filter(r => !r.is_previzionata).length
+  const unpaidNet    = filtered.filter(r => !r.is_paid).reduce((s, r) => s + Number(r.ron_net ?? 0), 0)
+  const unpaidCount  = filtered.filter(r => !r.is_paid).length
+  const paidCount    = filtered.filter(r => r.is_paid).length
   const rataAchitare = filtered.length > 0 ? Math.round((paidCount / filtered.length) * 100) : 0
 
   // ─── Charts data ───────────────────────────────────────────────────────────
@@ -165,7 +165,7 @@ export default function TranzactiiArendaPage() {
       [r.transaction_date, r.lessor_name, r.contract_number ?? '',
        r.product_name, r.kg_brut, r.kg_net, r.price_per_unit,
        r.ron_brut, r.ron_net, r.tax_amount, r.payment_type,
-       r.is_previzionata ? 'Neplatit' : 'Platit'].join(','))
+       r.is_paid ? 'Platit' : 'Neplatit'].join(','))
     const blob = new Blob([[header, ...csvRows].join('\n')], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = 'tranzactii-arenda.csv'; a.click()
@@ -301,9 +301,9 @@ export default function TranzactiiArendaPage() {
                           {r.payment_type}{r.pv_number ? ` #${r.pv_number}` : ''}
                         </td>
                         <td className={td}>
-                          {r.is_previzionata
-                            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600">Neplatit</span>
-                            : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">Platit</span>}
+                          {r.is_paid
+                            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">Platit</span>
+                            : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600">Neplatit</span>}
                         </td>
                       </tr>
                     ))}
