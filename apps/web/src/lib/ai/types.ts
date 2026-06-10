@@ -110,6 +110,7 @@ export interface AssistantRequest {
 }
 
 export interface AssistantResponse {
+  data_errors?: string[]
   ok: boolean
   mode: AssistantMode
   result?: AnalysisResult

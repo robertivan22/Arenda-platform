@@ -72,7 +72,7 @@ Analizeaza TOATE datele de mai jos din baza de date a fermei si returneaza STRIC
 }
 
 Reguli de prioritizare:
-- Contracte: expirat->inalta, <30 zile->inalta, 30-90 zile->medie, >90 zile->scazuta
+- Contracte: status=DRAFT sau end_date=null->status=atentie, priority=medie (contract nedefinitivat); expirat (end_date in trecut)->status=expirat, priority=inalta; <30 zile pana la expirare->status=critic, priority=inalta; 30-90 zile->status=atentie, priority=medie; >90 zile->status=ok, priority=scazuta. GENEREAZA ALERTA PENTRU FIECARE CONTRACT indiferent de status.
 - Ferma: intarziat + neexecutat->inalta, in executie->medie, planificat viitor->scazuta
 - Stocuri: 0 cantitate sau expirat->critic/inalta, <20% din initial->scazut/medie
 - Utilaje: GENEREAZA O ALERTA PENTRU FIECARE UTILAJ DIN DATE (activ sau nu). Mapare rca_status: EXPIRAT->status=critic, priority=inalta; EXPIRA_CURAND->status=atentie, priority=inalta; ATENTIE->status=atentie, priority=medie; NECUNOSCUT->status=atentie, priority=medie (mesaj: "RCA nedocumentat - verifica documentele"); OK->status=ok, priority=scazuta. Verifica si sarcini_mentenanta. Nu omite nicun utilaj - returneaza FIECARE utilaj ca o alerta.

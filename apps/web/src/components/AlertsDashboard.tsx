@@ -26,8 +26,9 @@ const CONTRACT_STATUS_STYLE: Record<string, string> = {
   critic:  'bg-orange-100 text-orange-700',
   atentie: 'bg-amber-100 text-amber-700',
   ok:      'bg-green-100 text-green-700',
+  draft:   'bg-blue-100 text-blue-700',
 }
-const CONTRACT_STATUS_LABEL: Record<string, string> = { expirat: 'Expirat', critic: 'Critic', atentie: 'Atentie', ok: 'OK' }
+const CONTRACT_STATUS_LABEL: Record<string, string> = { expirat: 'Expirat', critic: 'Critic', atentie: 'Atentie', ok: 'OK', draft: 'Draft' }
 
 const STOCK_STATUS_STYLE: Record<string, string> = {
   critic: 'bg-red-100 text-red-700',
@@ -37,11 +38,12 @@ const STOCK_STATUS_STYLE: Record<string, string> = {
 const STOCK_STATUS_LABEL: Record<string, string> = { critic: 'Critic', scazut: 'Scazut', ok: 'OK' }
 
 const UTILAJ_STATUS_STYLE: Record<string, string> = {
-  critic:  'bg-red-100 text-red-700',
-  atentie: 'bg-amber-100 text-amber-700',
-  ok:      'bg-green-100 text-green-700',
+  critic:     'bg-red-100 text-red-700',
+  atentie:    'bg-amber-100 text-amber-700',
+  ok:         'bg-green-100 text-green-700',
+  necunoscut: 'bg-gray-100 text-gray-600',
 }
-const UTILAJ_STATUS_LABEL: Record<string, string> = { critic: 'Critic', atentie: 'Atentie', ok: 'OK' }
+const UTILAJ_STATUS_LABEL: Record<string, string> = { critic: 'Critic', atentie: 'Atentie', ok: 'OK', necunoscut: 'Necunoscut' }
 
 // â”€â”€â”€ Risk gauge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -104,13 +106,14 @@ function AlertDetail({ mesaj, actiune }: { mesaj: string; actiune: string }) {
 // â”€â”€â”€ Typed rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ContractRow({ a }: { a: ContractAlert }) {
+  const statusKey = String(a.status ?? '').toLowerCase()
   return (
     <AlertRow priority={a.priority}
       label={`#${a.contract_number} \u2014 ${a.lessor_name}`}
       badge={
         <>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CONTRACT_STATUS_STYLE[a.status] ?? ''}`}>
-            {CONTRACT_STATUS_LABEL[a.status] ?? a.status}
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CONTRACT_STATUS_STYLE[statusKey] ?? 'bg-gray-100 text-gray-600'}`}>
+            {CONTRACT_STATUS_LABEL[statusKey] ?? a.status}
           </span>
           {a.days_until_expiry != null && (
             <span className="text-xs text-gray-400">{a.days_until_expiry >= 0 ? `${a.days_until_expiry} zile` : 'expirat'}</span>
@@ -163,12 +166,13 @@ function StockRow({ a }: { a: StockAlert }) {
 }
 
 function UtilajeRow({ a }: { a: UtilajeAlert }) {
+  const statusKey = String(a.status ?? '').toLowerCase()
   return (
     <AlertRow priority={a.priority}
       label={`${a.utilaj}${a.tip ? ` (${a.tip})` : ''}`}
       badge={
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${UTILAJ_STATUS_STYLE[a.status] ?? ''}`}>
-          {UTILAJ_STATUS_LABEL[a.status] ?? a.status}
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${UTILAJ_STATUS_STYLE[statusKey] ?? 'bg-gray-100 text-gray-600'}`}>
+          {UTILAJ_STATUS_LABEL[statusKey] ?? a.status}
         </span>
       }>
       <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
@@ -265,6 +269,7 @@ export default function AlertsDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [model, setModel] = useState('')
   const [tokens, setTokens] = useState(0)
+  const [dataErrors, setDataErrors] = useState<string[]>([])
 
   // Load persisted analysis on mount
   useEffect(() => {
@@ -293,6 +298,7 @@ export default function AlertsDashboard() {
       setResult(json.result)
       setModel(json.model ?? '')
       setTokens(json.tokens_used ?? 0)
+      setDataErrors(json.data_errors ?? [])
       // Persist to localStorage
       localStorage.setItem(LS_KEY, JSON.stringify({ result: json.result, model: json.model ?? '', tokens: json.tokens_used ?? 0 }))
     } catch {
@@ -334,6 +340,16 @@ export default function AlertsDashboard() {
       {error && (
         <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {error}
+        </div>
+      )}
+
+      {dataErrors.length > 0 && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <p className="text-sm font-semibold text-amber-700 mb-1">Avertisment: unele tabele nu au putut fi incarcate din baza de date:</p>
+          <ul className="text-sm text-amber-600 list-disc list-inside space-y-0.5">
+            {dataErrors.map((e, i) => <li key={i}>{e}</li>)}
+          </ul>
+          <p className="text-xs text-amber-500 mt-2">Verifica daca migrarile SQL au fost rulate in Supabase Dashboard.</p>
         </div>
       )}
 

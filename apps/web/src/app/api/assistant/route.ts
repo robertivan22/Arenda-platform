@@ -127,6 +127,16 @@ async function fetchLiveData() {
       .limit(100),
   ])
 
+  // Collect query errors for diagnostics
+  const _errors: string[] = []
+  if (contractsRes.error) _errors.push(`Contracte: ${contractsRes.error.message}`)
+  if (ordersRes.error) _errors.push(`Activitati: ${ordersRes.error.message}`)
+  if (machinesRes.error) _errors.push(`Utilaje: ${machinesRes.error.message}`)
+  if (invoicesRes.error) _errors.push(`Facturi: ${invoicesRes.error.message}`)
+  if (apiaRes.error) _errors.push(`APIA: ${apiaRes.error.message}`)
+  if (fitosanitarRes.error) _errors.push(`Fitosanitar: ${fitosanitarRes.error.message}`)
+  if (stockRes.error) _errors.push(`Stocuri: ${stockRes.error.message}`)
+
   // Log query results for debugging
   console.log('[AI] Query results:', {
     contracts: contractsRes.data?.length ?? `ERR:${contractsRes.error?.message}`,
@@ -250,6 +260,7 @@ async function fetchLiveData() {
       rata_achitare_pct: rataAchitare,
       total_tranzactii: txns.length,
     },
+    _errors,
   }
 }
 
@@ -261,12 +272,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
     const parsed = RequestSchema.safeParse(body)
 
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, mode: 'full_analysis', error: 'Cerere invalidÄƒ.' }, { status: 400 })
+      return NextResponse.json({ ok: false, mode: 'full_analysis', error: 'Cerere invalida.' }, { status: 400 })
     }
 
     const { mode, question, context } = parsed.data
-    const data = context ?? await fetchLiveData()
-    const userPrompt = buildPrompt(mode, data, question)
+    const rawData: any = context ?? await fetchLiveData()
+    const queryErrors: string[] = rawData._errors ?? []
+    delete rawData._errors
+    const userPrompt = buildPrompt(mode, rawData, question)
 
     const { text, model, tokens } = await chat(
       [
@@ -282,7 +295,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
 
     const result = safeParseJSON<AnalysisResult>(text)
     if (!result) {
-      return NextResponse.json({ ok: false, mode, error: 'RÄƒspuns AI invalid (nu e JSON).', model }, { status: 500 })
+      return NextResponse.json({ ok: false, mode, error: 'Raspuns AI invalid (nu e JSON).', model }, { status: 500 })
     }
 
     result.generat_la = result.generat_la || new Date().toISOString()
@@ -296,9 +309,9 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
     result.fitosanitar ??= []
     result.arendasi_sumar ??= { total: 0, total_suprafata_ha: 0 }
 
-    return NextResponse.json({ ok: true, mode, result, model, tokens_used: tokens })
+    return NextResponse.json({ ok: true, mode, result, model, tokens_used: tokens, data_errors: queryErrors.length > 0 ? queryErrors : undefined })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Eroare necunoscutÄƒ.'
+    const message = err instanceof Error ? err.message : 'Eroare necunoscuta.'
     return NextResponse.json({ ok: false, mode: 'full_analysis', error: message }, { status: 500 })
   }
 }
