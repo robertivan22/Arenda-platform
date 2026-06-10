@@ -308,7 +308,7 @@ export default function MachineDetailPage() {
   ]
 
   return (
-    <div className="max-w-5xl">
+    <div>
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => router.push('/utilaje')}

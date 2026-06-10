@@ -92,7 +92,7 @@ export default function UtilajePage() {
   const activeCount = machines.filter(m => m.is_active).length
 
   return (
-    <div className="max-w-5xl">
+    <div>
       <div className="flex items-center justify-between mb-6">
         <PageHeader title="Parc Utilaje" subtitle="Tractoare, combine, semănători și alte echipamente agricole" />
         <button onClick={() => setShowAdd(v => !v)}

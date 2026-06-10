@@ -314,7 +314,7 @@ export default function CampaniePage() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-6xl">
+    <div>
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <PageHeader

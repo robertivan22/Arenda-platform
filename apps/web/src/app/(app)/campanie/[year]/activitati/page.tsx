@@ -379,7 +379,7 @@ export default function ActivitatiPage() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-6xl">
+    <div>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <PageHeader

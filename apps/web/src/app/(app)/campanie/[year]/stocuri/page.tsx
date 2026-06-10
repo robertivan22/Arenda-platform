@@ -176,7 +176,7 @@ export default function StocuriPage() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-5xl">
+    <div>
       <div className="flex items-start justify-between mb-4">
         <PageHeader
           title={campaign ? campaign.name : `Campania ${yearParam}`}

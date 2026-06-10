@@ -64,7 +64,7 @@ export default function OperatoriPage() {
   const activeCount = operators.filter(o => o.is_active).length
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <div className="flex items-center gap-3 mb-6">
         <a href="/utilaje" className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
           <ArrowLeft className="w-4 h-4" />
