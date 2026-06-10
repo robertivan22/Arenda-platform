@@ -206,6 +206,12 @@ export default function ParceleListPage() {
 
   return (
     <div className="space-y-4">
+      {/* Sub-nav */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        <span className="px-4 py-1.5 text-sm rounded-md bg-white shadow text-brand-700 font-medium">Lista parcele</span>
+        <a href="/parcele/harta" className="px-4 py-1.5 text-sm rounded-md text-gray-500 hover:text-gray-700 transition-colors">Hartă parcele</a>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard icon={<MapPin  className="w-5 h-5 text-brand-600"  />} label="Total Parcele"      value={rows.length}                              bg="bg-brand-50"  />

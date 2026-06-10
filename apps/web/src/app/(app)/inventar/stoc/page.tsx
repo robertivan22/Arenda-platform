@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Loader2, Package, AlertTriangle, TrendingDown } from 'lucide-react'
+import { Loader2, Package, AlertTriangle, TrendingDown, Wheat } from 'lucide-react'
 import type { InputCategory } from '@/lib/inventory-types'
 import { INPUT_CATEGORY_LABELS, INPUT_CATEGORY_COLORS } from '@/lib/inventory-types'
 
@@ -66,6 +66,14 @@ export default function StocPage() {
         title="Stoc Curent"
         subtitle={`${all.length} produse in stoc · ${totalValue.toFixed(0)} RON valoare estimata`}
       />
+
+      {/* Link to campaign usage */}
+      <a href="/campanie/stocuri"
+        className="flex items-center gap-3 mb-5 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors">
+        <Wheat className="w-4 h-4 text-amber-600 flex-shrink-0" />
+        <span className="text-sm text-amber-800"><strong>Stocuri campanie</strong> — vezi consumul de inputuri per activitate agricola</span>
+        <span className="ml-auto text-xs font-semibold text-amber-700">Deschide →</span>
+      </a>
 
       {/* Category summary cards */}
       {!loading && byCategory.length > 0 && (

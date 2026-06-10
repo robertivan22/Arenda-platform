@@ -3,6 +3,7 @@ export const runtime = 'edge'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
@@ -44,6 +45,7 @@ interface TranzactieRow {
   lessor_name: string
   lessor_type: string
   contract_number: string | null
+  contract_id: string | null
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -66,6 +68,7 @@ function fmtRON(v: number) { return v.toLocaleString('ro-RO', { minimumFractionD
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function TranzactiiArendaPage() {
+  const router = useRouter()
   const [rows, setRows]           = useState<TranzactieRow[]>([])
   const [loading, setLoading]     = useState(true)
   const [view, setView]           = useState<'tabel' | 'grafice'>('tabel')
@@ -79,7 +82,7 @@ export default function TranzactiiArendaPage() {
     const { data, error } = await createClient()
       .from('transactions')
       .select(`
-        id, transaction_date, campaign_year, product_name,
+        id, contract_id, transaction_date, campaign_year, product_name,
         kg_brut, kg_net, price_per_unit, ron_brut, ron_net, tax_amount,
         payment_type, pv_number, is_previzionata, impozit_aplicat, notes,
         lessors(first_name, last_name, company_name, type),
@@ -95,6 +98,7 @@ export default function TranzactiiArendaPage() {
         ? (t.lessors.type === 'LEGAL' ? t.lessors.company_name : `${t.lessors.last_name} ${t.lessors.first_name}`.trim())
         : '—',
       contract_number: t.contracts?.contract_number ?? null,
+      contract_id: t.contract_id ?? null,
     })))
     setLoading(false)
   }, [])
@@ -279,8 +283,8 @@ export default function TranzactiiArendaPage() {
                           </div>
                         </td>
                         <td className={td}>
-                          {r.contract_number
-                            ? <span className="text-brand-600 font-mono text-xs">#{r.contract_number}</span>
+                          {r.contract_number && r.contract_id
+                            ? <button onClick={() => router.push(`/contracte/${r.contract_id}`)} className="text-brand-600 font-mono text-xs hover:underline cursor-pointer">#{r.contract_number}</button>
                             : <span className="text-gray-300">—</span>}
                         </td>
                         <td className={td}>

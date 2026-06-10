@@ -190,7 +190,13 @@ export default function StocuriPage() {
 
       <CampaignTabs year={yearParam} />
 
-      {/* KPIs */}
+      {/* Link to inventory */}
+      <a href="/inventar/stoc"
+        className="flex items-center gap-3 mb-5 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
+        <Package className="w-4 h-4 text-blue-600 flex-shrink-0" />
+        <span className="text-sm text-blue-800"><strong>Inventar inputuri</strong> — stoc disponibil, loturi si miscari</span>
+        <span className="ml-auto text-xs font-semibold text-blue-700">Deschide →</span>
+      </a>
       {!loading && agg.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <div className="bg-white rounded-lg border border-gray-200 p-4">

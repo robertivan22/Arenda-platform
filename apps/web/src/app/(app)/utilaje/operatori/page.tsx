@@ -3,10 +3,11 @@
 export const runtime = 'edge'
 
 import { useState, useEffect, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Plus, Loader2, Power, Trash2, ArrowLeft } from 'lucide-react'
+import { Plus, Loader2, Power, Trash2 } from 'lucide-react'
 import type { Operator } from '@/lib/fleet-types'
 
 const EMPTY = () => ({ name: '', phone: '', license_category: '', notes: '' })
@@ -62,20 +63,32 @@ export default function OperatoriPage() {
   }
 
   const activeCount = operators.filter(o => o.is_active).length
+  const pathname = usePathname()
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        <a href="/utilaje" className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-          <ArrowLeft className="w-4 h-4" />
-        </a>
-        <div className="flex-1">
-          <PageHeader title="Operatori" subtitle="Mecanizatori și conducători auto utilaje agricole" />
-        </div>
+      <div className="flex items-center justify-between mb-4">
+        <PageHeader title="Operatori" subtitle="Mecanizatori și conducători auto utilaje agricole" />
         <button onClick={() => setShowAdd(v => !v)}
           className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg hover:bg-brand-700">
           <Plus className="w-4 h-4" /> Operator nou
         </button>
+      </div>
+
+      {/* Sub-nav */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
+        {[
+          { label: 'Parc utilaje',  href: '/utilaje' },
+          { label: 'Implementuri', href: '/utilaje/implementuri' },
+          { label: 'Operatori',    href: '/utilaje/operatori' },
+        ].map(t => (
+          <a key={t.href} href={t.href}
+            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+              pathname === t.href ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {t.label}
+          </a>
+        ))}
       </div>
 
       {/* KPIs */}

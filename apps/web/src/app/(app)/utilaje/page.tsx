@@ -3,6 +3,7 @@
 export const runtime = 'edge'
 
 import { useState, useEffect, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
@@ -94,15 +95,32 @@ export default function UtilajePage() {
 
   const filtered = filter === 'ALL' ? machines : machines.filter(m => m.type === filter)
   const activeCount = machines.filter(m => m.is_active).length
+  const pathname = usePathname()
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <PageHeader title="Parc Utilaje" subtitle="Tractoare, combine, semănători și alte echipamente agricole" />
         <button onClick={() => setShowAdd(v => !v)}
           className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg hover:bg-brand-700">
           <Plus className="w-4 h-4" /> Utilaj nou
         </button>
+      </div>
+
+      {/* Sub-nav */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
+        {[
+          { label: 'Parc utilaje',  href: '/utilaje' },
+          { label: 'Implementuri', href: '/utilaje/implementuri' },
+          { label: 'Operatori',    href: '/utilaje/operatori' },
+        ].map(t => (
+          <a key={t.href} href={t.href}
+            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+              pathname === t.href ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {t.label}
+          </a>
+        ))}
       </div>
 
       {/* KPIs */}
