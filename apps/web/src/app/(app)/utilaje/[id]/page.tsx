@@ -158,6 +158,9 @@ export default function MachineDetailPage() {
       vin: editForm.vin || null,
       purchase_date: editForm.purchase_date || null,
       purchase_price: editForm.purchase_price ? Number(editForm.purchase_price) : null,
+      rca_active: editForm.rca_active ?? false,
+      rca_price: editForm.rca_price ? Number(editForm.rca_price) : null,
+      rca_expiry_date: editForm.rca_expiry_date || null,
       notes: editForm.notes || null,
     }).eq('id', machine.id)
     if (error) { toast.error(error.message); setSaving(false); return }
@@ -404,6 +407,8 @@ export default function MachineDetailPage() {
               { label: 'Km odometru curenți', key: 'current_km', inputType: 'number' },
               { label: 'Dată achiziție', key: 'purchase_date', inputType: 'date' },
               { label: 'Preț achiziție (RON)', key: 'purchase_price', inputType: 'number' },
+              { label: 'Preț RCA (RON)', key: 'rca_price', inputType: 'number' },
+              { label: 'Data expirare RCA', key: 'rca_expiry_date', inputType: 'date' },
             ] as { label: string; key: keyof Machine; required?: boolean; inputType?: string }[]).map(f => (
               <div key={f.key as string}>
                 <label className="block text-xs text-gray-500 mb-1">{f.label}</label>
@@ -444,8 +449,22 @@ export default function MachineDetailPage() {
                   value={editForm.notes ?? ''}
                   onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))} />
               ) : <div className="text-sm text-gray-800 py-0.5">{machine.notes ?? '—'}</div>}
-            </div>
-          </div>
+            </div>            {/* RCA active checkbox */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">RCA activ (Da / Nu)</label>
+              {editing ? (
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mt-1">
+                  <input type="checkbox" className="rounded"
+                    checked={editForm.rca_active ?? false}
+                    onChange={e => setEditForm(p => ({ ...p, rca_active: e.target.checked }))} />
+                  RCA activ
+                </label>
+              ) : (
+                <div className={`text-sm py-0.5 font-medium ${machine.rca_active ? 'text-green-700' : 'text-gray-400'}`}>
+                  {machine.rca_active ? 'Da' : 'Nu'}
+                </div>
+              )}
+            </div>          </div>
         </form>
       )}
 

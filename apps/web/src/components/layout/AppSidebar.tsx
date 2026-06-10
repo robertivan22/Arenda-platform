@@ -44,6 +44,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
           { label: 'Contract nou', href: '/contracte/nou' },
         ],
       },
+      { label: 'Tranzactii Arenda', href: '/plati', icon: CreditCard, permKey: 'can_facturi' },
       {
         label: 'Parcele', icon: MapPin, permKey: 'can_parcele',
         children: [
@@ -93,7 +94,6 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: 'FINANCIAR',
     items: [
-      { label: 'Tranzacții', href: '/plati', icon: CreditCard, permKey: 'can_facturi' },
       { label: 'e-Factura ANAF', href: '/efactura', icon: Receipt, permKey: 'can_facturi' },
     ],
   },

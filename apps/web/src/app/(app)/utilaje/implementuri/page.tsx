@@ -95,7 +95,7 @@ export default function ImplementuriPage() {
           <ArrowLeft className="w-4 h-4" />
         </a>
         <div className="flex-1">
-          <PageHeader title="Implementuri & Attachmente" subtitle="Pluguri, discuitoare, semănători, stropitori și alte unelte" />
+          <PageHeader title="Implementuri & Atasamente" subtitle="Pluguri, discuitoare, semănători, stropitori și alte unelte" />
         </div>
         <button onClick={() => setShowAdd(v => !v)}
           className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg hover:bg-brand-700">

@@ -16,6 +16,9 @@ export interface Machine {
   vin: string | null
   purchase_date: string | null
   purchase_price: number | null
+  rca_active: boolean | null
+  rca_price: number | null
+  rca_expiry_date: string | null
   created_at: string
   updated_at: string
 }
