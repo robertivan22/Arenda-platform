@@ -182,26 +182,25 @@ async function fetchLiveData() {
       total_parcele: parcels.length,
       total_ha: Math.round(totalHa * 100) / 100,
       an_campanie: new Date().getFullYear(),
-      planuri_cultura: (cropPlansRes.data ?? []),
-      recolte: (harvestRes.data ?? []),
       consum_carburant_litri_an: Math.round(totalFuel),
     },
     contracte: contracts,
-    activitati_ferma: (ordersRes.data ?? []).map((o: any) => ({
-      operatie: o.operation_type,
-      parcela: o.parcels?.bloc_fizic ?? null,
-      suprafata_ha: o.area_ha,
-      status: o.status,
-      data_planificata: o.planned_date,
-      data_executie: o.execution_date,
-    })),
+    activitati_ferma: (ordersRes.data ?? [])
+      .filter((o: any) => o.status !== 'DONE' && o.status !== 'COMPLETED')
+      .slice(0, 40)
+      .map((o: any) => ({
+        operatie: o.operation_type,
+        parcela: o.parcels?.bloc_fizic ?? null,
+        status: o.status,
+        data_planificata: o.planned_date,
+        data_executie: o.execution_date,
+      })),
     stocuri: (stockRes.data ?? []).map((s: any) => ({
       produs: s.product_name,
       categorie: s.category,
       cantitate_disponibila: s.quantity_available,
       cantitate_initiala: s.quantity,
       unitate: s.unit,
-      pret_unitar: s.unit_price,
       data_expirare: s.expiry_date,
     })),
     utilaje: (machinesRes.data ?? []).map((m: any) => {
@@ -248,7 +247,13 @@ async function fetchLiveData() {
         scadenta_depasita: daysOverdue !== null && daysOverdue > 0 && isUnpaid,
       }
     }),
-    fitosanitar_recent: (fitosanitarRes.data ?? []),
+    fitosanitar_recent: (fitosanitarRes.data ?? []).slice(0, 20).map((f: any) => ({
+      produs: f.product_name ?? f.produs ?? f.substance,
+      parcela: f.parcel_id ?? f.parcela,
+      data_aplicarii: f.application_date ?? f.data_aplicarii ?? f.created_at?.split('T')[0],
+      cantitate: f.quantity ?? f.cantitate,
+      unitate: f.unit ?? f.unitate,
+    })),
     apia: (apiaRes.data ?? []),
     arendasi: {
       total: lessors.length,

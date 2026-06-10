@@ -84,8 +84,8 @@ IMPORTANT: Campurile pre-calculate din date (rca_status, rca_zile_ramase, scaden
 IMPORTANT: Daca un camp lipsa din date (ex: rca_expiry_date nu exista), nu incerca sa il calculezi - foloseste valoarea disponibila (ex: rca_status din date).
 IMPORTANT: Chiar daca toate campurile au valori normale/ok, tot genereaza alerta cu status=ok si priority=scazuta pentru completitudine.
 
-Date complete ferma:
-${JSON.stringify(data, null, 2)}
+Date ferma (JSON compact):
+${JSON.stringify(data)}
 
 Returneaza NUMAI JSON, fara comentarii, fara markdown.`
 }
@@ -93,6 +93,6 @@ Returneaza NUMAI JSON, fara comentarii, fara markdown.`
 // --- Q&A ---------------------------------------------------------------------
 
 function buildQAPrompt(question: string, context: unknown): string {
-  const ctxStr = context ? `\nDate disponibile din baza de date:\n${JSON.stringify(context, null, 2)}` : ''
+  const ctxStr = context ? `\nDate disponibile:\n${JSON.stringify(context)}` : ''
   return `${ctxStr}\n\nIntrebare: ${question}\n\nRaspunde concis si util in romana. Daca nu ai suficiente date, spune clar.`
 }
