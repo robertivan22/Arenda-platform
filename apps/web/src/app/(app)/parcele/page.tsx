@@ -74,7 +74,7 @@ const ALL_COLS = [
   { key: 'status',           label: 'Status' },
 ]
 
-const PAGE_SIZE = 7
+const PAGE_SIZE = 15
 
 export default function ParceleListPage() {
   const router = useRouter()
@@ -206,10 +206,9 @@ export default function ParceleListPage() {
 
   return (
     <div className="space-y-4">
-      {/* Sub-nav */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-        <span className="px-4 py-1.5 text-sm rounded-md bg-white shadow text-brand-700 font-medium">Lista parcele</span>
-        <a href="/parcele/harta" className="px-4 py-1.5 text-sm rounded-md text-gray-500 hover:text-gray-700 transition-colors">Hartă parcele</a>
+      <div className="flex gap-2 mb-5">
+        <span className="px-4 py-1.5 text-sm rounded-lg border border-gray-200 bg-white text-gray-700 font-medium shadow-sm">Lista parcele</span>
+        <a href="/parcele/harta" className="px-4 py-1.5 text-sm rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium transition-colors">Harta parcele</a>
       </div>
 
       {/* KPI Cards */}

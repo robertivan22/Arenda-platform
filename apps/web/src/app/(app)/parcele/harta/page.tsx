@@ -45,9 +45,9 @@ export default function HartaParcelePage() {
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Sub-nav */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-        <a href="/parcele" className="px-4 py-1.5 text-sm rounded-md text-gray-500 hover:text-gray-700 transition-colors">Lista parcele</a>
-        <span className="px-4 py-1.5 text-sm rounded-md bg-white shadow text-brand-700 font-medium">Hartă parcele</span>
+      <div className="flex gap-2">
+        <a href="/parcele" className="px-4 py-1.5 text-sm rounded-lg border border-gray-200 bg-white text-gray-700 font-medium shadow-sm hover:bg-gray-50 transition-colors">Lista parcele</a>
+        <span className="px-4 py-1.5 text-sm rounded-lg bg-brand-600 text-white font-medium">Harta parcele</span>
       </div>
 
       <PageHeader

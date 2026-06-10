@@ -92,6 +92,7 @@ interface WorkOrderInput {
   unit: string
   cost_per_unit: number | null
   notes: string | null
+  lot_id: string | null
 }
 
 const INPUT_TYPES = [
@@ -181,8 +182,9 @@ export default function ActivitatiPage() {
   const [saving, setSaving] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [inputsCache, setInputsCache] = useState<Map<string, WorkOrderInput[]>>(new Map())
-  const [addInputForm, setAddInputForm] = useState({ input_type: 'SAMANTA', product_name: '', quantity: '', unit: 'kg', cost_per_unit: '', notes: '' })
+  const [addInputForm, setAddInputForm] = useState({ input_type: 'SAMANTA', product_name: '', quantity: '', unit: 'kg', cost_per_unit: '', notes: '', lot_id: '' })
   const [savingInput, setSavingInput] = useState(false)
+  const [inventoryLots, setInventoryLots] = useState<{id:string;product_name:string;unit:string;category:string;quantity_available:number}[]>([])
 
   // Filters
   const [filterOp, setFilterOp] = useState('')
@@ -216,6 +218,16 @@ export default function ActivitatiPage() {
       .eq('is_active', true)
       .order('name')
       .then(({ data }) => { if (data) setMachines(data as Machine[]) })
+  }, [])
+
+  // ── Load inventory lots (for input linkage) ──
+  useEffect(() => {
+    createClient()
+      .from('input_lots')
+      .select('id,product_name,unit,category,quantity_available')
+      .gt('quantity_available', 0)
+      .order('product_name')
+      .then(({ data }) => { if (data) setInventoryLots(data as any[]) })
   }, [])
 
   // ── Load work orders ──
@@ -264,19 +276,62 @@ export default function ActivitatiPage() {
       unit: addInputForm.unit,
       cost_per_unit: addInputForm.cost_per_unit ? parseFloat(addInputForm.cost_per_unit) : null,
       notes: addInputForm.notes || null,
+      lot_id: addInputForm.lot_id || null,
     }).select().single()
+    if (error) { toast.error(error.message); setSavingInput(false); return }
+
+    // If a lot was selected, create an OUT stock movement (deducts quantity_available)
+    if (addInputForm.lot_id) {
+      const mvtErr = await db.from('input_stock_mvt').insert({
+        user_id: user.id,
+        lot_id: addInputForm.lot_id,
+        work_order_id: workOrderId,
+        campaign_id: campaign?.id ?? null,
+        mvt_type: 'OUT',
+        quantity: parseFloat(addInputForm.quantity),
+        mvt_date: new Date().toISOString().split('T')[0],
+        notes: `Consum campanie: ${addInputForm.product_name.trim()}`,
+      }).then(r => r.error)
+      if (mvtErr) toast.error(`Input salvat, dar eroare la miscare stoc: ${mvtErr.message}`)
+      else {
+        // Refresh inventory lots so balances stay up to date
+        createClient().from('input_lots').select('id,product_name,unit,category,quantity_available').gt('quantity_available', 0).order('product_name')
+          .then(({ data: ld }) => { if (ld) setInventoryLots(ld as any[]) })
+      }
+    }
+
     setSavingInput(false)
-    if (error) { toast.error(error.message); return }
     setInputsCache(m => {
       const n = new Map(m)
       n.set(workOrderId, [...(n.get(workOrderId) ?? []), data as WorkOrderInput])
       return n
     })
-    setAddInputForm({ input_type: 'SAMANTA', product_name: '', quantity: '', unit: 'kg', cost_per_unit: '', notes: '' })
+    setAddInputForm({ input_type: 'SAMANTA', product_name: '', quantity: '', unit: 'kg', cost_per_unit: '', notes: '', lot_id: '' })
     toast.success('Input adăugat.')
   }
 
   async function deleteInput(workOrderId: string, inputId: string) {
+    // If linked to a lot, insert a reversal IN movement to restore stock
+    const cached = inputsCache.get(workOrderId) ?? []
+    const inp = cached.find(x => x.id === inputId)
+    if (inp?.lot_id) {
+      const db = createClient()
+      const { data: { user } } = await db.auth.getUser()
+      if (user) {
+        await db.from('input_stock_mvt').insert({
+          user_id: user.id,
+          lot_id: inp.lot_id,
+          work_order_id: workOrderId,
+          campaign_id: campaign?.id ?? null,
+          mvt_type: 'IN',
+          quantity: inp.quantity,
+          mvt_date: new Date().toISOString().split('T')[0],
+          notes: `Revenire stoc: stergere input campanie`,
+        })
+        createClient().from('input_lots').select('id,product_name,unit,category,quantity_available').gt('quantity_available', 0).order('product_name')
+          .then(({ data: ld }) => { if (ld) setInventoryLots(ld as any[]) })
+      }
+    }
     const { error } = await createClient().from('work_order_inputs').delete().eq('id', inputId)
     if (error) { toast.error(error.message); return }
     setInputsCache(m => {
@@ -621,7 +676,10 @@ export default function ActivitatiPage() {
                             {(inputsCache.get(o.id) ?? []).map(inp => (
                               <tr key={inp.id} className="border-b border-gray-100">
                                 <td className="py-1 pr-3 text-gray-500">{INPUT_TYPES.find(t => t.value === inp.input_type)?.label ?? inp.input_type}</td>
-                                <td className="py-1 pr-3 font-medium text-gray-700">{inp.product_name}</td>
+                                <td className="py-1 pr-3 font-medium text-gray-700">
+                                  {inp.product_name}
+                                  {inp.lot_id && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">stoc</span>}
+                                </td>
                                 <td className="py-1 pr-3 text-right">{inp.quantity} {inp.unit}</td>
                                 <td className="py-1 pr-3 text-right">{inp.cost_per_unit != null ? `${inp.cost_per_unit} RON/${inp.unit}` : '—'}</td>
                                 <td className="py-1 pr-3 text-right font-semibold">
@@ -637,6 +695,26 @@ export default function ActivitatiPage() {
                       )}
                       {/* Add input form */}
                       <div className="flex flex-wrap items-end gap-2 pt-1">
+                        {/* Lot selector — picks from inventory */}
+                        {inventoryLots.length > 0 && (
+                          <select
+                            className="text-xs border border-brand-300 rounded px-2 py-1 bg-brand-50 text-brand-700 min-w-[140px]"
+                            value={addInputForm.lot_id}
+                            onChange={e => {
+                              const lot = inventoryLots.find(l => l.id === e.target.value)
+                              if (lot) {
+                                const catToType: Record<string,string> = { SEED:'SAMANTA', FERTILIZER:'INGRASAMANT', PPP:'ERBICID', FUEL:'CARBURANT', OTHER:'ALTELE' }
+                                setAddInputForm(f => ({ ...f, lot_id: lot.id, product_name: lot.product_name, unit: lot.unit, input_type: catToType[lot.category] ?? 'ALTELE' }))
+                              } else {
+                                setAddInputForm(f => ({ ...f, lot_id: '' }))
+                              }
+                            }}>
+                            <option value="">+ Din inventar</option>
+                            {inventoryLots.map(l => (
+                              <option key={l.id} value={l.id}>{l.product_name} ({l.quantity_available} {l.unit})</option>
+                            ))}
+                          </select>
+                        )}
                         <select className="text-xs border border-gray-300 rounded px-2 py-1"
                           value={addInputForm.input_type} onChange={e => setAddInputForm(f => ({ ...f, input_type: e.target.value }))}>
                           {INPUT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -649,11 +727,11 @@ export default function ActivitatiPage() {
                           value={addInputForm.unit} onChange={e => setAddInputForm(f => ({ ...f, unit: e.target.value }))}>
                           {['kg','L','t','buc'].map(u => <option key={u}>{u}</option>)}
                         </select>
-                        <input className="text-xs border border-gray-300 rounded px-2 py-1 w-24" placeholder="Preț/UM (RON)" type="number" step="0.01"
+                        <input className="text-xs border border-gray-300 rounded px-2 py-1 w-24" placeholder="Pret/UM (RON)" type="number" step="0.01"
                           value={addInputForm.cost_per_unit} onChange={e => setAddInputForm(f => ({ ...f, cost_per_unit: e.target.value }))} />
                         <button onClick={() => void saveInput(o.id)} disabled={savingInput}
                           className="flex items-center gap-1 text-xs px-2.5 py-1 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">
-                          {savingInput ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />} Adăugă
+                          {savingInput ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />} Adauga
                         </button>
                       </div>
                     </td>
