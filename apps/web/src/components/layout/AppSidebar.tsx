@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen,
+  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen, Package,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -74,6 +74,20 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
         ],
       },
       { label: 'Monitorizare Fermă', href: '/ferma', icon: Activity, permKey: 'can_ferma' },
+    ],
+  },
+  {
+    label: 'INVENTAR',
+    items: [
+      {
+        label: 'Stocuri Inputuri', icon: Package, permKey: 'can_utilaje',
+        children: [
+          { label: 'Stoc curent', href: '/inventar/stoc' },
+          { label: 'Loturi inputuri', href: '/inventar/loturi' },
+          { label: 'Furnizori', href: '/inventar/furnizori' },
+          { label: 'Miscari stoc', href: '/inventar/miscari' },
+        ],
+      },
     ],
   },
   {
