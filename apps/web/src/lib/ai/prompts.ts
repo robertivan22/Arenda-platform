@@ -28,7 +28,7 @@ function buildFullAnalysisPrompt(data: unknown): string {
 {"sumar":"string","scor_risc":0,"generat_la":"ISO","actiuni":["max 4 actiuni scurte concrete"],"insights":[{"impact":"mare|mediu|mic","categorie":"string","titlu":"string","descriere":"max 2 propozitii"}],"contracte":[{"contract_number":"","lessor_name":"","status":"expirat|critic|atentie|ok|draft","priority":"inalta|medie|scazuta","end_date":null,"days_until_expiry":null,"mesaj":"","actiune_recomandata":""}],"ferma":[{"activitate":"","parcela":null,"status":"","priority":"inalta|medie|scazuta","data_planificata":null,"intarziere_zile":null,"mesaj":"","actiune_recomandata":""}],"stocuri":[{"produs":"","categorie":"","status":"critic|scazut|ok","priority":"inalta|medie|scazuta","cantitate_disponibila":0,"unitate":"","mesaj":"","actiune_recomandata":""}]}
 
 REGULA CRITICA: Utilizeaza STRICT datele din 'Date'. NU inventa produse, arendatori sau date inexistente.
-- CONTRACTE: un alert pt fiecare element din contracte[]. contract_number=camp 'nr', lessor_name=camp 'arendas' EXACT. zile<0->expirat/inalta; zile<30->critic/inalta; zile<90->atentie/medie; DRAFT/null->atentie/medie; altfel->ok/scazuta.
+- CONTRACTE: un alert pt fiecare element din contracte[]. contract_number=camp 'nr', lessor_name=camp 'arendas' EXACT. zile<0->expirat/inalta; zile<=45->critic/inalta; zile<90->atentie/medie; DRAFT/null->atentie/medie; altfel->ok/scazuta.
 - ACTIVITATI("ferma" in output): un alert pt fiecare element din activitati[]. activitate=camp 'op', parcela=camp 'parc' EXACT.
 - STOCURI: un alert pt fiecare element din stocuri[]. produs=camp 'prod' EXACT. NU adauga produse inexistente.
 - ACTIUNI: max 4 actiuni concrete de maxim 5 cuvinte fiecare (ex: "Comanda azot 1.2t", "Renegociaza contract #nr")

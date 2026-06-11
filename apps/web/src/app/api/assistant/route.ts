@@ -2,8 +2,7 @@
 import { z } from 'zod'
 import { chat, safeParseJSON } from '@/lib/groq'
 import { SYSTEM_PROMPT, buildPrompt } from '@/lib/ai/prompts'
-import { MOCK_FARM_DATA } from '@/lib/ai/mock-data'
-import { createClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseServerClient } from '@/lib/supabase/server'
 import type { AssistantResponse, AnalysisResult, UtilajeAlert, TranzactieAlert } from '@/lib/ai/types'
 
 export const runtime = 'edge'
@@ -73,13 +72,11 @@ function computeTranzactiiAlerts(transactions: any[]): TranzactieAlert[] {
 }
 
 // ─── Fetch ALL live data from Supabase ────────────────────────────────────────
+// Uses the user's authenticated session (cookies) — no service role key needed.
+// RLS applies: user sees only their own data.
 
 async function fetchLiveData() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return MOCK_FARM_DATA
-
-  const db = createClient(url, key)
+  const db = await createSupabaseServerClient()
   const today = new Date().toISOString().split('T')[0]
   const yearStart = `${new Date().getFullYear()}-01-01`
 
@@ -188,7 +185,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
       return NextResponse.json({ ok: false, mode, error: 'Raspuns AI invalid (nu e JSON).', model }, { status: 500 })
     }
 
-    result.generat_la = result.generat_la || new Date().toISOString()
+    result.generat_la = new Date().toISOString()  // always server time, never trust AI date
     result.contracte ??= []
     result.ferma ??= []
     result.stocuri ??= []

@@ -41,7 +41,7 @@ function flattenAlerts(r: AnalysisResult): AlertItem[] {
       label: `#${a.contract_number} \u2014 ${a.lessor_name}`,
       sublabel: z != null && z < 0 ? `Expirat acum ${Math.abs(z)} zile` : (a.end_date ?? undefined),
       badgeText: z == null ? (a.status ?? '?') : z < 0 ? 'Expirat' : `${z} zile`,
-      badgeColor: z != null && z < 0 ? 'bg-red-100 text-red-700' : z != null && z < 30 ? 'bg-orange-100 text-orange-700' : 'bg-green-50 text-green-700',
+      badgeColor: z != null && z < 0 ? 'bg-red-100 text-red-700' : z != null && z <= 45 ? 'bg-orange-100 text-orange-700' : 'bg-green-50 text-green-700',
       mesaj: a.mesaj, actiune: a.actiune_recomandata,
     })
   })
@@ -440,7 +440,7 @@ export default function AlertsDashboard() {
                 : result.scor_risc < 70
                 ? <><Clock className="w-6 h-6 text-amber-500 mb-1" /><p className="text-sm font-semibold text-amber-700">Necesita atentie</p></>
                 : <><TrendingDown className="w-6 h-6 text-red-500 mb-1" /><p className="text-sm font-semibold text-red-700">Risc ridicat</p></>}
-              <p className="text-xs text-gray-400 mt-1">{new Date(result.generat_la).toLocaleString('ro-RO')}</p>
+              <p className="text-xs text-gray-400 mt-1">{(() => { const d = new Date(result.generat_la); return !isNaN(d.getTime()) && d.getFullYear() > 2000 ? d.toLocaleString('ro-RO') : 'acum' })()}</p>
             </div>
           </div>
 
