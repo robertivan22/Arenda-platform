@@ -1,10 +1,11 @@
 ﻿'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   AlertTriangle, CheckCircle, Clock, TrendingDown,
   Loader2, RefreshCw, ChevronRight, Zap, ArrowLeftRight,
-  FileText, Tractor, Package, Shield, Wrench, Receipt,
+  FileText, Tractor, Package, Shield, Wrench,
   Sparkles, X,
 } from 'lucide-react'
 import type {
@@ -145,10 +146,12 @@ function AlertItemRow({ item, selected, onClick }: { item: AlertItem; selected: 
 
 // --- SectionCard -------------------------------------------------------------
 
-function SectionCard({ icon, title, count, high, items, selectedId, onSelect }: {
+function SectionCard({ icon, title, count, high, items, selectedId, onSelect, addHref }: {
   icon: React.ReactNode; title: string; count: number; high: number
   items: AlertItem[]; selectedId: string | null; onSelect: (item: AlertItem) => void
+  addHref?: string
 }) {
+  const router = useRouter()
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -166,9 +169,15 @@ function SectionCard({ icon, title, count, high, items, selectedId, onSelect }: 
       <div className="p-3 space-y-0.5">
         {count === 0
           ? (
-            <div className="flex items-center justify-center gap-1.5 py-4 text-gray-300">
+            <div className="flex flex-col items-center justify-center gap-1 py-4 text-gray-300">
               <CheckCircle className="w-4 h-4" />
               <span className="text-sm">Nicio alerta</span>
+              {addHref && (
+                <button onClick={() => router.push(addHref)}
+                  className="text-xs text-brand-500 hover:text-brand-700 font-medium mt-0.5 transition-colors">
+                  Gestioneaza &rarr;
+                </button>
+              )}
             </div>
           )
           : items.map(item => (
@@ -180,9 +189,20 @@ function SectionCard({ icon, title, count, high, items, selectedId, onSelect }: 
   )
 }
 
+// --- Category routes --------------------------------------------------------
+
+const CATEGORY_ROUTES: Record<string, string> = {
+  Contracte:  '/contracte',
+  Activitati: '/ferma',
+  Stocuri:    '/inventar/stoc',
+  Utilaje:    '/utilaje',
+  Tranzactii: '/plati',
+}
+
 // --- AlertDetailPanel --------------------------------------------------------
 
 function AlertDetailPanel({ item, onClose }: { item: AlertItem | null; onClose: () => void }) {
+  const router = useRouter()
   if (!item) {
     return (
       <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center">
@@ -221,7 +241,9 @@ function AlertDetailPanel({ item, onClose }: { item: AlertItem | null; onClose: 
           </div>
         </div>
         <div className="flex gap-2 pt-1">
-          <button className="flex-1 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors">
+          <button
+            onClick={() => { router.push(CATEGORY_ROUTES[item.category] ?? '/alerte'); onClose() }}
+            className="flex-1 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors">
             Aplica actiunea
           </button>
           <button onClick={onClose} className="px-3 py-2 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg transition-colors">
@@ -471,27 +493,31 @@ export default function AlertsDashboard() {
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4">
               <SectionCard icon={<FileText className="w-4 h-4" />} title="Contracte"
                 count={sectionItems('Contracte').length} high={highOf(result.contracte)}
-                items={sectionItems('Contracte')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem} />
+                items={sectionItems('Contracte')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
+                addHref="/contracte" />
               <SectionCard icon={<Tractor className="w-4 h-4" />} title="Activitati Ferma"
                 count={sectionItems('Activitati').length} high={highOf(result.ferma)}
-                items={sectionItems('Activitati')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem} />
+                items={sectionItems('Activitati')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
+                addHref="/ferma" />
               <SectionCard icon={<Package className="w-4 h-4" />} title="Stocuri"
                 count={sectionItems('Stocuri').length} high={highOf(result.stocuri)}
-                items={sectionItems('Stocuri')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem} />
+                items={sectionItems('Stocuri')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
+                addHref="/inventar/stoc" />
               <SectionCard icon={<Wrench className="w-4 h-4" />} title="Utilaje &amp; RCA"
                 count={sectionItems('Utilaje').length} high={highOf(result.utilaje)}
-                items={sectionItems('Utilaje')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem} />
+                items={sectionItems('Utilaje')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
+                addHref="/utilaje" />
               <SectionCard icon={<ArrowLeftRight className="w-4 h-4" />} title="Tranzactii Arenda"
                 count={sectionItems('Tranzactii').length} high={highOf(result.tranzactii)}
-                items={sectionItems('Tranzactii')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem} />
-              <SectionCard icon={<Receipt className="w-4 h-4" />} title="Facturi"
-                count={0} high={0} items={[]} selectedId={null} onSelect={() => {}} />
+                items={sectionItems('Tranzactii')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
+                addHref="/plati" />
+              {/* Insights in grid, 3rd col row 2 */}
+              <InsightsPanel insights={result.insights ?? []} />
             </div>
 
-            {/* Right sidebar */}
-            <div className="w-72 flex-shrink-0 space-y-4">
+            {/* Right sidebar — detail panel only */}
+            <div className="w-72 flex-shrink-0">
               <AlertDetailPanel item={selectedItem} onClose={() => setSelectedItem(null)} />
-              <InsightsPanel insights={result.insights ?? []} />
             </div>
           </div>
         </>
