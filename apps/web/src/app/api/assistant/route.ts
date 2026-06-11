@@ -4,7 +4,7 @@ import { chat, safeParseJSON } from '@/lib/groq'
 import { SYSTEM_PROMPT, buildPrompt } from '@/lib/ai/prompts'
 import { MOCK_FARM_DATA } from '@/lib/ai/mock-data'
 import { createClient } from '@supabase/supabase-js'
-import type { AssistantResponse, AnalysisResult } from '@/lib/ai/types'
+import type { AssistantResponse, AnalysisResult, UtilajeAlert, TranzactieAlert } from '@/lib/ai/types'
 
 export const runtime = 'edge'
 
@@ -16,7 +16,61 @@ const RequestSchema = z.object({
   context: z.record(z.unknown()).optional(),
 })
 
-// â”€â”€â”€ Fetch ALL live data from Supabase â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Server-side alert computers (no AI hallucination possible) ───────────────
+
+function computeUtilajeAlerts(machines: any[], maintenance: any[], today_d: Date): UtilajeAlert[] {
+  return machines.map((m: any) => {
+    const rcaExp = m.rca_expiry_date ? new Date(m.rca_expiry_date) : null
+    const rcaZile = rcaExp ? Math.round((rcaExp.getTime() - today_d.getTime()) / 86400000) : null
+    const rcaSt = !rcaExp ? 'NECUNOSCUT' : rcaZile! < 0 ? 'EXPIRAT' : rcaZile! <= 30 ? 'EXPIRA_CURAND' : rcaZile! <= 60 ? 'ATENTIE' : 'OK'
+    const tasks = maintenance.filter((t: any) => t.machine_id === m.id)
+    const nextTask = tasks[0]
+    const mentenantaPending = nextTask ? `${nextTask.title}(${nextTask.type},${nextTask.due_date})` : null
+    const taskZile = nextTask?.due_date ? Math.round((new Date(nextTask.due_date).getTime() - today_d.getTime()) / 86400000) : null
+    let status: 'critic' | 'atentie' | 'ok' | 'necunoscut' = 'ok'
+    let priority: 'inalta' | 'medie' | 'scazuta' = 'scazuta'
+    if (rcaSt === 'EXPIRAT') { status = 'critic'; priority = 'inalta' }
+    else if (rcaSt === 'EXPIRA_CURAND') { status = 'atentie'; priority = 'inalta' }
+    else if (rcaSt === 'ATENTIE') { status = 'atentie'; priority = 'medie' }
+    else if (rcaSt === 'NECUNOSCUT') { status = 'necunoscut'; priority = 'medie' }
+    if (taskZile !== null && taskZile <= 0 && priority !== 'inalta') priority = 'inalta'
+    else if (taskZile !== null && taskZile <= 14 && priority === 'scazuta') priority = 'medie'
+    let mesaj = `${m.name} (${m.type})`
+    if (rcaSt === 'EXPIRAT') mesaj += ` — RCA expirat cu ${Math.abs(rcaZile!)} zile in urma (${m.rca_expiry_date})`
+    else if (rcaSt === 'EXPIRA_CURAND') mesaj += ` — RCA expira in ${rcaZile} zile (${m.rca_expiry_date})`
+    else if (rcaSt === 'ATENTIE') mesaj += ` — RCA expira in ${rcaZile} zile`
+    else if (rcaSt === 'NECUNOSCUT') mesaj += ' — data expirare RCA necunoscuta'
+    else mesaj += ` — RCA valid pana la ${m.rca_expiry_date}`
+    if (nextTask && taskZile !== null) mesaj += taskZile <= 0 ? `. Service "${nextTask.title}" intarziat` : `. Service "${nextTask.title}" in ${taskZile} zile`
+    const actiune = rcaSt === 'EXPIRAT' ? 'Reinnoiti RCA imediat — utilajul nu poate circula legal'
+      : rcaSt === 'EXPIRA_CURAND' ? `Programati reinnoirea RCA (expira ${m.rca_expiry_date})`
+      : rcaSt === 'NECUNOSCUT' ? 'Adaugati data de expirare RCA in sistemul de evidenta'
+      : nextTask && taskZile !== null && taskZile <= 14 ? `Programati service-ul: ${nextTask.title} (${nextTask.type})`
+      : 'Verificati documentele periodic'
+    return { utilaj: m.name, tip: m.type, status, priority, rca_expiry: m.rca_expiry_date ?? null, mentenanta_pending: mentenantaPending, mesaj, actiune_recomandata: actiune }
+  })
+}
+
+function computeTranzactiiAlerts(transactions: any[]): TranzactieAlert[] {
+  return transactions.map((t: any) => {
+    const l = t.lessors
+    const lessor = l ? (l.type === 'LEGAL' ? l.company_name : `${l.last_name ?? ''} ${l.first_name ?? ''}`.trim()) : ''
+    const suma = Number(t.ron_net ?? 0)
+    const priority: 'inalta' | 'medie' | 'scazuta' = suma > 1000 ? 'inalta' : suma > 200 ? 'medie' : 'scazuta'
+    return {
+      lessor_name: lessor,
+      status: 'neplatita' as const,
+      priority,
+      suma_ron: suma,
+      campanie: t.campaign_year ?? 0,
+      produs: t.product_name ?? '',
+      mesaj: `Tranzactie neplatita: ${t.product_name ?? '?'} ${suma.toFixed(2)} RON — ${lessor || 'arendator necunoscut'}`,
+      actiune_recomandata: suma > 500 ? 'Contactati arendatorul si regularizati plata urgent' : 'Efectuati plata conform contractului',
+    }
+  })
+}
+
+// ─── Fetch ALL live data from Supabase ────────────────────────────────────────
 
 async function fetchLiveData() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -68,16 +122,9 @@ async function fetchLiveData() {
       const rca = !rcaExp ? 'NECUNOSCUT' : rcaZile! < 0 ? 'EXPIRAT' : rcaZile! <= 30 ? 'EXPIRA_CURAND' : rcaZile! <= 60 ? 'ATENTIE' : 'OK'
       return { utilaj: m.name, tip: m.type, rca, rca_zile: rcaZile, rca_data: m.rca_expiry_date }
     }),
-    mentenanta: (() => {
-      const mMap: Record<string, string> = {}
-      for (const m of machinesRes.data ?? []) mMap[(m as any).id] = (m as any).name
-      return (maintenanceRes.data ?? []).map((t: any) => ({ masina: mMap[t.machine_id] ?? t.machine_id, titlu: t.title, tip: t.type, scad: t.due_date, st: t.status }))
-    })(),
-    tranzactii: (transactionsRes.data ?? []).map((t: any) => {
-      const l = t.lessors
-      const lessor = l ? (l.type === 'LEGAL' ? l.company_name : `${l.last_name ?? ''} ${l.first_name ?? ''}`.trim()) : ''
-      return { lessor, ron: t.ron_net, prod: t.product_name, an: t.campaign_year, paid: t.is_paid }
-    }),
+    _machines_raw: machinesRes.data ?? [],
+    _maintenance_raw: maintenanceRes.data ?? [],
+    _transactions_raw: transactionsRes.data ?? [],
     _errors,
   }
 }
@@ -96,8 +143,17 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
     const { mode, question, context } = parsed.data
     const rawData: any = context ?? await fetchLiveData()
     const queryErrors: string[] = rawData._errors ?? []
-    delete rawData._errors
-    const userPrompt = buildPrompt(mode, rawData, question)
+    const today_d_post = new Date()
+    const serverUtilaje = computeUtilajeAlerts(rawData._machines_raw ?? [], rawData._maintenance_raw ?? [], today_d_post)
+    const serverTranzactii = computeTranzactiiAlerts(rawData._transactions_raw ?? [])
+    // Build AI prompt data without internal raw arrays
+    const { _machines_raw: _m, _maintenance_raw: _mt, _transactions_raw: _tx, _errors: _e, ...aiData } = rawData
+    const promptData = {
+      ...aiData,
+      utilaje_risc: serverUtilaje.filter(u => u.priority === 'inalta').map(u => u.mesaj).join('; ') || 'toate OK',
+      tranzactii_risc: serverTranzactii.length > 0 ? `${serverTranzactii.length} neplatite total ${serverTranzactii.reduce((s, t) => s + t.suma_ron, 0).toFixed(0)} RON` : 'toate platite',
+    }
+    const userPrompt = buildPrompt(mode, promptData, question)
 
     const { text, model, tokens } = await chat(
       [
@@ -117,12 +173,11 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
     }
 
     result.generat_la = result.generat_la || new Date().toISOString()
-    // Ensure all arrays exist
     result.contracte ??= []
     result.ferma ??= []
     result.stocuri ??= []
-    result.utilaje ??= []
-    result.tranzactii ??= []
+    result.utilaje = serverUtilaje
+    result.tranzactii = serverTranzactii
 
     return NextResponse.json({ ok: true, mode, result, model, tokens_used: tokens, data_errors: queryErrors.length > 0 ? queryErrors : undefined })
   } catch (err: unknown) {

@@ -3,7 +3,7 @@
 export type Priority = 'inalta' | 'medie' | 'scazuta'
 export type ContractStatus = 'expirat' | 'critic' | 'atentie' | 'ok'
 export type StockStatus = 'critic' | 'scazut' | 'ok'
-export type UtilajeStatus = 'critic' | 'atentie' | 'ok'
+export type UtilajeStatus = 'critic' | 'atentie' | 'ok' | 'necunoscut'
 
 export interface ContractAlert {
   contract_number: string
