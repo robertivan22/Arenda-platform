@@ -27,13 +27,14 @@ async function fetchLiveData() {
   const today = new Date().toISOString().split('T')[0]
   const yearStart = `${new Date().getFullYear()}-01-01`
 
-  const [contractsRes, ordersRes, stockRes, machinesRes, maintenanceRes, invoicesRes] = await Promise.all([
+  const [contractsRes, ordersRes, stockRes, machinesRes, maintenanceRes, invoicesRes, transactionsRes] = await Promise.all([
     db.from('contracts').select('contract_number, end_date, status, lessors(first_name, last_name, company_name)').limit(50),
     db.from('work_orders').select('operation_type, status, planned_date, execution_date, parcels(bloc_fizic)').gte('planned_date', yearStart).order('planned_date').limit(40),
     db.from('input_lots').select('product_name, category, quantity_available, quantity, unit, expiry_date').order('category').limit(60),
     db.from('machines').select('*').order('name').limit(30),
-    db.from('maintenance_tasks').select('title, due_date, status, machine_id').in('status', ['PENDING', 'OVERDUE']).order('due_date').limit(20),
+    db.from('maintenance_tasks').select('title, type, due_date, status, machine_id').in('status', ['PLANIFICAT', 'IN_EXECUTIE']).order('due_date').limit(20),
     db.from('invoices').select('invoice_number, total_amount, status, due_date').order('due_date', { ascending: true, nullsFirst: false }).limit(30),
+    db.from('transactions').select('ron_net, is_paid, campaign_year, product_name, lessors(company_name, first_name, last_name, type)').gte('transaction_date', yearStart).order('transaction_date', { ascending: false }).limit(60),
   ])
 
   const _errors: string[] = []
@@ -42,8 +43,10 @@ async function fetchLiveData() {
   if (stockRes.error) _errors.push(`Stocuri: ${stockRes.error.message}`)
   if (machinesRes.error) _errors.push(`Utilaje: ${machinesRes.error.message}`)
   if (invoicesRes.error) _errors.push(`Facturi: ${invoicesRes.error.message}`)
+  if (maintenanceRes.error) _errors.push(`Mentenanta: ${maintenanceRes.error.message}`)
+  if (transactionsRes.error) _errors.push(`Tranzactii: ${transactionsRes.error.message}`)
 
-  console.log('[AI]', { c: contractsRes.data?.length, o: ordersRes.data?.length, s: stockRes.data?.length, m: machinesRes.data?.length, f: invoicesRes.data?.length })
+  console.log('[AI]', { c: contractsRes.data?.length, o: ordersRes.data?.length, s: stockRes.data?.length, m: machinesRes.data?.length, f: invoicesRes.data?.length, tx: transactionsRes.data?.length })
 
   const today_d = new Date(today)
 
@@ -67,7 +70,16 @@ async function fetchLiveData() {
       const rca = !rcaExp ? 'NECUNOSCUT' : rcaZile! < 0 ? 'EXPIRAT' : rcaZile! <= 30 ? 'EXPIRA_CURAND' : rcaZile! <= 60 ? 'ATENTIE' : 'OK'
       return { utilaj: m.name, tip: m.type, rca, rca_zile: rcaZile, rca_data: m.rca_expiry_date }
     }),
-    mentenanta: (maintenanceRes.data ?? []).map((t: any) => ({ titlu: t.title, scad: t.due_date, st: t.status, masina: t.machine_id })),
+    mentenanta: (() => {
+      const mMap: Record<string, string> = {}
+      for (const m of machinesRes.data ?? []) mMap[(m as any).id] = (m as any).name
+      return (maintenanceRes.data ?? []).map((t: any) => ({ masina: mMap[t.machine_id] ?? t.machine_id, titlu: t.title, tip: t.type, scad: t.due_date, st: t.status }))
+    })(),
+    tranzactii: (transactionsRes.data ?? []).map((t: any) => {
+      const l = t.lessors
+      const lessor = l ? (l.type === 'LEGAL' ? l.company_name : `${l.last_name ?? ''} ${l.first_name ?? ''}`.trim()) : ''
+      return { lessor, ron: t.ron_net, prod: t.product_name, an: t.campaign_year, paid: t.is_paid }
+    }),
     facturi: (invoicesRes.data ?? []).map((i: any) => {
       const due = i.due_date ? new Date(i.due_date) : null
       const dep = due ? Math.round((today_d.getTime() - due.getTime()) / 86400000) : null
@@ -119,6 +131,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
     result.stocuri ??= []
     result.utilaje ??= []
     result.facturi ??= []
+    result.tranzactii ??= []
 
     return NextResponse.json({ ok: true, mode, result, model, tokens_used: tokens, data_errors: queryErrors.length > 0 ? queryErrors : undefined })
   } catch (err: unknown) {

@@ -4,11 +4,11 @@ import { useState, useCallback, useEffect } from 'react'
 import {
   AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown,
   Loader2, RefreshCw, ChevronDown, ChevronRight, Zap,
-  FileText, Tractor, Package, Shield, Wrench, Receipt,
+  FileText, Tractor, Package, Shield, Wrench, Receipt, ArrowLeftRight,
 } from 'lucide-react'
 import type {
   AnalysisResult, ContractAlert, FarmAlert, StockAlert,
-  UtilajeAlert, FacturaAlert,
+  UtilajeAlert, FacturaAlert, TranzactieAlert,
 } from '@/lib/ai/types'
 
 const LS_KEY = 'arenda_ai_analysis'
@@ -177,6 +177,7 @@ function UtilajeRow({ a }: { a: UtilajeAlert }) {
       }>
       <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
       {a.rca_expiry && <p className="text-xs text-gray-400">RCA expira: {a.rca_expiry}</p>}
+      {a.mentenanta_pending && <p className="text-xs text-amber-500">Service: {a.mentenanta_pending}</p>}
     </AlertRow>
   )
 }
@@ -196,6 +197,24 @@ function FacturaRow({ a }: { a: FacturaAlert }) {
       }>
       <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
       {a.due_date && <p className="text-xs text-gray-400">Scadenta: {a.due_date}</p>}
+    </AlertRow>
+  )
+}
+
+function TranzactieRow({ a }: { a: TranzactieAlert }) {
+  return (
+    <AlertRow priority={a.priority}
+      label={`${a.lessor_name} — ${a.produs}`}
+      badge={
+        <>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            a.status === 'neplatita' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+          }`}>{a.status === 'neplatita' ? 'Neplatita' : 'Platita'}</span>
+          <span className="text-xs text-gray-500">{a.suma_ron?.toFixed(0)} RON</span>
+        </>
+      }>
+      <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
+      {a.campanie && <p className="text-xs text-gray-400">Campanie: {a.campanie}</p>}
     </AlertRow>
   )
 }
@@ -281,6 +300,7 @@ export default function AlertsDashboard() {
     ...(result?.stocuri ?? []),
     ...(result?.utilaje ?? []),
     ...(result?.facturi ?? []),
+    ...(result?.tranzactii ?? []),
   ].filter(a => a.priority === 'inalta').length
 
   const highOf = (arr?: { priority: string }[]) => (arr ?? []).filter(a => a.priority === 'inalta').length
@@ -355,7 +375,7 @@ export default function AlertsDashboard() {
               <div className={`text-3xl font-bold ${totalHigh > 0 ? 'text-red-600' : 'text-green-600'}`}>{totalHigh}</div>
               <p className="text-xs text-gray-400 mt-1">din {
                 (result.contracte?.length ?? 0) + (result.ferma?.length ?? 0) + (result.stocuri?.length ?? 0) +
-                (result.utilaje?.length ?? 0) + (result.facturi?.length ?? 0)
+                (result.utilaje?.length ?? 0) + (result.facturi?.length ?? 0) + (result.tranzactii?.length ?? 0)
               } total</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
@@ -398,12 +418,15 @@ export default function AlertsDashboard() {
           </div>
 
           {/* Alert grid row 2 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <Section icon={<Wrench className="w-5 h-5" />} title="Utilaje" count={result.utilaje?.length ?? 0} high={highOf(result.utilaje)}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <Section icon={<Wrench className="w-5 h-5" />} title="Utilaje & RCA" count={result.utilaje?.length ?? 0} high={highOf(result.utilaje)}>
               {result.utilaje?.map((a, i) => <UtilajeRow key={i} a={a} />)}
             </Section>
             <Section icon={<Receipt className="w-5 h-5" />} title="Facturi" count={result.facturi?.length ?? 0} high={highOf(result.facturi)}>
               {result.facturi?.map((a, i) => <FacturaRow key={i} a={a} />)}
+            </Section>
+            <Section icon={<ArrowLeftRight className="w-5 h-5" />} title="Tranzactii" count={result.tranzactii?.length ?? 0} high={highOf(result.tranzactii)}>
+              {result.tranzactii?.map((a, i) => <TranzactieRow key={i} a={a} />)}
             </Section>
           </div>
 

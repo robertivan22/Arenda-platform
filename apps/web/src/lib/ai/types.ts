@@ -46,6 +46,7 @@ export interface UtilajeAlert {
   status: UtilajeStatus
   priority: Priority
   rca_expiry: string | null
+  mentenanta_pending: string | null
   mesaj: string
   actiune_recomandata: string
 }
@@ -60,6 +61,17 @@ export interface FacturaAlert {
   actiune_recomandata: string
 }
 
+export interface TranzactieAlert {
+  lessor_name: string
+  status: 'neplatita' | 'platita_recent'
+  priority: Priority
+  suma_ron: number
+  campanie: number
+  produs: string
+  mesaj: string
+  actiune_recomandata: string
+}
+
 export interface AnalysisResult {
   sumar: string
   scor_risc: number
@@ -69,6 +81,7 @@ export interface AnalysisResult {
   stocuri: StockAlert[]
   utilaje: UtilajeAlert[]
   facturi: FacturaAlert[]
+  tranzactii: TranzactieAlert[]
 }
 
 // ─── Mode ────────────────────────────────────────────────────────────────────
