@@ -83,14 +83,27 @@ async function fetchLiveData() {
   const today = new Date().toISOString().split('T')[0]
   const yearStart = `${new Date().getFullYear()}-01-01`
 
-  const [contractsRes, ordersRes, stockRes, machinesRes, maintenanceRes, transactionsRes] = await Promise.all([
+  const [contractsRes, ordersRes, stockRes, machinesRes, maintenanceRes, txBaseRes] = await Promise.all([
     db.from('contracts').select('contract_number, end_date, status, lessors(first_name, last_name, company_name)').limit(50),
     db.from('work_orders').select('operation_type, status, planned_date, execution_date, parcels(bloc_fizic)').gte('planned_date', yearStart).order('planned_date').limit(40),
     db.from('input_lots').select('product_name, category, quantity_available, quantity, unit, expiry_date').order('category').limit(60),
     db.from('machines').select('*').order('name').limit(30),
     db.from('maintenance_tasks').select('title, type, due_date, status, machine_id').in('status', ['PLANIFICAT', 'IN_EXECUTIE']).order('due_date').limit(20),
-    db.from('transactions').select('ron_net, is_paid, campaign_year, product_name, lessors!lessor_id(company_name, first_name, last_name, type)').order('transaction_date', { ascending: false }).limit(100),
+    db.from('transactions').select('id, lessor_id, ron_net, is_paid, campaign_year, product_name').order('transaction_date', { ascending: false }).limit(100),
   ])
+
+  // Fetch lessors separately — avoids ambiguous PostgREST join on transactions
+  const _lessorIds = [...new Set((txBaseRes.data ?? []).map((t: any) => t.lessor_id).filter(Boolean))]
+  const lessorRes = _lessorIds.length > 0
+    ? await db.from('lessors').select('id, company_name, first_name, last_name, type').in('id', _lessorIds as string[])
+    : { data: [] as any[], error: null }
+  const _lessorMap: Record<string, any> = Object.fromEntries(
+    (lessorRes.data ?? []).map((l: any) => [l.id, l])
+  )
+  const _transactions_raw = (txBaseRes.data ?? []).map((t: any) => ({
+    ...t,
+    lessors: t.lessor_id ? (_lessorMap[t.lessor_id] ?? null) : null,
+  }))
 
   const _errors: string[] = []
   if (contractsRes.error) _errors.push(`Contracte: ${contractsRes.error.message}`)
@@ -98,9 +111,10 @@ async function fetchLiveData() {
   if (stockRes.error) _errors.push(`Stocuri: ${stockRes.error.message}`)
   if (machinesRes.error) _errors.push(`Utilaje: ${machinesRes.error.message}`)
   if (maintenanceRes.error) _errors.push(`Mentenanta: ${maintenanceRes.error.message}`)
-  if (transactionsRes.error) _errors.push(`Tranzactii: ${transactionsRes.error.message}`)
+  if (txBaseRes.error) _errors.push(`Tranzactii: ${txBaseRes.error.message}`)
+  if (lessorRes.error) _errors.push(`Arendatori: ${lessorRes.error.message}`)
 
-  console.log('[AI]', { c: contractsRes.data?.length, o: ordersRes.data?.length, s: stockRes.data?.length, m: machinesRes.data?.length, tx: transactionsRes.data?.length })
+  console.log('[AI]', { c: contractsRes.data?.length, o: ordersRes.data?.length, s: stockRes.data?.length, m: machinesRes.data?.length, tx: txBaseRes.data?.length, lessors: lessorRes.data?.length })
 
   const today_d = new Date(today)
 
@@ -126,7 +140,7 @@ async function fetchLiveData() {
     }),
     _machines_raw: machinesRes.data ?? [],
     _maintenance_raw: maintenanceRes.data ?? [],
-    _transactions_raw: transactionsRes.data ?? [],
+    _transactions_raw,
     _errors,
   }
 }
@@ -183,7 +197,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
     result.utilaje = serverUtilaje
     result.tranzactii = serverTranzactii
 
-    return NextResponse.json({ ok: true, mode, result, model, tokens_used: tokens, data_errors: queryErrors.length > 0 ? queryErrors : undefined })
+    return NextResponse.json({ ok: true, mode, result, model, tokens_used: tokens, data_errors: queryErrors.length > 0 ? queryErrors : undefined, _debug: { machines: rawData._machines_raw?.length ?? 0, transactions: rawData._transactions_raw?.length ?? 0 } })
   } catch (err: unknown) {
     const e = err as any
     const is429 = e?.status === 429 || (err instanceof Error && (err.message.includes('rate_limit') || err.message.includes('Rate limit') || err.message.includes('429')))

@@ -262,6 +262,7 @@ export default function AlertsDashboard() {
   const [model, setModel] = useState('')
   const [tokens, setTokens] = useState(0)
   const [dataErrors, setDataErrors] = useState<string[]>([])
+  const [dbDebug, setDbDebug] = useState<{ machines: number; transactions: number } | null>(null)
   const [activeFilter, setActiveFilter] = useState<FilterTab>('toate')
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
   const router = useRouter()
@@ -301,6 +302,7 @@ export default function AlertsDashboard() {
       setModel(json.model ?? '')
       setTokens(json.tokens_used ?? 0)
       setDataErrors(json.data_errors ?? [])
+      if (json._debug) setDbDebug(json._debug)
       localStorage.setItem(LS_KEY, JSON.stringify({ result: json.result, model: json.model ?? '', tokens: json.tokens_used ?? 0 }))
     } catch {
       setError('Nu s-a putut contacta serverul AI.')
@@ -372,6 +374,16 @@ export default function AlertsDashboard() {
           <ul className="text-sm text-amber-600 list-disc list-inside space-y-0.5">
             {dataErrors.map((e, i) => <li key={i}>{e}</li>)}
           </ul>
+        </div>
+      )}
+
+      {dbDebug && (dbDebug.machines === 0 || dbDebug.transactions === 0) && (
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500 flex flex-wrap gap-3">
+          <span className="font-semibold text-gray-700">Date BD returnate:</span>
+          <span className={dbDebug.machines === 0 ? 'text-red-600 font-semibold' : ''}>Utilaje: {dbDebug.machines}</span>
+          <span className={dbDebug.transactions === 0 ? 'text-red-600 font-semibold' : ''}>Tranzactii: {dbDebug.transactions}</span>
+          {dbDebug.machines === 0 && <span className="text-red-500">— tabela machines este goala sau cheia Supabase lipseste</span>}
+          {dbDebug.transactions === 0 && <span className="text-red-500">— tabela transactions este goala sau toate sunt platite</span>}
         </div>
       )}
 

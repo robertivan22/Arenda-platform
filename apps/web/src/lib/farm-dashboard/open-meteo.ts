@@ -11,6 +11,7 @@ interface OpenMeteoResponse {
   }
   hourly?: {
     time: string[]
+    temperature_2m: (number | null)[]
     soil_moisture_0_to_1cm: (number | null)[]
     soil_moisture_1_to_3cm: (number | null)[]
     soil_moisture_3_to_9cm: (number | null)[]
@@ -41,7 +42,7 @@ export async function fetchOpenMeteo(lat: number, lng: number): Promise<OpenMete
       latitude: String(lat),
       longitude: String(lng),
       current: 'temperature_2m,weather_code',
-      hourly: 'soil_moisture_0_to_1cm,soil_moisture_1_to_3cm,soil_moisture_3_to_9cm',
+      hourly: 'temperature_2m,soil_moisture_0_to_1cm,soil_moisture_1_to_3cm,soil_moisture_3_to_9cm',
       daily: 'temperature_2m_max,temperature_2m_min,precipitation_sum,et0_fao_evapotranspiration',
       past_days: '7',
       forecast_days: '3',
@@ -61,6 +62,26 @@ export async function fetchOpenMeteo(lat: number, lng: number): Promise<OpenMete
   }
 }
 
+// Returns the index in the hourly time array matching the current Bucharest local hour
+function getBucharestHourIndex(times: string[]): number {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Bucharest', year: 'numeric', month: '2-digit',
+      day: '2-digit', hour: '2-digit', hour12: false,
+    }).formatToParts(new Date())
+    const yr = parts.find(p => p.type === 'year')?.value ?? ''
+    const mo = parts.find(p => p.type === 'month')?.value ?? ''
+    const da = parts.find(p => p.type === 'day')?.value ?? ''
+    const hr = parts.find(p => p.type === 'hour')?.value ?? '00'
+    const nowHour = `${yr}-${mo}-${da}T${hr === '24' ? '00' : hr}`
+    const idx = times.findIndex(t => t.startsWith(nowHour))
+    // If not found, return the last entry with index < 80% of array (avoid forecasts)
+    return idx >= 0 ? idx : Math.floor(times.length * 0.7)
+  } catch {
+    return Math.floor(times.length * 0.7)
+  }
+}
+
 export function normalizeWeather(raw: OpenMeteoResponse | null): WeatherData {
   const empty: WeatherData = {
     temp_current: null, temp_min_48h: null, temp_max_48h: null,
@@ -68,7 +89,12 @@ export function normalizeWeather(raw: OpenMeteoResponse | null): WeatherData {
   }
   if (!raw) return empty
 
-  const temp_current = raw.current?.temperature_2m ?? null
+  let temp_current = raw.current?.temperature_2m ?? null
+  // Fallback: derive from hourly if current is missing
+  if (temp_current == null && raw.hourly?.temperature_2m) {
+    const idx = getBucharestHourIndex(raw.hourly.time)
+    temp_current = raw.hourly.temperature_2m[idx] ?? null
+  }
   const code = raw.current?.weather_code ?? null
   const condition_label = code != null ? (WMO_LABELS[code] ?? null) : null
 
@@ -107,9 +133,7 @@ export function normalizeSoil(raw: OpenMeteoResponse | null): SoilData {
   if (!raw?.hourly) return { moisture_avg: null, status: null }
 
   const h = raw.hourly
-  const nowHour = new Date().toISOString().slice(0, 13) // "2026-06-09T12"
-  let curIdx = h.time.findIndex(t => t.startsWith(nowHour))
-  if (curIdx < 0) curIdx = h.time.length - 1
+  const curIdx = getBucharestHourIndex(h.time)
 
   const hourlyAvgs: number[] = []
   for (let i = Math.max(0, curIdx - 2); i <= curIdx; i++) {
