@@ -4,11 +4,11 @@ import { useState, useCallback, useEffect } from 'react'
 import {
   AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown,
   Loader2, RefreshCw, ChevronDown, ChevronRight, Zap,
-  FileText, Tractor, Package, Shield, Wrench, Receipt, ArrowLeftRight,
+  FileText, Tractor, Package, Shield, Wrench, ArrowLeftRight,
 } from 'lucide-react'
 import type {
   AnalysisResult, ContractAlert, FarmAlert, StockAlert,
-  UtilajeAlert, FacturaAlert, TranzactieAlert,
+  UtilajeAlert, TranzactieAlert,
 } from '@/lib/ai/types'
 
 const LS_KEY = 'arenda_ai_analysis'
@@ -182,25 +182,6 @@ function UtilajeRow({ a }: { a: UtilajeAlert }) {
   )
 }
 
-function FacturaRow({ a }: { a: FacturaAlert }) {
-  return (
-    <AlertRow priority={a.priority}
-      label={`Factura ${a.invoice_number}`}
-      badge={
-        <>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            a.status === 'PAID' ? 'bg-green-100 text-green-700' :
-            a.status === 'OVERDUE' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-          }`}>{a.status}</span>
-          <span className="text-xs text-gray-500">{a.total_amount?.toFixed(0)} RON</span>
-        </>
-      }>
-      <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
-      {a.due_date && <p className="text-xs text-gray-400">Scadenta: {a.due_date}</p>}
-    </AlertRow>
-  )
-}
-
 function TranzactieRow({ a }: { a: TranzactieAlert }) {
   return (
     <AlertRow priority={a.priority}
@@ -299,7 +280,6 @@ export default function AlertsDashboard() {
     ...(result?.ferma ?? []),
     ...(result?.stocuri ?? []),
     ...(result?.utilaje ?? []),
-    ...(result?.facturi ?? []),
     ...(result?.tranzactii ?? []),
   ].filter(a => a.priority === 'inalta').length
 
@@ -346,7 +326,7 @@ export default function AlertsDashboard() {
           </div>
           <h2 className="text-lg font-semibold text-gray-800 mb-1">Asistentul AI este pregatit</h2>
           <p className="text-sm text-gray-400 max-w-md">
-            Apasa <strong>Ruleaza analiza</strong> pentru a primi o analiza completa a fermei &mdash; contracte, utilaje, stocuri, facturi, APIA si fitosanitar.
+            Apasa <strong>Ruleaza analiza</strong> pentru a primi o analiza completa a fermei &mdash; contracte, utilaje, stocuri si tranzactii arenda neplatite.
           </p>
         </div>
       )}
@@ -375,15 +355,15 @@ export default function AlertsDashboard() {
               <div className={`text-3xl font-bold ${totalHigh > 0 ? 'text-red-600' : 'text-green-600'}`}>{totalHigh}</div>
               <p className="text-xs text-gray-400 mt-1">din {
                 (result.contracte?.length ?? 0) + (result.ferma?.length ?? 0) + (result.stocuri?.length ?? 0) +
-                (result.utilaje?.length ?? 0) + (result.facturi?.length ?? 0) + (result.tranzactii?.length ?? 0)
+                (result.utilaje?.length ?? 0) + (result.tranzactii?.length ?? 0)
               } total</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-                <Receipt className="w-3.5 h-3.5" /> Facturi neplatite
+                <ArrowLeftRight className="w-3.5 h-3.5" /> Tranzactii neplatite
               </div>
-              <div className={`text-3xl font-bold ${(result.facturi?.length ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'}`}>{result.facturi?.length ?? 0}</div>
-              <p className="text-xs text-gray-400 mt-1">din totalul de facturi</p>
+              <div className={`text-3xl font-bold ${(result.tranzactii?.length ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'}`}>{result.tranzactii?.length ?? 0}</div>
+              <p className="text-xs text-gray-400 mt-1">arenda neachitata</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
               {result.scor_risc < 40
@@ -418,14 +398,11 @@ export default function AlertsDashboard() {
           </div>
 
           {/* Alert grid row 2 */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <Section icon={<Wrench className="w-5 h-5" />} title="Utilaje & RCA" count={result.utilaje?.length ?? 0} high={highOf(result.utilaje)}>
               {result.utilaje?.map((a, i) => <UtilajeRow key={i} a={a} />)}
             </Section>
-            <Section icon={<Receipt className="w-5 h-5" />} title="Facturi" count={result.facturi?.length ?? 0} high={highOf(result.facturi)}>
-              {result.facturi?.map((a, i) => <FacturaRow key={i} a={a} />)}
-            </Section>
-            <Section icon={<ArrowLeftRight className="w-5 h-5" />} title="Tranzactii" count={result.tranzactii?.length ?? 0} high={highOf(result.tranzactii)}>
+            <Section icon={<ArrowLeftRight className="w-5 h-5" />} title="Tranzactii Arenda" count={result.tranzactii?.length ?? 0} high={highOf(result.tranzactii)}>
               {result.tranzactii?.map((a, i) => <TranzactieRow key={i} a={a} />)}
             </Section>
           </div>

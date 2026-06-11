@@ -27,14 +27,13 @@ async function fetchLiveData() {
   const today = new Date().toISOString().split('T')[0]
   const yearStart = `${new Date().getFullYear()}-01-01`
 
-  const [contractsRes, ordersRes, stockRes, machinesRes, maintenanceRes, invoicesRes, transactionsRes] = await Promise.all([
+  const [contractsRes, ordersRes, stockRes, machinesRes, maintenanceRes, transactionsRes] = await Promise.all([
     db.from('contracts').select('contract_number, end_date, status, lessors(first_name, last_name, company_name)').limit(50),
     db.from('work_orders').select('operation_type, status, planned_date, execution_date, parcels(bloc_fizic)').gte('planned_date', yearStart).order('planned_date').limit(40),
     db.from('input_lots').select('product_name, category, quantity_available, quantity, unit, expiry_date').order('category').limit(60),
     db.from('machines').select('*').order('name').limit(30),
     db.from('maintenance_tasks').select('title, type, due_date, status, machine_id').in('status', ['PLANIFICAT', 'IN_EXECUTIE']).order('due_date').limit(20),
-    db.from('invoices').select('invoice_number, total_amount, status, due_date').order('due_date', { ascending: true, nullsFirst: false }).limit(30),
-    db.from('transactions').select('ron_net, is_paid, campaign_year, product_name, lessors(company_name, first_name, last_name, type)').gte('transaction_date', yearStart).order('transaction_date', { ascending: false }).limit(60),
+    db.from('transactions').select('ron_net, is_paid, campaign_year, product_name, lessors(company_name, first_name, last_name, type)').eq('is_paid', false).order('transaction_date', { ascending: false }).limit(30),
   ])
 
   const _errors: string[] = []
@@ -42,11 +41,10 @@ async function fetchLiveData() {
   if (ordersRes.error) _errors.push(`Activitati: ${ordersRes.error.message}`)
   if (stockRes.error) _errors.push(`Stocuri: ${stockRes.error.message}`)
   if (machinesRes.error) _errors.push(`Utilaje: ${machinesRes.error.message}`)
-  if (invoicesRes.error) _errors.push(`Facturi: ${invoicesRes.error.message}`)
   if (maintenanceRes.error) _errors.push(`Mentenanta: ${maintenanceRes.error.message}`)
   if (transactionsRes.error) _errors.push(`Tranzactii: ${transactionsRes.error.message}`)
 
-  console.log('[AI]', { c: contractsRes.data?.length, o: ordersRes.data?.length, s: stockRes.data?.length, m: machinesRes.data?.length, f: invoicesRes.data?.length, tx: transactionsRes.data?.length })
+  console.log('[AI]', { c: contractsRes.data?.length, o: ordersRes.data?.length, s: stockRes.data?.length, m: machinesRes.data?.length, tx: transactionsRes.data?.length })
 
   const today_d = new Date(today)
 
@@ -80,12 +78,6 @@ async function fetchLiveData() {
       const lessor = l ? (l.type === 'LEGAL' ? l.company_name : `${l.last_name ?? ''} ${l.first_name ?? ''}`.trim()) : ''
       return { lessor, ron: t.ron_net, prod: t.product_name, an: t.campaign_year, paid: t.is_paid }
     }),
-    facturi: (invoicesRes.data ?? []).map((i: any) => {
-      const due = i.due_date ? new Date(i.due_date) : null
-      const dep = due ? Math.round((today_d.getTime() - due.getTime()) / 86400000) : null
-      const unpaid = i.status !== 'PAID' && i.status !== 'PLATITA'
-      return { nr: i.invoice_number, suma: i.total_amount, st: i.status, scad: i.due_date, unpaid, dep: dep && dep > 0 ? dep : 0 }
-    }).filter((i: any) => i.unpaid),
     _errors,
   }
 }
@@ -130,7 +122,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
     result.ferma ??= []
     result.stocuri ??= []
     result.utilaje ??= []
-    result.facturi ??= []
     result.tranzactii ??= []
 
     return NextResponse.json({ ok: true, mode, result, model, tokens_used: tokens, data_errors: queryErrors.length > 0 ? queryErrors : undefined })

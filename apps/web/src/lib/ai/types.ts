@@ -80,7 +80,6 @@ export interface AnalysisResult {
   ferma: FarmAlert[]
   stocuri: StockAlert[]
   utilaje: UtilajeAlert[]
-  facturi: FacturaAlert[]
   tranzactii: TranzactieAlert[]
 }
 
