@@ -1,82 +1,339 @@
 ﻿'use client'
 
+/**
+ * AlertsDashboard — 100% database-driven operational alert dashboard.
+ * NO Groq. NO AI. NO LLM. NO model names. NO token counts.
+ * All alerts, statuses, scores, and summaries are computed deterministically
+ * from real DB records via GET /api/alerte.
+ */
+
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertTriangle, CheckCircle, Clock, TrendingDown,
-  Loader2, RefreshCw, ChevronRight, Zap, ArrowLeftRight,
-  FileText, Tractor, Package, Shield, Wrench,
-  Sparkles, X,
+  Loader2, RefreshCw, ChevronRight,
+  FileText, Tractor, Package, Wrench, ArrowLeftRight,
+  Shield, ShieldAlert, ShieldCheck,
 } from 'lucide-react'
 import type {
-  AnalysisResult, AlertInsight,
-} from '@/lib/ai/types'
-import DirectStatusCards from '@/components/DirectStatusCards'
+  AlerteResponse, ContractAlerta, FermaAlerta, StocAlerta,
+  UtilajeAlerta, TranzactieAlerta, AlertaInsight,
+  AlertPriority, DocStatus, AlertPaymentStatus, StocStatus,
+} from '@/lib/alerte/types'
 
-const LS_KEY = 'arenda_ai_analysis'
-
-// â”€â”€â”€ Priority / status helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// --- Alert item shape -------------------------------------------------------
-
-interface AlertItem {
-  id: string
-  priority: string
-  category: string
-  label: string
-  sublabel?: string
-  badgeText?: string
-  badgeColor?: string
-  qtyText?: string
-  qtyColor?: string
-  mesaj: string
-  actiune: string
+// Status display maps
+const DOC_LABEL: Record<DocStatus, string> = {
+  valid: 'Valid', expiring_soon: 'Expira curand', expiring_critical: 'Expira urgent',
+  expired: 'Expirat', missing: 'Data lipsa', invalid_date: 'Data invalida',
+}
+const DOC_CLS: Record<DocStatus, string> = {
+  valid: 'bg-green-100 text-green-700', expiring_soon: 'bg-orange-100 text-orange-700',
+  expiring_critical: 'bg-red-100 text-red-700', expired: 'bg-red-100 text-red-700',
+  missing: 'bg-gray-100 text-gray-500', invalid_date: 'bg-yellow-100 text-yellow-700',
+}
+const DOC_DOT: Record<DocStatus, string> = {
+  valid: 'bg-green-500', expiring_soon: 'bg-orange-400', expiring_critical: 'bg-red-500',
+  expired: 'bg-red-600', missing: 'bg-gray-300', invalid_date: 'bg-yellow-400',
+}
+const PAY_LABEL: Record<AlertPaymentStatus, string> = {
+  paid: 'Platit', unpaid: 'Neplatit', overdue_unpaid: 'Restant',
+}
+const PAY_CLS: Record<AlertPaymentStatus, string> = {
+  paid: 'bg-green-100 text-green-700', unpaid: 'bg-amber-100 text-amber-700',
+  overdue_unpaid: 'bg-red-100 text-red-700',
+}
+const PAY_DOT: Record<AlertPaymentStatus, string> = {
+  paid: 'bg-green-500', unpaid: 'bg-amber-400', overdue_unpaid: 'bg-red-500',
+}
+const STOC_LABEL: Record<StocStatus, string> = {
+  epuizat: 'Epuizat', critic: 'Critic (<5%)', scazut: 'Scazut (<25%)', ok: 'OK',
+}
+const STOC_CLS: Record<StocStatus, string> = {
+  epuizat: 'bg-red-100 text-red-700', critic: 'bg-red-100 text-red-700',
+  scazut: 'bg-amber-100 text-amber-700', ok: 'bg-green-100 text-green-700',
+}
+const PRIORITY_DOT: Record<AlertPriority, string> = {
+  inalta: 'bg-red-500', medie: 'bg-amber-400', scazuta: 'bg-gray-300',
 }
 
-function flattenAlerts(r: AnalysisResult): AlertItem[] {
-  const items: AlertItem[] = []
-  r.contracte?.forEach((a, i) => {
-    const z = a.days_until_expiry
-    items.push({
-      id: `c-${i}`, priority: a.priority, category: 'Contracte',
-      label: `#${a.contract_number} \u2014 ${a.lessor_name}`,
-      sublabel: z != null && z < 0 ? `Expirat acum ${Math.abs(z)} zile` : (a.end_date ?? undefined),
-      badgeText: z == null ? (a.status ?? '?') : z < 0 ? 'Expirat' : `${z} zile`,
-      badgeColor: z != null && z < 0 ? 'bg-red-100 text-red-700' : z != null && z <= 45 ? 'bg-orange-100 text-orange-700' : 'bg-green-50 text-green-700',
-      mesaj: a.mesaj, actiune: a.actiune_recomandata,
-    })
-  })
-  r.ferma?.forEach((a, i) => items.push({
-    id: `f-${i}`, priority: a.priority, category: 'Activitati',
-    label: `${a.activitate}${a.parcela ? ` \u2014 ${a.parcela}` : ''}`,
-    sublabel: a.intarziere_zile && a.intarziere_zile > 0 ? `${a.intarziere_zile} zile intarziere` : (a.status ?? undefined),
-    badgeText: a.priority === 'inalta' ? 'Critica' : a.priority === 'medie' ? 'Medie' : 'Scazuta',
-    badgeColor: a.priority === 'inalta' ? 'bg-red-100 text-red-700' : a.priority === 'medie' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600',
-    mesaj: a.mesaj, actiune: a.actiune_recomandata,
-  }))
-  r.stocuri?.forEach((a, i) => items.push({
-    id: `s-${i}`, priority: a.priority, category: 'Stocuri',
-    label: a.produs,
-    sublabel: a.status === 'critic' ? 'Stoc epuizat' : a.status === 'scazut' ? 'Sub pragul minim' : 'Stoc OK',
-    qtyText: `${a.cantitate_disponibila} ${a.unitate}`,
-    qtyColor: a.status === 'critic' ? 'bg-red-50 text-red-700' : a.status === 'scazut' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700',
-    mesaj: a.mesaj, actiune: a.actiune_recomandata,
-  }))
-  // NOTE: Utilaje & Tranzactii are handled by DirectStatusCards (direct DB, no AI)
-  return items
+// Helpers
+function fmtDate(d: string | null): string {
+  if (!d) return 'Lipseste'
+  try {
+    const dt = new Date(d)
+    if (isNaN(dt.getTime()) || dt.getFullYear() < 2000) return 'Data invalida'
+    return dt.toLocaleDateString('ro-RO')
+  } catch { return 'Data invalida' }
+}
+function fmtRON(v: number): string {
+  return v.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function fmtTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    return d.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })
+  } catch { return '' }
 }
 
-const DOT: Record<string, string> = { inalta: 'bg-red-500', medie: 'bg-amber-400', scazuta: 'bg-gray-300' }
+// Expandable rows
+function ContractRow({ c, onOpen }: { c: ContractAlerta; onOpen: () => void }) {
+  const [open, setOpen] = useState(false)
+  const daysLabel = c.days_until_expiry === null ? '' :
+    c.days_until_expiry < 0 ? `${Math.abs(c.days_until_expiry)}z expirat` : `${c.days_until_expiry} zile`
+  return (
+    <div>
+      <button onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-gray-50 transition-all">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${DOC_DOT[c.doc_status]}`} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">#{c.contract_number} — {c.lessor_name}</p>
+          <p className="text-xs text-gray-400 truncate">{c.end_date ? `Expira: ${fmtDate(c.end_date)}` : 'Data expirare lipsa'}</p>
+        </div>
+        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${DOC_CLS[c.doc_status]}`}>
+          {daysLabel || DOC_LABEL[c.doc_status]}
+        </span>
+        <ChevronRight className={`w-3.5 h-3.5 text-gray-300 flex-shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="mx-3 mb-2 p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <div><span className="text-gray-400">Status BD:</span> <span className="font-medium text-gray-700">{c.status_db}</span></div>
+            <div><span className="text-gray-400">Data expirare:</span> <span className="font-medium text-gray-700">{fmtDate(c.end_date)}</span></div>
+            <div><span className="text-gray-400">Arenda anuala:</span> <span className="font-medium text-gray-700">{fmtRON(c.annual_rent)} RON</span></div>
+            <div><span className="text-gray-400">Prioritate:</span> <span className={`font-medium ${c.priority === 'inalta' ? 'text-red-600' : c.priority === 'medie' ? 'text-amber-600' : 'text-gray-600'}`}>{c.priority}</span></div>
+          </div>
+          <button onClick={onOpen}
+            className="mt-1 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors">
+            Vezi contract
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
-const ACTION_COLORS = [
-  'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
-  'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100',
-  'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
-  'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100',
-]
+function FermaRow({ f, onOpen }: { f: FermaAlerta; onOpen: () => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div>
+      <button onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-gray-50 transition-all">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[f.priority]}`} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{f.operation_type}{f.parcel_code ? ` — ${f.parcel_code}` : ''}</p>
+          <p className="text-xs text-gray-400 truncate">Planificat: {fmtDate(f.planned_date)} · {f.status_db}</p>
+        </div>
+        {f.is_overdue && f.overdue_days !== null && (
+          <span className="text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 bg-red-100 text-red-700">
+            {f.overdue_days}z intarziere
+          </span>
+        )}
+        <ChevronRight className={`w-3.5 h-3.5 text-gray-300 flex-shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="mx-3 mb-2 p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs space-y-1">
+          <div className="grid grid-cols-2 gap-1">
+            <span className="text-gray-400">Operatie:</span><span className="text-gray-700">{f.operation_type}</span>
+            <span className="text-gray-400">Status:</span><span className="text-gray-700">{f.status_db}</span>
+            <span className="text-gray-400">Data planificata:</span><span className="text-gray-700">{fmtDate(f.planned_date)}</span>
+            {f.is_overdue && <><span className="text-gray-400">Intarziere:</span><span className="text-red-600 font-medium">{f.overdue_days} zile</span></>}
+          </div>
+          <button onClick={onOpen}
+            className="mt-1 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors">
+            Vezi activitate
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
-// â”€â”€â”€ Risk gauge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function StocRow({ s, onOpen }: { s: StocAlerta; onOpen: () => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div>
+      <button onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-gray-50 transition-all">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.stock_status === 'ok' ? 'bg-green-500' : s.stock_status === 'scazut' ? 'bg-amber-400' : 'bg-red-500'}`} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{s.product_name}</p>
+          <p className="text-xs text-gray-400 truncate">{s.category} · {s.quantity_available} {s.unit} disponibil</p>
+        </div>
+        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${STOC_CLS[s.stock_status]}`}>
+          {STOC_LABEL[s.stock_status]} ({s.pct_remaining}%)
+        </span>
+        <ChevronRight className={`w-3.5 h-3.5 text-gray-300 flex-shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="mx-3 mb-2 p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs space-y-1">
+          <div className="grid grid-cols-2 gap-1">
+            <span className="text-gray-400">Disponibil:</span><span className="font-medium text-gray-700">{s.quantity_available} {s.unit}</span>
+            <span className="text-gray-400">Initial:</span><span className="text-gray-700">{s.quantity_original} {s.unit}</span>
+            <span className="text-gray-400">Procent ramas:</span><span className={`font-medium ${s.pct_remaining < 5 ? 'text-red-600' : s.pct_remaining < 25 ? 'text-amber-600' : 'text-green-600'}`}>{s.pct_remaining}%</span>
+            <span className="text-gray-400">Expirare lot:</span><span className="text-gray-700">{fmtDate(s.expiry_date)}</span>
+          </div>
+          <button onClick={onOpen}
+            className="mt-1 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors">
+            Gestioneaza stoc
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
+function UtilajRow({ u, onOpen }: { u: UtilajeAlerta; onOpen: () => void }) {
+  const [open, setOpen] = useState(false)
+  const daysLabel = u.rca_days === null ? '' :
+    u.rca_days < 0 ? `${Math.abs(u.rca_days)}z expirat` : `${u.rca_days}z`
+  return (
+    <div>
+      <button onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-gray-50 transition-all">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${DOC_DOT[u.rca_status]}`} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{u.name}</p>
+          <p className="text-xs text-gray-400 truncate">{u.type}{u.plate ? ` · ${u.plate}` : ''}</p>
+        </div>
+        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${DOC_CLS[u.rca_status]}`}>
+          RCA{daysLabel ? `: ${daysLabel}` : ` — ${DOC_LABEL[u.rca_status]}`}
+        </span>
+        <ChevronRight className={`w-3.5 h-3.5 text-gray-300 flex-shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="mx-3 mb-2 p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+            <div>
+              <p className="text-gray-400 mb-0.5 font-medium">RCA</p>
+              <span className={`font-semibold ${DOC_CLS[u.rca_status]} rounded px-1.5 py-0.5 inline-block text-[11px]`}>{DOC_LABEL[u.rca_status]}</span>
+              <p className="text-gray-500 mt-0.5">Expira: {fmtDate(u.rca_expiry_date)}</p>
+            </div>
+            {u.itp_due_date && (
+              <div>
+                <p className="text-gray-400 mb-0.5 font-medium">ITP</p>
+                <span className={`font-semibold ${u.itp_status ? DOC_CLS[u.itp_status] : 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 inline-block text-[11px]`}>{u.itp_status ? DOC_LABEL[u.itp_status] : 'Necunoscut'}</span>
+                <p className="text-gray-500 mt-0.5">Scadent: {fmtDate(u.itp_due_date)}</p>
+              </div>
+            )}
+            {u.service_due_date && (
+              <div>
+                <p className="text-gray-400 mb-0.5 font-medium">Service</p>
+                <span className={`font-semibold ${u.service_status ? DOC_CLS[u.service_status] : 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 inline-block text-[11px]`}>{u.service_status ? DOC_LABEL[u.service_status] : 'Necunoscut'}</span>
+                <p className="text-gray-500 mt-0.5">Scadent: {fmtDate(u.service_due_date)}</p>
+                {u.service_task_title && <p className="text-gray-400">{u.service_task_title}</p>}
+              </div>
+            )}
+            <div>
+              <p className="text-gray-400 mb-0.5 font-medium">Fabricatie</p>
+              <p className="text-gray-700">{[u.brand, u.model, u.year].filter(Boolean).join(' ') || '—'}</p>
+            </div>
+          </div>
+          <button onClick={onOpen}
+            className="mt-1 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors">
+            Vezi utilaj
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TranzactieRow({ t, onPay }: { t: TranzactieAlerta; onPay: () => void }) {
+  const [open, setOpen] = useState(false)
+  if (t.is_paid) return null  // ONLY unpaid transactions shown in this card
+  return (
+    <div>
+      <button onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-gray-50 transition-all">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PAY_DOT[t.payment_status]}`} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{t.lessor_name} — {t.product_name}</p>
+          <p className="text-xs text-gray-400 truncate">Camp. {t.campaign_year}{t.contract_number ? ` · #${t.contract_number}` : ''}</p>
+        </div>
+        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${PAY_CLS[t.payment_status]}`}>
+          {PAY_LABEL[t.payment_status]}
+        </span>
+        <span className="text-xs font-semibold text-gray-700 flex-shrink-0 min-w-[64px] text-right">
+          {fmtRON(t.ron_net)} RON
+        </span>
+        <ChevronRight className={`w-3.5 h-3.5 text-gray-300 flex-shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="mx-3 mb-2 p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <span className="text-gray-400">Arendator:</span><span className="text-gray-700">{t.lessor_name}</span>
+            <span className="text-gray-400">Produs:</span><span className="text-gray-700">{t.product_name}</span>
+            <span className="text-gray-400">Campanie:</span><span className="text-gray-700">{t.campaign_year}</span>
+            <span className="text-gray-400">Data tranzactie:</span><span className="text-gray-700">{fmtDate(t.transaction_date)}</span>
+            <span className="text-gray-400">Valoare:</span><span className="font-semibold text-gray-900">{fmtRON(t.ron_net)} RON</span>
+            <span className="text-gray-400">Status:</span>
+            <span className={`font-semibold ${PAY_CLS[t.payment_status]} rounded px-1 inline-block text-[11px]`}>{PAY_LABEL[t.payment_status]}</span>
+            {t.is_overdue && (
+              <span className="col-span-2 text-red-600 font-semibold">Plata intarziata cu &gt;30 zile</span>
+            )}
+            {t.contract_id && (
+              <><span className="text-gray-400">Contract:</span><span className="text-gray-700">#{t.contract_number ?? t.contract_id.slice(0, 8)}</span></>
+            )}
+          </div>
+          {/* Navigate to contract dashboard for payment registration */}
+          <button onClick={onPay}
+            className="mt-1 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors">
+            Inregistreaza plata
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Section card
+function SectionCard({
+  icon, title, count, critice, addHref, children,
+}: {
+  icon: React.ReactNode; title: string; count: number; critice: number
+  addHref: string; children: React.ReactNode
+}) {
+  const router = useRouter()
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <div className="text-brand-600">{icon}</div>
+          <span className="font-semibold text-gray-900 text-sm">{title}</span>
+          <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{count}</span>
+        </div>
+        {critice > 0 && (
+          <span className="flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+            <AlertTriangle className="w-3 h-3" /> {critice} critice
+          </span>
+        )}
+      </div>
+      <div className="p-3 space-y-0.5">
+        {count === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-1 py-4 text-gray-300">
+            <CheckCircle className="w-4 h-4" />
+            <span className="text-sm">Situatie buna — nicio alerta</span>
+            <button onClick={() => router.push(addHref)}
+              className="text-xs text-brand-500 hover:text-brand-700 font-medium mt-0.5 transition-colors">
+              Gestioneaza &rarr;
+            </button>
+          </div>
+        ) : children}
+      </div>
+      {count > 0 && (
+        <div className="px-4 py-2 border-t border-gray-50">
+          <button onClick={() => router.push(addHref)}
+            className="text-xs text-brand-500 hover:text-brand-700 font-medium transition-colors">
+            Vezi toate &rarr;
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Risk gauge
 function RiskGauge({ score }: { score: number }) {
   const s = Math.max(0, Math.min(100, score))
   const color = s >= 70 ? '#ef4444' : s >= 40 ? '#f59e0b' : '#16a34a'
@@ -88,8 +345,8 @@ function RiskGauge({ score }: { score: number }) {
       <svg width="100" height="100" className="-rotate-90">
         <circle cx="50" cy="50" r="40" fill="none" stroke="#f3f4f6" strokeWidth="10" />
         <circle cx="50" cy="50" r="40" fill="none" stroke={color} strokeWidth="10"
-          strokeDasharray={circ} strokeDashoffset={offset}
-          strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1s ease' }} />
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+          style={{ transition: 'stroke-dashoffset 1s ease' }} />
       </svg>
       <span className="text-2xl font-bold -mt-16" style={{ color }}>{s}</span>
       <span className="text-xs text-gray-400 mt-6">/ 100</span>
@@ -98,128 +355,24 @@ function RiskGauge({ score }: { score: number }) {
   )
 }
 
-// â”€â”€â”€ Generic expandable row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// --- AlertItemRow -----------------------------------------------------------
-
-function AlertItemRow({ item, onNavigate }: { item: AlertItem; onNavigate: (route: string) => void }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div>
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all hover:bg-gray-50"
-      >
-        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${DOT[item.priority] ?? 'bg-gray-300'}`} />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">{item.label}</p>
-          {item.sublabel && <p className="text-xs text-gray-400 truncate">{item.sublabel}</p>}
-        </div>
-        {item.qtyText && (
-          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${item.qtyColor ?? 'bg-gray-100 text-gray-600'}`}>
-            {item.qtyText}
-          </span>
-        )}
-        {item.badgeText && (
-          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${item.badgeColor ?? 'bg-gray-100 text-gray-600'}`}>
-            {item.badgeText}
-          </span>
-        )}
-        <ChevronRight className={`w-3.5 h-3.5 text-gray-300 flex-shrink-0 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
-      </button>
-      {open && (
-        <div className="mx-3 mb-2 p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Rationament</p>
-          <p className="text-sm text-gray-700 leading-relaxed">{item.mesaj}</p>
-          <div className="flex items-start gap-1.5 pt-1">
-            <Zap className="w-3.5 h-3.5 text-brand-600 flex-shrink-0 mt-0.5" />
-            <p className="text-xs font-medium text-brand-700">{item.actiune}</p>
-          </div>
-          <button
-            onClick={() => onNavigate(CATEGORY_ROUTES[item.category] ?? '/alerte')}
-            className="mt-1 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors"
-          >
-            Aplica actiunea
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// --- SectionCard -------------------------------------------------------------
-
-function SectionCard({ icon, title, count, high, items, onNavigate, addHref }: {
-  icon: React.ReactNode; title: string; count: number; high: number
-  items: AlertItem[]; onNavigate: (route: string) => void
-  addHref?: string
-}) {
-  const router = useRouter()
-  return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <div className="text-brand-600">{icon}</div>
-          <span className="font-semibold text-gray-900 text-sm">{title}</span>
-          <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{count}</span>
-        </div>
-        {high > 0 && (
-          <span className="flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
-            <AlertTriangle className="w-3 h-3" /> {high} critice
-          </span>
-        )}
-      </div>
-      <div className="p-3 space-y-0.5">
-        {count === 0
-          ? (
-            <div className="flex flex-col items-center justify-center gap-1 py-4 text-gray-300">
-              <CheckCircle className="w-4 h-4" />
-              <span className="text-sm">Nicio alerta</span>
-              {addHref && (
-                <button onClick={() => router.push(addHref)}
-                  className="text-xs text-brand-500 hover:text-brand-700 font-medium mt-0.5 transition-colors">
-                  Gestioneaza &rarr;
-                </button>
-              )}
-            </div>
-          )
-          : items.map(item => (
-            <AlertItemRow key={item.id} item={item} onNavigate={onNavigate} />
-          ))
-        }
-      </div>
-    </div>
-  )
-}
-
-// --- Category routes --------------------------------------------------------
-
-const CATEGORY_ROUTES: Record<string, string> = {
-  Contracte:  '/contracte',
-  Activitati: '/campanie/activitati',
-  Stocuri:    '/inventar/stoc',
-  Utilaje:    '/utilaje',
-  Tranzactii: '/plati',
-}
-
-// --- InsightsPanel -----------------------------------------------------------
-
-function InsightsPanel({ insights }: { insights: AlertInsight[] }) {
+// Insights panel (DB-computed, not AI)
+function InsightsPanel({ insights }: { insights: AlertaInsight[] }) {
   if (insights.length === 0) return null
-  const impactColor = (impact: string) =>
-    impact === 'mare' ? 'bg-red-900 text-red-300' : impact === 'mediu' ? 'bg-amber-900 text-amber-300' : 'bg-gray-700 text-gray-300'
+  const impactCls = (impact: string) =>
+    impact === 'mare' ? 'bg-red-900 text-red-300' :
+    impact === 'mediu' ? 'bg-amber-900 text-amber-300' : 'bg-gray-700 text-gray-300'
   return (
     <div className="bg-gray-900 rounded-2xl overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-700">
-        <Sparkles className="w-4 h-4 text-brand-400" />
-        <span className="font-semibold text-white text-sm">Insights prioritare</span>
+        <ShieldAlert className="w-4 h-4 text-red-400" />
+        <span className="font-semibold text-white text-sm">Alerte prioritare</span>
         <span className="text-xs bg-brand-600 text-white px-1.5 py-0.5 rounded-full ml-auto">Top {insights.length}</span>
       </div>
       <div className="p-3 space-y-3">
         {insights.map((ins, i) => (
           <div key={i} className="space-y-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${impactColor(ins.impact)}`}>
+              <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${impactCls(ins.impact)}`}>
                 {ins.impact.toUpperCase()}
               </span>
               <span className="text-xs text-gray-400">{ins.categorie}</span>
@@ -233,233 +386,187 @@ function InsightsPanel({ insights }: { insights: AlertInsight[] }) {
   )
 }
 
-// â”€â”€â”€ Typed rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-
-// â”€â”€â”€ Main Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-interface Saved { result: AnalysisResult; model: string; tokens: number }
-type FilterTab = 'toate' | 'critice' | 'atentie' | 'ok'
+// Main dashboard
+type FilterTab = 'toate' | 'critice' | 'atentie'
 
 export default function AlertsDashboard() {
-  const [result, setResult] = useState<AnalysisResult | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [model, setModel] = useState('')
-  const [tokens, setTokens] = useState(0)
-  const [dataErrors, setDataErrors] = useState<string[]>([])
-  const [dbDebug, setDbDebug] = useState<{ machines: number; transactions: number } | null>(null)
-  const [activeFilter, setActiveFilter] = useState<FilterTab>('toate')
-  const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
   const router = useRouter()
+  const [data, setData]       = useState<AlerteResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null)
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('toate')
 
-  useEffect(() => {
+  const load = useCallback(async () => {
+    setLoading(true); setError(null)
     try {
-      const raw = localStorage.getItem(LS_KEY)
-      if (raw) {
-        const saved: Saved = JSON.parse(raw)
-        setResult(saved.result)
-        setModel(saved.model)
-        setTokens(saved.tokens)
-      }
-    } catch { /* ignore */ }
+      const res  = await fetch('/api/alerte', { cache: 'no-store' })
+      const json: AlerteResponse = await res.json()
+      if (!json.ok) { setError(json.error ?? 'Eroare la incarcarea alertelor.') }
+      else { setData(json); setUpdatedAt(fmtTime(json.generat_la)) }
+    } catch { setError('Nu s-a putut contacta baza de date.') }
+    finally  { setLoading(false) }
   }, [])
 
-  useEffect(() => {
-    if (!retryCountdown || retryCountdown <= 0) return
-    const t = setTimeout(() => setRetryCountdown(c => c !== null && c > 1 ? c - 1 : null), 1000)
-    return () => clearTimeout(t)
-  }, [retryCountdown])
+  useEffect(() => { void load() }, [load])
 
-  const run = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setRetryCountdown(null)
-    try {
-      const res = await fetch('/api/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'full_analysis' }),
-      })
-      const json = await res.json()
-      if (json.rateLimited) { setRetryCountdown(json.retryAfterSecs ?? 60); return }
-      if (!json.ok) { setError(json.error ?? 'Eroare necunoscuta.'); return }
-      setResult(json.result)
-      setModel(json.model ?? '')
-      setTokens(json.tokens_used ?? 0)
-      setDataErrors(json.data_errors ?? [])
-      if (json._debug) setDbDebug(json._debug)
-      localStorage.setItem(LS_KEY, JSON.stringify({ result: json.result, model: json.model ?? '', tokens: json.tokens_used ?? 0 }))
-    } catch {
-      setError('Nu s-a putut contacta serverul AI.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const d = data
 
-  const allItems = result ? flattenAlerts(result) : []
-  const totalHigh = allItems.filter(a => a.priority === 'inalta').length
-  const totalMed  = allItems.filter(a => a.priority === 'medie').length
-  const totalOk   = allItems.filter(a => a.priority === 'scazuta').length
+  // Counts
+  const contracteCritice = (d?.contracte ?? []).filter(c => c.priority === 'inalta').length
+  const contracteMedii   = (d?.contracte ?? []).filter(c => c.priority === 'medie').length
+  const fermaCritice     = (d?.ferma     ?? []).filter(f => f.priority === 'inalta').length
+  const fermaMedii       = (d?.ferma     ?? []).filter(f => f.priority === 'medie').length
+  const stocuriCritice   = (d?.stocuri   ?? []).filter(s => s.priority === 'inalta').length
+  const stocuriMedii     = (d?.stocuri   ?? []).filter(s => s.priority === 'medie').length
+  const utilajeCritice   = (d?.utilaje   ?? []).filter(u => u.overall_priority === 'high').length
+  const utilajeMedii     = (d?.utilaje   ?? []).filter(u => u.overall_priority === 'medium').length
+  const txUnpaid         = (d?.tranzactii ?? []).filter(t => !t.is_paid)
+  const txCritice        = txUnpaid.filter(t => t.is_overdue).length
+  const txMedii          = txUnpaid.filter(t => !t.is_overdue).length
 
-  const filteredIds = new Set(
-    activeFilter === 'critice' ? allItems.filter(a => a.priority === 'inalta').map(a => a.id)
-    : activeFilter === 'atentie' ? allItems.filter(a => a.priority === 'medie').map(a => a.id)
-    : activeFilter === 'ok' ? allItems.filter(a => a.priority === 'scazuta').map(a => a.id)
-    : allItems.map(a => a.id)
-  )
+  const totalCritice = contracteCritice + fermaCritice + stocuriCritice + utilajeCritice + txCritice
+  const totalMedii   = contracteMedii   + fermaMedii   + stocuriMedii   + utilajeMedii   + txMedii
+  const totalAlerte  = totalCritice + totalMedii
 
-  const sectionItems = (cat: string) => allItems.filter(a => a.category === cat && filteredIds.has(a.id))
-  const highOf = (arr?: { priority: string }[]) => (arr ?? []).filter(a => a.priority === 'inalta').length
+  // Filtered sections
+  function filterPriority<T extends { priority: AlertPriority }>(arr: T[]): T[] {
+    return activeFilter === 'critice' ? arr.filter(x => x.priority === 'inalta')
+         : activeFilter === 'atentie' ? arr.filter(x => x.priority === 'medie')
+         : arr
+  }
+  const showContracte  = filterPriority(d?.contracte ?? [])
+  const showFerma      = filterPriority(d?.ferma     ?? [])
+  const showStocuri    = filterPriority(d?.stocuri   ?? [])
+  const showUtilaje    = activeFilter === 'critice'
+    ? (d?.utilaje ?? []).filter(u => u.overall_priority === 'high')
+    : activeFilter === 'atentie'
+    ? (d?.utilaje ?? []).filter(u => u.overall_priority === 'medium')
+    : d?.utilaje ?? []
+  // Transactions: always show only unpaid, filter doesn't apply to is_paid
+  const showTranzactii = (d?.tranzactii ?? []).filter(t => !t.is_paid)
 
   const TABS: { key: FilterTab; label: string; count: number }[] = [
-    { key: 'toate',   label: 'Toate',   count: allItems.length },
-    { key: 'critice', label: 'Critice', count: totalHigh },
-    { key: 'atentie', label: 'Atentie', count: totalMed },
-    { key: 'ok',      label: 'OK',      count: totalOk },
+    { key: 'toate',   label: 'Toate',   count: totalAlerte },
+    { key: 'critice', label: 'Critice', count: totalCritice },
+    { key: 'atentie', label: 'Atentie', count: totalMedii },
   ]
+
+  const toContract = (c: ContractAlerta)    => router.push(`/contracte/${c.id}`)
+  const toActivity = ()                     => router.push('/campanie/activitati')
+  const toStock    = ()                     => router.push('/campanie/stocuri')
+  const toUtilaj   = ()                     => router.push('/utilaje')
+  const toPayment  = (t: TranzactieAlerta) =>
+    router.push(t.contract_id ? `/contracte/${t.contract_id}` : '/plati')
 
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Alerte &amp; Analiza AI</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Monitorizare inteligenta &mdash; toata ferma ta</p>
+          <h1 className="text-2xl font-bold text-gray-900">Alerte Operationale</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Situatia exacta a fermei din baza de date{updatedAt && <span className="ml-1 text-gray-400">· actualizat {updatedAt}</span>}
+          </p>
         </div>
-        <button onClick={run} disabled={loading}
-          className="flex items-center gap-1.5 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors">
+        <button onClick={load} disabled={loading}
+          className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl disabled:opacity-50 transition-colors">
           {loading
-            ? <><Loader2 className="w-4 h-4 animate-spin" /> Analizez...</>
-            : <><RefreshCw className="w-4 h-4" /> Ruleaza analiza</>}
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Incarc...</>
+            : <><RefreshCw className="w-4 h-4" /> Actualizeaza</>}
         </button>
       </div>
 
-      {retryCountdown !== null && (
-        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
-          <Clock className="w-4 h-4 flex-shrink-0" />
-          <span>Limita AI atinsa. Reincearca in <strong>{[
-            Math.floor(retryCountdown / 3600) > 0 ? `${Math.floor(retryCountdown / 3600)}h` : '',
-            Math.floor((retryCountdown % 3600) / 60) > 0 ? `${Math.floor((retryCountdown % 3600) / 60)}min` : '',
-            retryCountdown % 60 > 0 || retryCountdown < 60 ? `${retryCountdown % 60}s` : '',
-          ].filter(Boolean).join(' ')}</strong></span>
-          {retryCountdown === 0 && (
-            <button onClick={run} className="ml-auto text-xs font-semibold bg-amber-600 text-white px-3 py-1 rounded-lg">Ruleaza acum</button>
-          )}
-        </div>
-      )}
-      {error && !retryCountdown && (
+      {/* Error */}
+      {error && (
         <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {error}
         </div>
       )}
 
-      {dataErrors.length > 0 && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-          <p className="text-sm font-semibold text-amber-700 mb-1">Avertisment date:</p>
-          <ul className="text-sm text-amber-600 list-disc list-inside space-y-0.5">
-            {dataErrors.map((e, i) => <li key={i}>{e}</li>)}
+      {/* DB warnings (non-fatal) */}
+      {d && d.errors.length > 0 && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <p className="text-xs font-semibold text-amber-700 mb-1">Avertismente baza de date:</p>
+          <ul className="text-xs text-amber-600 list-disc list-inside space-y-0.5">
+            {d.errors.map((e, i) => <li key={i}>{e}</li>)}
           </ul>
         </div>
       )}
 
-      {dbDebug && (dbDebug.machines === 0 || dbDebug.transactions === 0) && (
-        <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500 flex flex-wrap gap-3">
-          <span className="font-semibold text-gray-700">Date BD returnate:</span>
-          <span className={dbDebug.machines === 0 ? 'text-red-600 font-semibold' : ''}>Utilaje: {dbDebug.machines}</span>
-          <span className={dbDebug.transactions === 0 ? 'text-red-600 font-semibold' : ''}>Tranzactii: {dbDebug.transactions}</span>
-          {dbDebug.machines === 0 && <span className="text-red-500">— tabela machines este goala sau cheia Supabase lipseste</span>}
-          {dbDebug.transactions === 0 && <span className="text-red-500">— tabela transactions este goala sau toate sunt platite</span>}
-        </div>
-      )}
-
-      {!result && !loading && !error && (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mb-4">
-            <Shield className="w-8 h-8 text-brand-600" />
-          </div>
-          <h2 className="text-lg font-semibold text-gray-800 mb-1">Asistentul AI este pregatit</h2>
-          <p className="text-sm text-gray-400 max-w-md">
-            Apasa <strong>Ruleaza analiza</strong> pentru a primi o analiza completa a fermei.
-          </p>
-        </div>
-      )}
-
-      {loading && (
-        <div className="flex flex-col items-center justify-center py-24">
+      {/* Loading */}
+      {loading && !d && (
+        <div className="flex flex-col items-center justify-center py-20">
           <Loader2 className="w-10 h-10 animate-spin text-brand-600 mb-4" />
-          <p className="text-sm text-gray-500">Analizez toate datele fermei tale...</p>
+          <p className="text-sm text-gray-500">Incarc situatia fermei din baza de date...</p>
         </div>
       )}
 
-      {result && !loading && (
+      {/* Dashboard */}
+      {d && !loading && (
         <>
-          {/* Insights prioritare — primo lucru vizibil */}
-          <InsightsPanel insights={result.insights ?? []} />
+          <InsightsPanel insights={d.insights} />
 
           {/* KPI row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col items-center justify-center">
               <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">Scor risc global</p>
-              <RiskGauge score={result.scor_risc} />
+              <RiskGauge score={d.scor_risc} />
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
                 <AlertTriangle className="w-3.5 h-3.5" /> Alerte critice
               </div>
-              <div className={`text-3xl font-bold ${totalHigh > 0 ? 'text-red-600' : 'text-green-600'}`}>{totalHigh}</div>
-              <p className="text-xs text-gray-400 mt-1">din {allItems.length} total</p>
-              {totalHigh > 0 && <p className="text-xs text-red-500 font-medium mt-0.5">+{totalHigh} azi</p>}
+              <div className={`text-3xl font-bold ${totalCritice > 0 ? 'text-red-600' : 'text-green-600'}`}>{totalCritice}</div>
+              <p className="text-xs text-gray-400 mt-1">din {totalAlerte} total</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
                 <ArrowLeftRight className="w-3.5 h-3.5" /> Arendasi afectati
               </div>
-              <div className={`text-3xl font-bold ${(result.tranzactii?.length ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                {result.tranzactii?.length ?? 0}
+              <div className={`text-3xl font-bold ${d.sumar.arendasi_afectati > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                {d.sumar.arendasi_afectati}
               </div>
-              <p className="text-xs text-gray-400 mt-1">{result.contracte?.length ?? 0} contracte active</p>
+              <p className="text-xs text-gray-400 mt-1">{d.sumar.contracte_active} contracte active</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
-              {result.scor_risc < 40
-                ? <><CheckCircle className="w-6 h-6 text-green-500 mb-1" /><p className="text-sm font-semibold text-green-700">Situatie buna</p></>
-                : result.scor_risc < 70
-                ? <><Clock className="w-6 h-6 text-amber-500 mb-1" /><p className="text-sm font-semibold text-amber-700">Necesita atentie</p></>
-                : <><TrendingDown className="w-6 h-6 text-red-500 mb-1" /><p className="text-sm font-semibold text-red-700">Risc ridicat</p></>}
-              <p className="text-xs text-gray-400 mt-1">{(() => { const d = new Date(result.generat_la); return !isNaN(d.getTime()) && d.getFullYear() > 2000 ? d.toLocaleString('ro-RO') : 'acum' })()}</p>
+              {d.scor_risc < 20
+                ? <><ShieldCheck className="w-6 h-6 text-green-500 mb-1" /><p className="text-sm font-semibold text-green-700">Situatie buna</p><p className="text-xs text-gray-400 mt-0.5">Fara alerte critice</p></>
+                : d.scor_risc < 50
+                ? <><Clock className="w-6 h-6 text-amber-500 mb-1" /><p className="text-sm font-semibold text-amber-700">Necesita atentie</p><p className="text-xs text-gray-400 mt-0.5">{totalMedii} alerte medii</p></>
+                : <><TrendingDown className="w-6 h-6 text-red-500 mb-1" /><p className="text-sm font-semibold text-red-700">Risc {d.scor_tier}</p><p className="text-xs text-gray-400 mt-0.5">{totalCritice} alerte critice</p></>}
             </div>
           </div>
 
-          {/* Sumar executiv */}
+          {/* Sumar executiv — template-based, DB-driven, no AI */}
           <div className="bg-brand-50 border border-brand-100 rounded-2xl p-5">
             <div className="flex flex-wrap items-center gap-2 mb-3">
-              <Sparkles className="w-4 h-4 text-brand-600" />
+              <Shield className="w-4 h-4 text-brand-600" />
               <span className="text-sm font-semibold text-brand-700">Sumar executiv</span>
-              <span className="text-xs bg-brand-600 text-white px-2 py-0.5 rounded-full font-medium">Generat de AI</span>
+              <span className="ml-auto text-xs text-brand-400">Date din baza de date · {updatedAt ?? '—'}</span>
             </div>
-            <p className="text-sm text-gray-700 leading-relaxed mb-3">{result.sumar}</p>
-            {(result.actiuni ?? []).length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {(result.actiuni ?? []).map((act, i) => (
-                  <button key={i} className={`text-xs font-medium px-3 py-1 rounded-full border transition-colors ${ACTION_COLORS[i % ACTION_COLORS.length]}`}>
-                    {act}
-                  </button>
-                ))}
-                <button className="text-xs font-medium px-3 py-1 rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors">
-                  Salveaza raport
-                </button>
-              </div>
-            )}
+            <p className="text-sm text-gray-700 leading-relaxed">{d.sumar_text}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+              {[
+                { label: 'Contracte active',    val: d.sumar.contracte_active,                              warn: d.sumar.contracte_expirate > 0 || d.sumar.contracte_expira_curand > 0 },
+                { label: 'Tranzactii neplatite', val: d.sumar.tranzactii_neplatite,                          warn: d.sumar.tranzactii_neplatite > 0 },
+                { label: 'Utilaje cu alerte',   val: d.sumar.utilaje_cu_alerte,                             warn: d.sumar.utilaje_cu_alerte > 0 },
+                { label: 'Stocuri cu probleme', val: d.sumar.stocuri_epuizate + d.sumar.stocuri_scazute,    warn: d.sumar.stocuri_epuizate > 0 },
+              ].map(({ label, val, warn }) => (
+                <div key={label} className="bg-white rounded-xl border border-brand-100 px-3 py-2">
+                  <p className="text-xs text-gray-400">{label}</p>
+                  <p className={`text-lg font-bold ${warn && val > 0 ? 'text-red-600' : 'text-gray-900'}`}>{val}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Filter tabs */}
+          {/* Filter tabs — no model/token display */}
           <div className="flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
             {TABS.map(tab => (
               <button key={tab.key} onClick={() => setActiveFilter(tab.key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  activeFilter === tab.key
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
+                  activeFilter === tab.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}>
                 {tab.label}
                 <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
@@ -467,33 +574,42 @@ export default function AlertsDashboard() {
                 }`}>{tab.count}</span>
               </button>
             ))}
-            <span className="ml-4 text-xs text-gray-400 hidden sm:block">{model} · {tokens.toLocaleString()} tokens</span>
           </div>
 
-          {/* Alert grids — AI sections only (Utilaje & Tranzactii are in DirectStatusCards below) */}
+          {/* Alert section cards */}
           <div className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <SectionCard icon={<FileText className="w-4 h-4" />} title="Contracte"
-                count={sectionItems('Contracte').length} high={highOf(result.contracte)}
-                items={sectionItems('Contracte')} onNavigate={r => router.push(r)}
-                addHref="/contracte" />
+                count={showContracte.length} critice={showContracte.filter(c => c.priority === 'inalta').length}
+                addHref="/contracte">
+                {showContracte.map(c => <ContractRow key={c.id} c={c} onOpen={() => toContract(c)} />)}
+              </SectionCard>
               <SectionCard icon={<Tractor className="w-4 h-4" />} title="Activitati Ferma"
-                count={sectionItems('Activitati').length} high={highOf(result.ferma)}
-                items={sectionItems('Activitati')} onNavigate={r => router.push(r)}
-                addHref="/campanie/activitati" />
-              <SectionCard icon={<Package className="w-4 h-4" />} title="Stocuri"
-                count={sectionItems('Stocuri').length} high={highOf(result.stocuri)}
-                items={sectionItems('Stocuri')} onNavigate={r => router.push(r)}
-                addHref="/inventar/stoc" />
+                count={showFerma.length} critice={showFerma.filter(f => f.priority === 'inalta').length}
+                addHref="/campanie/activitati">
+                {showFerma.map(f => <FermaRow key={f.id} f={f} onOpen={toActivity} />)}
+              </SectionCard>
+              <SectionCard icon={<Package className="w-4 h-4" />} title="Stocuri & Inputuri"
+                count={showStocuri.length} critice={showStocuri.filter(s => s.priority === 'inalta').length}
+                addHref="/campanie/stocuri">
+                {showStocuri.map(s => <StocRow key={s.id} s={s} onOpen={toStock} />)}
+              </SectionCard>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <SectionCard icon={<Wrench className="w-4 h-4" />} title="Utilaje & RCA"
+                count={showUtilaje.length} critice={showUtilaje.filter(u => u.overall_priority === 'high').length}
+                addHref="/utilaje">
+                {showUtilaje.map(u => <UtilajRow key={u.id} u={u} onOpen={toUtilaj} />)}
+              </SectionCard>
+              <SectionCard icon={<ArrowLeftRight className="w-4 h-4" />} title="Tranzactii Neplatite"
+                count={showTranzactii.length} critice={showTranzactii.filter(t => t.is_overdue).length}
+                addHref="/plati">
+                {showTranzactii.map(t => <TranzactieRow key={t.id} t={t} onPay={() => toPayment(t)} />)}
+              </SectionCard>
             </div>
           </div>
         </>
       )}
-
-      {/* Utilaje & Tranzactii — always loaded directly from DB, no AI required */}
-      <DirectStatusCards />
     </div>
   )
 }
-
-// â”€â”€â”€ Priority / status helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
