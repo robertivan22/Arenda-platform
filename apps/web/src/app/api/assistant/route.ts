@@ -82,7 +82,7 @@ async function fetchLiveData() {
 
   const [contractsRes, ordersRes, stockRes, machinesRes, maintenanceRes, txBaseRes] = await Promise.all([
     db.from('contracts').select('contract_number, end_date, status, lessors(first_name, last_name, company_name)').limit(50),
-    db.from('work_orders').select('operation_type, status, planned_date, execution_date, parcels(bloc_fizic)').gte('planned_date', yearStart).order('planned_date').limit(40),
+    db.from('work_orders').select('operation_type, status, planned_date, parcels(bloc_fizic)').gte('planned_date', yearStart).order('planned_date').limit(40),
     db.from('input_lots').select('product_name, category, quantity_available, quantity, unit, expiry_date').order('category').limit(60),
     db.from('machines').select('*').order('name').limit(30),
     db.from('maintenance_tasks').select('title, type, due_date, status, machine_id').in('status', ['PLANIFICAT', 'IN_EXECUTIE']).order('due_date').limit(20),

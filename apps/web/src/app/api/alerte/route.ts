@@ -321,7 +321,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
     // ── 2. Work orders (farm activities) ──────────────────────────────────────
     const { data: ordersRaw, error: oErr } = await db
       .from('work_orders')
-      .select('id, operation_type, status, planned_date, execution_date, parcels(bloc_fizic, parcel_nr)')
+      .select('id, operation_type, status, planned_date, parcels(bloc_fizic, parcel_nr)')
       .gte('planned_date', yearStart)
       .order('planned_date', { ascending: true })
       .limit(80)
