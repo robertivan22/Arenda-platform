@@ -193,66 +193,10 @@ function SectionCard({ icon, title, count, high, items, selectedId, onSelect, ad
 
 const CATEGORY_ROUTES: Record<string, string> = {
   Contracte:  '/contracte',
-  Activitati: '/ferma',
+  Activitati: '/campanie/activitati',
   Stocuri:    '/inventar/stoc',
   Utilaje:    '/utilaje',
   Tranzactii: '/plati',
-}
-
-// --- AlertDetailPanel --------------------------------------------------------
-
-function AlertDetailPanel({ item, onClose }: { item: AlertItem | null; onClose: () => void }) {
-  const router = useRouter()
-  if (!item) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center">
-        <ChevronRight className="w-8 h-8 mx-auto mb-2 text-gray-200" />
-        <p className="text-sm text-gray-300">Selecteaza o alerta pentru detalii</p>
-      </div>
-    )
-  }
-  return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <span className={`w-2.5 h-2.5 rounded-full ${DOT[item.priority] ?? 'bg-gray-300'}`} />
-          <span className="font-semibold text-gray-900 text-sm">Detaliu alerta</span>
-        </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <div className="p-4 space-y-4">
-        <div>
-          <span className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">Alerta</span>
-          <p className="text-sm font-semibold text-gray-900">{item.label}</p>
-          {item.sublabel && <p className="text-xs text-gray-500 mt-0.5">{item.sublabel}</p>}
-          <span className="inline-block mt-1.5 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{item.category}</span>
-        </div>
-        <div>
-          <span className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">Rationament</span>
-          <p className="text-sm text-gray-700 leading-relaxed">{item.mesaj}</p>
-        </div>
-        <div>
-          <span className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">Actiune recomandata</span>
-          <div className="flex items-start gap-2">
-            <Zap className="w-3.5 h-3.5 text-brand-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm font-medium text-brand-700">{item.actiune}</p>
-          </div>
-        </div>
-        <div className="flex gap-2 pt-1">
-          <button
-            onClick={() => { router.push(CATEGORY_ROUTES[item.category] ?? '/alerte'); onClose() }}
-            className="flex-1 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors">
-            Aplica actiunea
-          </button>
-          <button onClick={onClose} className="px-3 py-2 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg transition-colors">
-            Ignora
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // --- InsightsPanel -----------------------------------------------------------
@@ -303,6 +247,8 @@ export default function AlertsDashboard() {
   const [dataErrors, setDataErrors] = useState<string[]>([])
   const [selectedItem, setSelectedItem] = useState<AlertItem | null>(null)
   const [activeFilter, setActiveFilter] = useState<FilterTab>('toate')
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     try {
@@ -316,9 +262,16 @@ export default function AlertsDashboard() {
     } catch { /* ignore */ }
   }, [])
 
+  useEffect(() => {
+    if (!retryCountdown || retryCountdown <= 0) return
+    const t = setTimeout(() => setRetryCountdown(c => c !== null && c > 1 ? c - 1 : null), 1000)
+    return () => clearTimeout(t)
+  }, [retryCountdown])
+
   const run = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setRetryCountdown(null)
     setSelectedItem(null)
     try {
       const res = await fetch('/api/assistant', {
@@ -327,6 +280,7 @@ export default function AlertsDashboard() {
         body: JSON.stringify({ mode: 'full_analysis' }),
       })
       const json = await res.json()
+      if (json.rateLimited) { setRetryCountdown(json.retryAfterSecs ?? 60); return }
       if (!json.ok) { setError(json.error ?? 'Eroare necunoscuta.'); return }
       setResult(json.result)
       setModel(json.model ?? '')
@@ -363,7 +317,7 @@ export default function AlertsDashboard() {
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-20">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -378,7 +332,16 @@ export default function AlertsDashboard() {
         </button>
       </div>
 
-      {error && (
+      {retryCountdown !== null && (
+        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
+          <Clock className="w-4 h-4 flex-shrink-0" />
+          <span>Limita AI atinsa. Urmatoarea analiza disponibila in <strong>{retryCountdown}s</strong></span>
+          {retryCountdown === 0 && (
+            <button onClick={run} className="ml-auto text-xs font-semibold bg-amber-600 text-white px-3 py-1 rounded-lg">Ruleaza acum</button>
+          )}
+        </div>
+      )}
+      {error && !retryCountdown && (
         <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {error}
         </div>
@@ -414,6 +377,9 @@ export default function AlertsDashboard() {
 
       {result && !loading && (
         <>
+          {/* Insights prioritare — primo lucru vizibil */}
+          <InsightsPanel insights={result.insights ?? []} />
+
           {/* KPI row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col items-center justify-center">
@@ -487,10 +453,9 @@ export default function AlertsDashboard() {
             <span className="ml-4 text-xs text-gray-400 hidden sm:block">{model} · {tokens.toLocaleString()} tokens</span>
           </div>
 
-          {/* Main content: left grid + right sidebar */}
-          <div className="flex gap-5 items-start">
-            {/* Alert grid */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Alert grids — full width, 2 rows */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <SectionCard icon={<FileText className="w-4 h-4" />} title="Contracte"
                 count={sectionItems('Contracte').length} high={highOf(result.contracte)}
                 items={sectionItems('Contracte')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
@@ -498,11 +463,13 @@ export default function AlertsDashboard() {
               <SectionCard icon={<Tractor className="w-4 h-4" />} title="Activitati Ferma"
                 count={sectionItems('Activitati').length} high={highOf(result.ferma)}
                 items={sectionItems('Activitati')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
-                addHref="/ferma" />
+                addHref="/campanie/activitati" />
               <SectionCard icon={<Package className="w-4 h-4" />} title="Stocuri"
                 count={sectionItems('Stocuri').length} high={highOf(result.stocuri)}
                 items={sectionItems('Stocuri')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
                 addHref="/inventar/stoc" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SectionCard icon={<Wrench className="w-4 h-4" />} title="Utilaje &amp; RCA"
                 count={sectionItems('Utilaje').length} high={highOf(result.utilaje)}
                 items={sectionItems('Utilaje')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
@@ -511,16 +478,39 @@ export default function AlertsDashboard() {
                 count={sectionItems('Tranzactii').length} high={highOf(result.tranzactii)}
                 items={sectionItems('Tranzactii')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
                 addHref="/plati" />
-              {/* Insights in grid, 3rd col row 2 */}
-              <InsightsPanel insights={result.insights ?? []} />
-            </div>
-
-            {/* Right sidebar — detail panel only */}
-            <div className="w-72 flex-shrink-0">
-              <AlertDetailPanel item={selectedItem} onClose={() => setSelectedItem(null)} />
             </div>
           </div>
         </>
+      )}
+
+      {/* Fixed bottom bar — selected alert detail */}
+      {selectedItem && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
+          <div className="max-w-screen-xl mx-auto px-6 py-3 flex items-center gap-4">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${DOT[selectedItem.priority] ?? 'bg-gray-300'}`} />
+              <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">{selectedItem.label}</span>
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{selectedItem.category}</span>
+            </div>
+            <div className="flex-1 min-w-0 hidden md:block">
+              <p className="text-sm text-gray-500 truncate">{selectedItem.mesaj}</p>
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="text-right hidden lg:block max-w-64">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Actiune recomandata</p>
+                <p className="text-sm font-medium text-brand-700 truncate">{selectedItem.actiune}</p>
+              </div>
+              <button
+                onClick={() => { router.push(CATEGORY_ROUTES[selectedItem.category] ?? '/alerte'); setSelectedItem(null) }}
+                className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap">
+                Aplica actiunea
+              </button>
+              <button onClick={() => setSelectedItem(null)} className="p-2 text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg transition-colors flex-shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

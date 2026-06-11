@@ -113,4 +113,6 @@ export interface AssistantResponse {
   error?: string
   model?: string
   tokens_used?: number
+  rateLimited?: boolean
+  retryAfterSecs?: number
 }

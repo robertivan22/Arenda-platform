@@ -52,7 +52,9 @@ function computeUtilajeAlerts(machines: any[], maintenance: any[], today_d: Date
 }
 
 function computeTranzactiiAlerts(transactions: any[]): TranzactieAlert[] {
-  return transactions.map((t: any) => {
+  return transactions
+    .filter((t: any) => t.is_paid !== true)
+    .map((t: any) => {
     const l = t.lessors
     const lessor = l ? (l.type === 'LEGAL' ? l.company_name : `${l.last_name ?? ''} ${l.first_name ?? ''}`.trim()) : ''
     const suma = Number(t.ron_net ?? 0)
@@ -87,7 +89,7 @@ async function fetchLiveData() {
     db.from('input_lots').select('product_name, category, quantity_available, quantity, unit, expiry_date').order('category').limit(60),
     db.from('machines').select('*').order('name').limit(30),
     db.from('maintenance_tasks').select('title, type, due_date, status, machine_id').in('status', ['PLANIFICAT', 'IN_EXECUTIE']).order('due_date').limit(20),
-    db.from('transactions').select('ron_net, is_paid, campaign_year, product_name, lessors(company_name, first_name, last_name, type)').eq('is_paid', false).order('transaction_date', { ascending: false }).limit(30),
+    db.from('transactions').select('ron_net, is_paid, campaign_year, product_name, contracts(contract_number), lessors(company_name, first_name, last_name, type)').order('transaction_date', { ascending: false }).limit(100),
   ])
 
   const _errors: string[] = []
@@ -183,6 +185,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
 
     return NextResponse.json({ ok: true, mode, result, model, tokens_used: tokens, data_errors: queryErrors.length > 0 ? queryErrors : undefined })
   } catch (err: unknown) {
+    const e = err as any
+    const is429 = e?.status === 429 || (err instanceof Error && (err.message.includes('rate_limit') || err.message.includes('Rate limit') || err.message.includes('429')))
+    if (is429) {
+      const secMatch = (err instanceof Error ? err.message : '').match(/in (\d+\.?\d*)\s*s/)
+      const retryAfterSecs = secMatch ? Math.ceil(Number(secMatch[1])) : 60
+      return NextResponse.json({ ok: false, mode: 'full_analysis', rateLimited: true, retryAfterSecs })
+    }
     const message = err instanceof Error ? err.message : 'Eroare necunoscuta.'
     return NextResponse.json({ ok: false, mode: 'full_analysis', error: message }, { status: 500 })
   }
