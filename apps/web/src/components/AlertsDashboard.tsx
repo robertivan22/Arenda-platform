@@ -11,6 +11,7 @@ import {
 import type {
   AnalysisResult, AlertInsight,
 } from '@/lib/ai/types'
+import DirectStatusCards from '@/components/DirectStatusCards'
 
 const LS_KEY = 'arenda_ai_analysis'
 
@@ -61,22 +62,7 @@ function flattenAlerts(r: AnalysisResult): AlertItem[] {
     qtyColor: a.status === 'critic' ? 'bg-red-50 text-red-700' : a.status === 'scazut' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700',
     mesaj: a.mesaj, actiune: a.actiune_recomandata,
   }))
-  r.utilaje?.forEach((a, i) => items.push({
-    id: `u-${i}`, priority: a.priority, category: 'Utilaje',
-    label: `${a.utilaj} (${a.tip})`,
-    sublabel: a.mentenanta_pending ?? (a.rca_expiry ? `RCA: ${a.rca_expiry}` : undefined),
-    badgeText: a.status === 'critic' ? 'RCA Expirat' : a.status === 'atentie' ? 'Atentie RCA' : a.status === 'necunoscut' ? 'Neverificat' : 'OK',
-    badgeColor: a.status === 'critic' ? 'bg-red-100 text-red-700' : a.status === 'atentie' ? 'bg-amber-100 text-amber-700' : a.status === 'necunoscut' ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700',
-    mesaj: a.mesaj, actiune: a.actiune_recomandata,
-  }))
-  r.tranzactii?.forEach((a, i) => items.push({
-    id: `t-${i}`, priority: a.priority, category: 'Tranzactii',
-    label: `${a.lessor_name} \u2014 ${a.produs}`,
-    sublabel: `Campanie ${a.campanie}`,
-    qtyText: `${a.suma_ron?.toFixed(0)} RON`, qtyColor: 'bg-amber-50 text-amber-700',
-    badgeText: 'Neplatita', badgeColor: 'bg-red-100 text-red-700',
-    mesaj: a.mesaj, actiune: a.actiune_recomandata,
-  }))
+  // NOTE: Utilaje & Tranzactii are handled by DirectStatusCards (direct DB, no AI)
   return items
 }
 
@@ -484,7 +470,7 @@ export default function AlertsDashboard() {
             <span className="ml-4 text-xs text-gray-400 hidden sm:block">{model} · {tokens.toLocaleString()} tokens</span>
           </div>
 
-          {/* Alert grids — full width, 2 rows */}
+          {/* Alert grids — AI sections only (Utilaje & Tranzactii are in DirectStatusCards below) */}
           <div className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <SectionCard icon={<FileText className="w-4 h-4" />} title="Contracte"
@@ -500,19 +486,12 @@ export default function AlertsDashboard() {
                 items={sectionItems('Stocuri')} onNavigate={r => router.push(r)}
                 addHref="/inventar/stoc" />
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SectionCard icon={<Wrench className="w-4 h-4" />} title="Utilaje &amp; RCA"
-                count={sectionItems('Utilaje').length} high={highOf(result.utilaje)}
-                items={sectionItems('Utilaje')} onNavigate={r => router.push(r)}
-                addHref="/utilaje" />
-              <SectionCard icon={<ArrowLeftRight className="w-4 h-4" />} title="Tranzactii Arenda"
-                count={sectionItems('Tranzactii').length} high={highOf(result.tranzactii)}
-                items={sectionItems('Tranzactii')} onNavigate={r => router.push(r)}
-                addHref="/plati" />
-            </div>
           </div>
         </>
       )}
+
+      {/* Utilaje & Tranzactii — always loaded directly from DB, no AI required */}
+      <DirectStatusCards />
     </div>
   )
 }
