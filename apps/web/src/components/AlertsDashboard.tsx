@@ -2,54 +2,98 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import {
-  AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown,
-  Loader2, RefreshCw, ChevronDown, ChevronRight, Zap,
-  FileText, Tractor, Package, Shield, Wrench, ArrowLeftRight,
+  AlertTriangle, CheckCircle, Clock, TrendingDown,
+  Loader2, RefreshCw, ChevronRight, Zap, ArrowLeftRight,
+  FileText, Tractor, Package, Shield, Wrench, Receipt,
+  Sparkles, X,
 } from 'lucide-react'
 import type {
-  AnalysisResult, ContractAlert, FarmAlert, StockAlert,
-  UtilajeAlert, TranzactieAlert,
+  AnalysisResult, AlertInsight,
 } from '@/lib/ai/types'
 
 const LS_KEY = 'arenda_ai_analysis'
 
 // â”€â”€â”€ Priority / status helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const P = {
-  inalta:  { badge: 'bg-red-100 text-red-700 border-red-200',     dot: 'bg-red-500',    label: 'Inalta' },
-  medie:   { badge: 'bg-amber-100 text-amber-700 border-amber-200', dot: 'bg-amber-400',  label: 'Medie' },
-  scazuta: { badge: 'bg-gray-100 text-gray-600 border-gray-200',   dot: 'bg-gray-400',   label: 'Scazuta' },
+// --- Alert item shape -------------------------------------------------------
+
+interface AlertItem {
+  id: string
+  priority: string
+  category: string
+  label: string
+  sublabel?: string
+  badgeText?: string
+  badgeColor?: string
+  qtyText?: string
+  qtyColor?: string
+  mesaj: string
+  actiune: string
 }
 
-const CONTRACT_STATUS_STYLE: Record<string, string> = {
-  expirat: 'bg-red-100 text-red-700',
-  critic:  'bg-orange-100 text-orange-700',
-  atentie: 'bg-amber-100 text-amber-700',
-  ok:      'bg-green-100 text-green-700',
-  draft:   'bg-blue-100 text-blue-700',
+function flattenAlerts(r: AnalysisResult): AlertItem[] {
+  const items: AlertItem[] = []
+  r.contracte?.forEach((a, i) => {
+    const z = a.days_until_expiry
+    items.push({
+      id: `c-${i}`, priority: a.priority, category: 'Contracte',
+      label: `#${a.contract_number} \u2014 ${a.lessor_name}`,
+      sublabel: z != null && z < 0 ? `Expirat acum ${Math.abs(z)} zile` : (a.end_date ?? undefined),
+      badgeText: z == null ? (a.status ?? '?') : z < 0 ? 'Expirat' : `${z} zile`,
+      badgeColor: z != null && z < 0 ? 'bg-red-100 text-red-700' : z != null && z < 30 ? 'bg-orange-100 text-orange-700' : 'bg-green-50 text-green-700',
+      mesaj: a.mesaj, actiune: a.actiune_recomandata,
+    })
+  })
+  r.ferma?.forEach((a, i) => items.push({
+    id: `f-${i}`, priority: a.priority, category: 'Activitati',
+    label: `${a.activitate}${a.parcela ? ` \u2014 ${a.parcela}` : ''}`,
+    sublabel: a.intarziere_zile && a.intarziere_zile > 0 ? `${a.intarziere_zile} zile intarziere` : (a.status ?? undefined),
+    badgeText: a.priority === 'inalta' ? 'Critica' : a.priority === 'medie' ? 'Medie' : 'Scazuta',
+    badgeColor: a.priority === 'inalta' ? 'bg-red-100 text-red-700' : a.priority === 'medie' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600',
+    mesaj: a.mesaj, actiune: a.actiune_recomandata,
+  }))
+  r.stocuri?.forEach((a, i) => items.push({
+    id: `s-${i}`, priority: a.priority, category: 'Stocuri',
+    label: a.produs,
+    sublabel: a.status === 'critic' ? 'Stoc epuizat' : a.status === 'scazut' ? 'Sub pragul minim' : 'Stoc OK',
+    qtyText: `${a.cantitate_disponibila} ${a.unitate}`,
+    qtyColor: a.status === 'critic' ? 'bg-red-50 text-red-700' : a.status === 'scazut' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700',
+    mesaj: a.mesaj, actiune: a.actiune_recomandata,
+  }))
+  r.utilaje?.forEach((a, i) => items.push({
+    id: `u-${i}`, priority: a.priority, category: 'Utilaje',
+    label: `${a.utilaj} (${a.tip})`,
+    sublabel: a.mentenanta_pending ?? (a.rca_expiry ? `RCA: ${a.rca_expiry}` : undefined),
+    badgeText: a.status === 'critic' ? 'RCA Expirat' : a.status === 'atentie' ? 'Atentie RCA' : a.status === 'necunoscut' ? 'Neverificat' : 'OK',
+    badgeColor: a.status === 'critic' ? 'bg-red-100 text-red-700' : a.status === 'atentie' ? 'bg-amber-100 text-amber-700' : a.status === 'necunoscut' ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700',
+    mesaj: a.mesaj, actiune: a.actiune_recomandata,
+  }))
+  r.tranzactii?.forEach((a, i) => items.push({
+    id: `t-${i}`, priority: a.priority, category: 'Tranzactii',
+    label: `${a.lessor_name} \u2014 ${a.produs}`,
+    sublabel: `Campanie ${a.campanie}`,
+    qtyText: `${a.suma_ron?.toFixed(0)} RON`, qtyColor: 'bg-amber-50 text-amber-700',
+    badgeText: 'Neplatita', badgeColor: 'bg-red-100 text-red-700',
+    mesaj: a.mesaj, actiune: a.actiune_recomandata,
+  }))
+  return items
 }
-const CONTRACT_STATUS_LABEL: Record<string, string> = { expirat: 'Expirat', critic: 'Critic', atentie: 'Atentie', ok: 'OK', draft: 'Draft' }
 
-const STOCK_STATUS_STYLE: Record<string, string> = {
-  critic: 'bg-red-100 text-red-700',
-  scazut: 'bg-amber-100 text-amber-700',
-  ok:     'bg-green-100 text-green-700',
-}
-const STOCK_STATUS_LABEL: Record<string, string> = { critic: 'Critic', scazut: 'Scazut', ok: 'OK' }
+const DOT: Record<string, string> = { inalta: 'bg-red-500', medie: 'bg-amber-400', scazuta: 'bg-gray-300' }
 
-const UTILAJ_STATUS_STYLE: Record<string, string> = {
-  critic:     'bg-red-100 text-red-700',
-  atentie:    'bg-amber-100 text-amber-700',
-  ok:         'bg-green-100 text-green-700',
-  necunoscut: 'bg-gray-100 text-gray-600',
-}
-const UTILAJ_STATUS_LABEL: Record<string, string> = { critic: 'Critic', atentie: 'Atentie', ok: 'OK', necunoscut: 'Necunoscut' }
+const ACTION_COLORS = [
+  'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
+  'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100',
+  'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
+  'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100',
+]
 
 // â”€â”€â”€ Risk gauge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function RiskGauge({ score }: { score: number }) {
   const s = Math.max(0, Math.min(100, score))
   const color = s >= 70 ? '#ef4444' : s >= 40 ? '#f59e0b' : '#16a34a'
+  const label = s >= 70 ? 'Risc ridicat' : s >= 40 ? 'Risc moderat' : 'Risc scazut'
   const circ = 2 * Math.PI * 40
   const offset = circ - (s / 100) * circ
   return (
@@ -62,151 +106,53 @@ function RiskGauge({ score }: { score: number }) {
       </svg>
       <span className="text-2xl font-bold -mt-16" style={{ color }}>{s}</span>
       <span className="text-xs text-gray-400 mt-6">/ 100</span>
+      <span className="text-xs font-semibold mt-1" style={{ color }}>{label}</span>
     </div>
   )
 }
 
 // â”€â”€â”€ Generic expandable row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function AlertRow({ priority, label, badge, children }: {
-  priority: string; label: string; badge: React.ReactNode; children: React.ReactNode
-}) {
-  const [open, setOpen] = useState(false)
-  const p = P[priority as keyof typeof P] ?? P.scazuta
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-2">
-      <button onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
-        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${p.dot}`} />
-        <span className="font-semibold text-gray-900 flex-1 text-sm">{label}</span>
-        {badge}
-        {open ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
-      </button>
-      {open && (
-        <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-2">
-          {children}
-        </div>
-      )}
-    </div>
-  )
-}
+// --- AlertItemRow -----------------------------------------------------------
 
-function AlertDetail({ mesaj, actiune }: { mesaj: string; actiune: string }) {
+function AlertItemRow({ item, selected, onClick }: { item: AlertItem; selected: boolean; onClick: () => void }) {
   return (
-    <>
-      <p className="text-sm text-gray-700">{mesaj}</p>
-      <div className="flex items-start gap-2">
-        <Zap className="w-3.5 h-3.5 text-brand-600 flex-shrink-0 mt-0.5" />
-        <p className="text-sm font-medium text-brand-700">{actiune}</p>
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
+        selected ? 'bg-brand-50 border border-brand-200' : 'hover:bg-gray-50'
+      }`}
+    >
+      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${DOT[item.priority] ?? 'bg-gray-300'}`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-900 truncate">{item.label}</p>
+        {item.sublabel && <p className="text-xs text-gray-400 truncate">{item.sublabel}</p>}
       </div>
-    </>
-  )
-}
-
-// â”€â”€â”€ Typed rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-function ContractRow({ a }: { a: ContractAlert }) {
-  const statusKey = String(a.status ?? '').toLowerCase()
-  return (
-    <AlertRow priority={a.priority}
-      label={`#${a.contract_number} \u2014 ${a.lessor_name}`}
-      badge={
-        <>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CONTRACT_STATUS_STYLE[statusKey] ?? 'bg-gray-100 text-gray-600'}`}>
-            {CONTRACT_STATUS_LABEL[statusKey] ?? a.status}
-          </span>
-          {a.days_until_expiry != null && (
-            <span className="text-xs text-gray-400">{a.days_until_expiry >= 0 ? `${a.days_until_expiry} zile` : 'expirat'}</span>
-          )}
-        </>
-      }>
-      <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
-      {a.suprafata_ha != null && <p className="text-xs text-gray-400">Suprafata: {a.suprafata_ha} ha</p>}
-      {a.end_date && <p className="text-xs text-gray-400">Expira: {a.end_date}</p>}
-    </AlertRow>
-  )
-}
-
-function FarmRow({ a }: { a: FarmAlert }) {
-  return (
-    <AlertRow priority={a.priority}
-      label={`${a.activitate}${a.parcela ? ` \u2014 ${a.parcela}` : ''}`}
-      badge={
-        <>
-          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${P[a.priority as keyof typeof P]?.badge ?? ''}`}>
-            {P[a.priority as keyof typeof P]?.label ?? a.priority}
-          </span>
-          {a.intarziere_zile != null && a.intarziere_zile > 0 && (
-            <span className="text-xs text-red-500">{a.intarziere_zile}z intarziere</span>
-          )}
-        </>
-      }>
-      <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
-      {a.data_planificata && <p className="text-xs text-gray-400">Planificat: {a.data_planificata}</p>}
-    </AlertRow>
-  )
-}
-
-function StockRow({ a }: { a: StockAlert }) {
-  return (
-    <AlertRow priority={a.priority}
-      label={a.produs}
-      badge={
-        <>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STOCK_STATUS_STYLE[a.status] ?? ''}`}>
-            {STOCK_STATUS_LABEL[a.status] ?? a.status}
-          </span>
-          <span className="text-xs text-gray-500">{a.cantitate_disponibila} {a.unitate}</span>
-        </>
-      }>
-      <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
-      {a.valoare_estimata != null && <p className="text-xs text-gray-400">Valoare: {a.valoare_estimata.toFixed(0)} RON</p>}
-    </AlertRow>
-  )
-}
-
-function UtilajeRow({ a }: { a: UtilajeAlert }) {
-  const statusKey = String(a.status ?? '').toLowerCase()
-  return (
-    <AlertRow priority={a.priority}
-      label={`${a.utilaj}${a.tip ? ` (${a.tip})` : ''}`}
-      badge={
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${UTILAJ_STATUS_STYLE[statusKey] ?? 'bg-gray-100 text-gray-600'}`}>
-          {UTILAJ_STATUS_LABEL[statusKey] ?? a.status}
+      {item.qtyText && (
+        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${item.qtyColor ?? 'bg-gray-100 text-gray-600'}`}>
+          {item.qtyText}
         </span>
-      }>
-      <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
-      {a.rca_expiry && <p className="text-xs text-gray-400">RCA expira: {a.rca_expiry}</p>}
-      {a.mentenanta_pending && <p className="text-xs text-amber-500">Service: {a.mentenanta_pending}</p>}
-    </AlertRow>
+      )}
+      {item.badgeText && (
+        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${item.badgeColor ?? 'bg-gray-100 text-gray-600'}`}>
+          {item.badgeText}
+        </span>
+      )}
+      <ChevronRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+    </button>
   )
 }
 
-function TranzactieRow({ a }: { a: TranzactieAlert }) {
-  return (
-    <AlertRow priority={a.priority}
-      label={`${a.lessor_name} — ${a.produs}`}
-      badge={
-        <>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            a.status === 'neplatita' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-          }`}>{a.status === 'neplatita' ? 'Neplatita' : 'Platita'}</span>
-          <span className="text-xs text-gray-500">{a.suma_ron?.toFixed(0)} RON</span>
-        </>
-      }>
-      <AlertDetail mesaj={a.mesaj} actiune={a.actiune_recomandata} />
-      {a.campanie && <p className="text-xs text-gray-400">Campanie: {a.campanie}</p>}
-    </AlertRow>
-  )
-}
+// --- SectionCard -------------------------------------------------------------
 
-function Section({ icon, title, count, high, children }: {
-  icon: React.ReactNode; title: string; count: number; high: number; children: React.ReactNode
+function SectionCard({ icon, title, count, high, items, selectedId, onSelect }: {
+  icon: React.ReactNode; title: string; count: number; high: number
+  items: AlertItem[]; selectedId: string | null; onSelect: (item: AlertItem) => void
 }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-        <div className="flex items-center gap-2.5">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
           <div className="text-brand-600">{icon}</div>
           <span className="font-semibold text-gray-900 text-sm">{title}</span>
           <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{count}</span>
@@ -217,18 +163,114 @@ function Section({ icon, title, count, high, children }: {
           </span>
         )}
       </div>
-      <div className="p-4">
+      <div className="p-3 space-y-0.5">
         {count === 0
-          ? <p className="text-sm text-gray-400 text-center py-3">Nicio alerta.</p>
-          : children}
+          ? (
+            <div className="flex items-center justify-center gap-1.5 py-4 text-gray-300">
+              <CheckCircle className="w-4 h-4" />
+              <span className="text-sm">Nicio alerta</span>
+            </div>
+          )
+          : items.map(item => (
+            <AlertItemRow key={item.id} item={item} selected={selectedId === item.id} onClick={() => onSelect(item)} />
+          ))
+        }
       </div>
     </div>
   )
 }
 
+// --- AlertDetailPanel --------------------------------------------------------
+
+function AlertDetailPanel({ item, onClose }: { item: AlertItem | null; onClose: () => void }) {
+  if (!item) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center">
+        <ChevronRight className="w-8 h-8 mx-auto mb-2 text-gray-200" />
+        <p className="text-sm text-gray-300">Selecteaza o alerta pentru detalii</p>
+      </div>
+    )
+  }
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <span className={`w-2.5 h-2.5 rounded-full ${DOT[item.priority] ?? 'bg-gray-300'}`} />
+          <span className="font-semibold text-gray-900 text-sm">Detaliu alerta</span>
+        </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="p-4 space-y-4">
+        <div>
+          <span className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">Alerta</span>
+          <p className="text-sm font-semibold text-gray-900">{item.label}</p>
+          {item.sublabel && <p className="text-xs text-gray-500 mt-0.5">{item.sublabel}</p>}
+          <span className="inline-block mt-1.5 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{item.category}</span>
+        </div>
+        <div>
+          <span className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">Rationament</span>
+          <p className="text-sm text-gray-700 leading-relaxed">{item.mesaj}</p>
+        </div>
+        <div>
+          <span className="text-xs font-medium uppercase tracking-wide text-gray-400 block mb-1">Actiune recomandata</span>
+          <div className="flex items-start gap-2">
+            <Zap className="w-3.5 h-3.5 text-brand-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm font-medium text-brand-700">{item.actiune}</p>
+          </div>
+        </div>
+        <div className="flex gap-2 pt-1">
+          <button className="flex-1 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors">
+            Aplica actiunea
+          </button>
+          <button onClick={onClose} className="px-3 py-2 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg transition-colors">
+            Ignora
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- InsightsPanel -----------------------------------------------------------
+
+function InsightsPanel({ insights }: { insights: AlertInsight[] }) {
+  if (insights.length === 0) return null
+  const impactColor = (impact: string) =>
+    impact === 'mare' ? 'bg-red-900 text-red-300' : impact === 'mediu' ? 'bg-amber-900 text-amber-300' : 'bg-gray-700 text-gray-300'
+  return (
+    <div className="bg-gray-900 rounded-2xl overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-700">
+        <Sparkles className="w-4 h-4 text-brand-400" />
+        <span className="font-semibold text-white text-sm">Insights prioritare</span>
+        <span className="text-xs bg-brand-600 text-white px-1.5 py-0.5 rounded-full ml-auto">Top {insights.length}</span>
+      </div>
+      <div className="p-3 space-y-3">
+        {insights.map((ins, i) => (
+          <div key={i} className="space-y-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${impactColor(ins.impact)}`}>
+                {ins.impact.toUpperCase()}
+              </span>
+              <span className="text-xs text-gray-400">{ins.categorie}</span>
+            </div>
+            <p className="text-sm font-semibold text-white">{ins.titlu}</p>
+            <p className="text-xs text-gray-400 leading-relaxed">{ins.descriere}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// â”€â”€â”€ Typed rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
 // â”€â”€â”€ Main Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface Saved { result: AnalysisResult; model: string; tokens: number }
+type FilterTab = 'toate' | 'critice' | 'atentie' | 'ok'
 
 export default function AlertsDashboard() {
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -237,8 +279,9 @@ export default function AlertsDashboard() {
   const [model, setModel] = useState('')
   const [tokens, setTokens] = useState(0)
   const [dataErrors, setDataErrors] = useState<string[]>([])
+  const [selectedItem, setSelectedItem] = useState<AlertItem | null>(null)
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('toate')
 
-  // Load persisted analysis on mount
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_KEY)
@@ -254,6 +297,7 @@ export default function AlertsDashboard() {
   const run = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setSelectedItem(null)
     try {
       const res = await fetch('/api/assistant', {
         method: 'POST',
@@ -266,7 +310,6 @@ export default function AlertsDashboard() {
       setModel(json.model ?? '')
       setTokens(json.tokens_used ?? 0)
       setDataErrors(json.data_errors ?? [])
-      // Persist to localStorage
       localStorage.setItem(LS_KEY, JSON.stringify({ result: json.result, model: json.model ?? '', tokens: json.tokens_used ?? 0 }))
     } catch {
       setError('Nu s-a putut contacta serverul AI.')
@@ -275,18 +318,30 @@ export default function AlertsDashboard() {
     }
   }, [])
 
-  const totalHigh = [
-    ...(result?.contracte ?? []),
-    ...(result?.ferma ?? []),
-    ...(result?.stocuri ?? []),
-    ...(result?.utilaje ?? []),
-    ...(result?.tranzactii ?? []),
-  ].filter(a => a.priority === 'inalta').length
+  const allItems = result ? flattenAlerts(result) : []
+  const totalHigh = allItems.filter(a => a.priority === 'inalta').length
+  const totalMed  = allItems.filter(a => a.priority === 'medie').length
+  const totalOk   = allItems.filter(a => a.priority === 'scazuta').length
 
+  const filteredIds = new Set(
+    activeFilter === 'critice' ? allItems.filter(a => a.priority === 'inalta').map(a => a.id)
+    : activeFilter === 'atentie' ? allItems.filter(a => a.priority === 'medie').map(a => a.id)
+    : activeFilter === 'ok' ? allItems.filter(a => a.priority === 'scazuta').map(a => a.id)
+    : allItems.map(a => a.id)
+  )
+
+  const sectionItems = (cat: string) => allItems.filter(a => a.category === cat && filteredIds.has(a.id))
   const highOf = (arr?: { priority: string }[]) => (arr ?? []).filter(a => a.priority === 'inalta').length
 
+  const TABS: { key: FilterTab; label: string; count: number }[] = [
+    { key: 'toate',   label: 'Toate',   count: allItems.length },
+    { key: 'critice', label: 'Critice', count: totalHigh },
+    { key: 'atentie', label: 'Atentie', count: totalMed },
+    { key: 'ok',      label: 'OK',      count: totalOk },
+  ]
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -301,7 +356,6 @@ export default function AlertsDashboard() {
         </button>
       </div>
 
-      {/* Error */}
       {error && (
         <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {error}
@@ -310,15 +364,13 @@ export default function AlertsDashboard() {
 
       {dataErrors.length > 0 && (
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-          <p className="text-sm font-semibold text-amber-700 mb-1">Avertisment: unele tabele nu au putut fi incarcate din baza de date:</p>
+          <p className="text-sm font-semibold text-amber-700 mb-1">Avertisment date:</p>
           <ul className="text-sm text-amber-600 list-disc list-inside space-y-0.5">
             {dataErrors.map((e, i) => <li key={i}>{e}</li>)}
           </ul>
-          <p className="text-xs text-amber-500 mt-2">Verifica daca migrarile SQL au fost rulate in Supabase Dashboard.</p>
         </div>
       )}
 
-      {/* Empty state */}
       {!result && !loading && !error && (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mb-4">
@@ -326,12 +378,11 @@ export default function AlertsDashboard() {
           </div>
           <h2 className="text-lg font-semibold text-gray-800 mb-1">Asistentul AI este pregatit</h2>
           <p className="text-sm text-gray-400 max-w-md">
-            Apasa <strong>Ruleaza analiza</strong> pentru a primi o analiza completa a fermei &mdash; contracte, utilaje, stocuri si tranzactii arenda neplatite.
+            Apasa <strong>Ruleaza analiza</strong> pentru a primi o analiza completa a fermei.
           </p>
         </div>
       )}
 
-      {/* Loading */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-24">
           <Loader2 className="w-10 h-10 animate-spin text-brand-600 mb-4" />
@@ -339,7 +390,6 @@ export default function AlertsDashboard() {
         </div>
       )}
 
-      {/* Results */}
       {result && !loading && (
         <>
           {/* KPI row */}
@@ -353,17 +403,17 @@ export default function AlertsDashboard() {
                 <AlertTriangle className="w-3.5 h-3.5" /> Alerte critice
               </div>
               <div className={`text-3xl font-bold ${totalHigh > 0 ? 'text-red-600' : 'text-green-600'}`}>{totalHigh}</div>
-              <p className="text-xs text-gray-400 mt-1">din {
-                (result.contracte?.length ?? 0) + (result.ferma?.length ?? 0) + (result.stocuri?.length ?? 0) +
-                (result.utilaje?.length ?? 0) + (result.tranzactii?.length ?? 0)
-              } total</p>
+              <p className="text-xs text-gray-400 mt-1">din {allItems.length} total</p>
+              {totalHigh > 0 && <p className="text-xs text-red-500 font-medium mt-0.5">+{totalHigh} azi</p>}
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-                <ArrowLeftRight className="w-3.5 h-3.5" /> Tranzactii neplatite
+                <ArrowLeftRight className="w-3.5 h-3.5" /> Arendasi afectati
               </div>
-              <div className={`text-3xl font-bold ${(result.tranzactii?.length ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'}`}>{result.tranzactii?.length ?? 0}</div>
-              <p className="text-xs text-gray-400 mt-1">arenda neachitata</p>
+              <div className={`text-3xl font-bold ${(result.tranzactii?.length ?? 0) > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                {result.tranzactii?.length ?? 0}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">{result.contracte?.length ?? 0} contracte active</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-center">
               {result.scor_risc < 40
@@ -375,41 +425,75 @@ export default function AlertsDashboard() {
             </div>
           </div>
 
-          {/* Sumar */}
+          {/* Sumar executiv */}
           <div className="bg-brand-50 border border-brand-100 rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-4 h-4 text-brand-600" />
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <Sparkles className="w-4 h-4 text-brand-600" />
               <span className="text-sm font-semibold text-brand-700">Sumar executiv</span>
+              <span className="text-xs bg-brand-600 text-white px-2 py-0.5 rounded-full font-medium">Generat de AI</span>
             </div>
-            <p className="text-sm text-gray-700 leading-relaxed">{result.sumar}</p>
+            <p className="text-sm text-gray-700 leading-relaxed mb-3">{result.sumar}</p>
+            {(result.actiuni ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {(result.actiuni ?? []).map((act, i) => (
+                  <button key={i} className={`text-xs font-medium px-3 py-1 rounded-full border transition-colors ${ACTION_COLORS[i % ACTION_COLORS.length]}`}>
+                    {act}
+                  </button>
+                ))}
+                <button className="text-xs font-medium px-3 py-1 rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors">
+                  Salveaza raport
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Alert grid row 1 */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <Section icon={<FileText className="w-5 h-5" />} title="Contracte" count={result.contracte?.length ?? 0} high={highOf(result.contracte)}>
-              {result.contracte?.map((a, i) => <ContractRow key={i} a={a} />)}
-            </Section>
-            <Section icon={<Tractor className="w-5 h-5" />} title="Activitati Ferma" count={result.ferma?.length ?? 0} high={highOf(result.ferma)}>
-              {result.ferma?.map((a, i) => <FarmRow key={i} a={a} />)}
-            </Section>
-            <Section icon={<Package className="w-5 h-5" />} title="Stocuri" count={result.stocuri?.length ?? 0} high={highOf(result.stocuri)}>
-              {result.stocuri?.map((a, i) => <StockRow key={i} a={a} />)}
-            </Section>
+          {/* Filter tabs */}
+          <div className="flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+            {TABS.map(tab => (
+              <button key={tab.key} onClick={() => setActiveFilter(tab.key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  activeFilter === tab.key
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}>
+                {tab.label}
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                  activeFilter === tab.key ? 'bg-brand-100 text-brand-700' : 'bg-gray-200 text-gray-500'
+                }`}>{tab.count}</span>
+              </button>
+            ))}
+            <span className="ml-4 text-xs text-gray-400 hidden sm:block">{model} · {tokens.toLocaleString()} tokens</span>
           </div>
 
-          {/* Alert grid row 2 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <Section icon={<Wrench className="w-5 h-5" />} title="Utilaje & RCA" count={result.utilaje?.length ?? 0} high={highOf(result.utilaje)}>
-              {result.utilaje?.map((a, i) => <UtilajeRow key={i} a={a} />)}
-            </Section>
-            <Section icon={<ArrowLeftRight className="w-5 h-5" />} title="Tranzactii Arenda" count={result.tranzactii?.length ?? 0} high={highOf(result.tranzactii)}>
-              {result.tranzactii?.map((a, i) => <TranzactieRow key={i} a={a} />)}
-            </Section>
-          </div>
+          {/* Main content: left grid + right sidebar */}
+          <div className="flex gap-5 items-start">
+            {/* Alert grid */}
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <SectionCard icon={<FileText className="w-4 h-4" />} title="Contracte"
+                count={sectionItems('Contracte').length} high={highOf(result.contracte)}
+                items={sectionItems('Contracte')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem} />
+              <SectionCard icon={<Tractor className="w-4 h-4" />} title="Activitati Ferma"
+                count={sectionItems('Activitati').length} high={highOf(result.ferma)}
+                items={sectionItems('Activitati')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem} />
+              <SectionCard icon={<Package className="w-4 h-4" />} title="Stocuri"
+                count={sectionItems('Stocuri').length} high={highOf(result.stocuri)}
+                items={sectionItems('Stocuri')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem} />
+              <SectionCard icon={<Wrench className="w-4 h-4" />} title="Utilaje &amp; RCA"
+                count={sectionItems('Utilaje').length} high={highOf(result.utilaje)}
+                items={sectionItems('Utilaje')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem} />
+              <SectionCard icon={<ArrowLeftRight className="w-4 h-4" />} title="Tranzactii Arenda"
+                count={sectionItems('Tranzactii').length} high={highOf(result.tranzactii)}
+                items={sectionItems('Tranzactii')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem} />
+              <SectionCard icon={<Receipt className="w-4 h-4" />} title="Facturi"
+                count={0} high={0} items={[]} selectedId={null} onSelect={() => {}} />
+            </div>
 
-          <p className="text-xs text-gray-300 text-right">
-            Model: {model} · {tokens} tokens · {new Date(result.generat_la).toLocaleString('ro-RO')}
-          </p>
+            {/* Right sidebar */}
+            <div className="w-72 flex-shrink-0 space-y-4">
+              <AlertDetailPanel item={selectedItem} onClose={() => setSelectedItem(null)} />
+              <InsightsPanel insights={result.insights ?? []} />
+            </div>
+          </div>
         </>
       )}
     </div>

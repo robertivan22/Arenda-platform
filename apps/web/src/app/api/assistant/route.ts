@@ -176,6 +176,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
     result.contracte ??= []
     result.ferma ??= []
     result.stocuri ??= []
+    result.actiuni ??= []
+    result.insights ??= []
     result.utilaje = serverUtilaje
     result.tranzactii = serverTranzactii
 

@@ -72,10 +72,19 @@ export interface TranzactieAlert {
   actiune_recomandata: string
 }
 
+export interface AlertInsight {
+  impact: 'mare' | 'mediu' | 'mic'
+  categorie: string
+  titlu: string
+  descriere: string
+}
+
 export interface AnalysisResult {
   sumar: string
   scor_risc: number
   generat_la: string
+  actiuni: string[]
+  insights: AlertInsight[]
   contracte: ContractAlert[]
   ferma: FarmAlert[]
   stocuri: StockAlert[]
