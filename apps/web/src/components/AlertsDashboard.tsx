@@ -116,39 +116,56 @@ function RiskGauge({ score }: { score: number }) {
 
 // --- AlertItemRow -----------------------------------------------------------
 
-function AlertItemRow({ item, selected, onClick }: { item: AlertItem; selected: boolean; onClick: () => void }) {
+function AlertItemRow({ item, onNavigate }: { item: AlertItem; onNavigate: (route: string) => void }) {
+  const [open, setOpen] = useState(false)
   return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
-        selected ? 'bg-brand-50 border border-brand-200' : 'hover:bg-gray-50'
-      }`}
-    >
-      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${DOT[item.priority] ?? 'bg-gray-300'}`} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">{item.label}</p>
-        {item.sublabel && <p className="text-xs text-gray-400 truncate">{item.sublabel}</p>}
-      </div>
-      {item.qtyText && (
-        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${item.qtyColor ?? 'bg-gray-100 text-gray-600'}`}>
-          {item.qtyText}
-        </span>
+    <div>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all hover:bg-gray-50"
+      >
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${DOT[item.priority] ?? 'bg-gray-300'}`} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{item.label}</p>
+          {item.sublabel && <p className="text-xs text-gray-400 truncate">{item.sublabel}</p>}
+        </div>
+        {item.qtyText && (
+          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${item.qtyColor ?? 'bg-gray-100 text-gray-600'}`}>
+            {item.qtyText}
+          </span>
+        )}
+        {item.badgeText && (
+          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${item.badgeColor ?? 'bg-gray-100 text-gray-600'}`}>
+            {item.badgeText}
+          </span>
+        )}
+        <ChevronRight className={`w-3.5 h-3.5 text-gray-300 flex-shrink-0 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="mx-3 mb-2 p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Rationament</p>
+          <p className="text-sm text-gray-700 leading-relaxed">{item.mesaj}</p>
+          <div className="flex items-start gap-1.5 pt-1">
+            <Zap className="w-3.5 h-3.5 text-brand-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs font-medium text-brand-700">{item.actiune}</p>
+          </div>
+          <button
+            onClick={() => onNavigate(CATEGORY_ROUTES[item.category] ?? '/alerte')}
+            className="mt-1 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg transition-colors"
+          >
+            Aplica actiunea
+          </button>
+        </div>
       )}
-      {item.badgeText && (
-        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${item.badgeColor ?? 'bg-gray-100 text-gray-600'}`}>
-          {item.badgeText}
-        </span>
-      )}
-      <ChevronRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
-    </button>
+    </div>
   )
 }
 
 // --- SectionCard -------------------------------------------------------------
 
-function SectionCard({ icon, title, count, high, items, selectedId, onSelect, addHref }: {
+function SectionCard({ icon, title, count, high, items, onNavigate, addHref }: {
   icon: React.ReactNode; title: string; count: number; high: number
-  items: AlertItem[]; selectedId: string | null; onSelect: (item: AlertItem) => void
+  items: AlertItem[]; onNavigate: (route: string) => void
   addHref?: string
 }) {
   const router = useRouter()
@@ -181,7 +198,7 @@ function SectionCard({ icon, title, count, high, items, selectedId, onSelect, ad
             </div>
           )
           : items.map(item => (
-            <AlertItemRow key={item.id} item={item} selected={selectedId === item.id} onClick={() => onSelect(item)} />
+            <AlertItemRow key={item.id} item={item} onNavigate={onNavigate} />
           ))
         }
       </div>
@@ -245,7 +262,6 @@ export default function AlertsDashboard() {
   const [model, setModel] = useState('')
   const [tokens, setTokens] = useState(0)
   const [dataErrors, setDataErrors] = useState<string[]>([])
-  const [selectedItem, setSelectedItem] = useState<AlertItem | null>(null)
   const [activeFilter, setActiveFilter] = useState<FilterTab>('toate')
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null)
   const router = useRouter()
@@ -272,7 +288,6 @@ export default function AlertsDashboard() {
     setLoading(true)
     setError(null)
     setRetryCountdown(null)
-    setSelectedItem(null)
     try {
       const res = await fetch('/api/assistant', {
         method: 'POST',
@@ -317,7 +332,7 @@ export default function AlertsDashboard() {
   ]
 
   return (
-    <div className="space-y-5 pb-20">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -335,7 +350,11 @@ export default function AlertsDashboard() {
       {retryCountdown !== null && (
         <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
           <Clock className="w-4 h-4 flex-shrink-0" />
-          <span>Limita AI atinsa. Urmatoarea analiza disponibila in <strong>{retryCountdown}s</strong></span>
+          <span>Limita AI atinsa. Reincearca in <strong>{[
+            Math.floor(retryCountdown / 3600) > 0 ? `${Math.floor(retryCountdown / 3600)}h` : '',
+            Math.floor((retryCountdown % 3600) / 60) > 0 ? `${Math.floor((retryCountdown % 3600) / 60)}min` : '',
+            retryCountdown % 60 > 0 || retryCountdown < 60 ? `${retryCountdown % 60}s` : '',
+          ].filter(Boolean).join(' ')}</strong></span>
           {retryCountdown === 0 && (
             <button onClick={run} className="ml-auto text-xs font-semibold bg-amber-600 text-white px-3 py-1 rounded-lg">Ruleaza acum</button>
           )}
@@ -458,59 +477,29 @@ export default function AlertsDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <SectionCard icon={<FileText className="w-4 h-4" />} title="Contracte"
                 count={sectionItems('Contracte').length} high={highOf(result.contracte)}
-                items={sectionItems('Contracte')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
+                items={sectionItems('Contracte')} onNavigate={r => router.push(r)}
                 addHref="/contracte" />
               <SectionCard icon={<Tractor className="w-4 h-4" />} title="Activitati Ferma"
                 count={sectionItems('Activitati').length} high={highOf(result.ferma)}
-                items={sectionItems('Activitati')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
+                items={sectionItems('Activitati')} onNavigate={r => router.push(r)}
                 addHref="/campanie/activitati" />
               <SectionCard icon={<Package className="w-4 h-4" />} title="Stocuri"
                 count={sectionItems('Stocuri').length} high={highOf(result.stocuri)}
-                items={sectionItems('Stocuri')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
+                items={sectionItems('Stocuri')} onNavigate={r => router.push(r)}
                 addHref="/inventar/stoc" />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SectionCard icon={<Wrench className="w-4 h-4" />} title="Utilaje &amp; RCA"
                 count={sectionItems('Utilaje').length} high={highOf(result.utilaje)}
-                items={sectionItems('Utilaje')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
+                items={sectionItems('Utilaje')} onNavigate={r => router.push(r)}
                 addHref="/utilaje" />
               <SectionCard icon={<ArrowLeftRight className="w-4 h-4" />} title="Tranzactii Arenda"
                 count={sectionItems('Tranzactii').length} high={highOf(result.tranzactii)}
-                items={sectionItems('Tranzactii')} selectedId={selectedItem?.id ?? null} onSelect={setSelectedItem}
+                items={sectionItems('Tranzactii')} onNavigate={r => router.push(r)}
                 addHref="/plati" />
             </div>
           </div>
         </>
-      )}
-
-      {/* Fixed bottom bar — selected alert detail */}
-      {selectedItem && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
-          <div className="max-w-screen-xl mx-auto px-6 py-3 flex items-center gap-4">
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${DOT[selectedItem.priority] ?? 'bg-gray-300'}`} />
-              <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">{selectedItem.label}</span>
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{selectedItem.category}</span>
-            </div>
-            <div className="flex-1 min-w-0 hidden md:block">
-              <p className="text-sm text-gray-500 truncate">{selectedItem.mesaj}</p>
-            </div>
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="text-right hidden lg:block max-w-64">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Actiune recomandata</p>
-                <p className="text-sm font-medium text-brand-700 truncate">{selectedItem.actiune}</p>
-              </div>
-              <button
-                onClick={() => { router.push(CATEGORY_ROUTES[selectedItem.category] ?? '/alerte'); setSelectedItem(null) }}
-                className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg transition-colors whitespace-nowrap">
-                Aplica actiunea
-              </button>
-              <button onClick={() => setSelectedItem(null)} className="p-2 text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg transition-colors flex-shrink-0">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )

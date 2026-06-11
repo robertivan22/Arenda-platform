@@ -89,7 +89,7 @@ async function fetchLiveData() {
     db.from('input_lots').select('product_name, category, quantity_available, quantity, unit, expiry_date').order('category').limit(60),
     db.from('machines').select('*').order('name').limit(30),
     db.from('maintenance_tasks').select('title, type, due_date, status, machine_id').in('status', ['PLANIFICAT', 'IN_EXECUTIE']).order('due_date').limit(20),
-    db.from('transactions').select('ron_net, is_paid, campaign_year, product_name, contracts(contract_number), lessors(company_name, first_name, last_name, type)').order('transaction_date', { ascending: false }).limit(100),
+    db.from('transactions').select('ron_net, is_paid, campaign_year, product_name, lessors!lessor_id(company_name, first_name, last_name, type)').order('transaction_date', { ascending: false }).limit(100),
   ])
 
   const _errors: string[] = []
@@ -188,8 +188,12 @@ export async function POST(req: NextRequest): Promise<NextResponse<AssistantResp
     const e = err as any
     const is429 = e?.status === 429 || (err instanceof Error && (err.message.includes('rate_limit') || err.message.includes('Rate limit') || err.message.includes('429')))
     if (is429) {
-      const secMatch = (err instanceof Error ? err.message : '').match(/in (\d+\.?\d*)\s*s/)
-      const retryAfterSecs = secMatch ? Math.ceil(Number(secMatch[1])) : 60
+    const errMsg = err instanceof Error ? err.message : ''
+    const minSecMatch = errMsg.match(/try again in (\d+)m(\d+\.?\d*)s/)
+    const secOnlyMatch = errMsg.match(/try again in (\d+\.?\d*)s/)
+    const retryAfterSecs = minSecMatch
+      ? Math.ceil(Number(minSecMatch[1]) * 60 + Number(minSecMatch[2]))
+      : secOnlyMatch ? Math.ceil(Number(secOnlyMatch[1])) : 60
       return NextResponse.json({ ok: false, mode: 'full_analysis', rateLimited: true, retryAfterSecs })
     }
     const message = err instanceof Error ? err.message : 'Eroare necunoscuta.'
