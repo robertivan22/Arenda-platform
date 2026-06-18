@@ -151,7 +151,7 @@ BEGIN
    WHERE id = v_conversion_id;
 
   -- ── 7. Audit log ────────────────────────────────────────────────────────
-  INSERT INTO admin_audit_log (user_id, action, table_name, record_id, details)
+  INSERT INTO admin_audit_log (user_id, action, table_name, record_id, metadata)
   VALUES (
     p_user_id, 'ARENDA_DISTRIBUTION', 'arenda_conversions', v_conversion_id,
     json_build_object(
