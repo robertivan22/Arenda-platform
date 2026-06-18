@@ -71,7 +71,8 @@ export default function ImportFacturaPage() {
       setToken(data.session?.access_token ?? null)
       setUserId(data.session?.user.id ?? null)
     })
-  }, [])\n
+  }, [])
+
   const loadList = useCallback(async () => {
     if (!userId) return
     const db = createClient()
