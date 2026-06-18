@@ -73,7 +73,7 @@ export function AppTopbar() {
         <Menu className="w-5 h-5" />
       </button>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 hidden sm:block">
         <Breadcrumb />
       </div>
 

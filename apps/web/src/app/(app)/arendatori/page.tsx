@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, Pencil } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/data-display/StatusBadge'
+import { ResponsiveTable } from '@/components/ui/responsive-table'
 import { toast } from 'sonner'
 
 interface Lessor {
@@ -30,7 +31,7 @@ export default function LessorsListPage() {
       .order('last_name')
       .limit(500)
       .then(({ data, error }) => {
-        if (error) { toast.error('Eroare la încărcarea arendatorilor.'); return }
+        if (error) { toast.error('Eroare la incarcarea arendatorilor.'); return }
         if (data) setRows(data as Lessor[])
       })
   }, [])
@@ -47,7 +48,7 @@ export default function LessorsListPage() {
         title="Arendatori"
         subtitle={`${filtered.length} inregistrari`}
         actions={
-          <button onClick={() => router.push('/arendatori/nou')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded font-medium transition-colors">
+          <button onClick={() => router.push('/arendatori/nou')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded font-medium transition-colors min-h-[44px] md:min-h-0">
             <Plus className="w-3.5 h-3.5" /> Arendator nou
           </button>
         }
@@ -58,43 +59,63 @@ export default function LessorsListPage() {
           <input
             type="text" placeholder="Cauta dupa nume, CNP, cod..."
             value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
       </div>
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              {['Cod','Nume / Denumire','Tip','CNP / CUI','Judet','Status',''].map(h => (
-                <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-gray-400">Niciun arendator inregistrat</td></tr>}
-            {filtered.map(r => (
-              <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="px-3 py-2 font-mono text-xs text-gray-500">{r.code}</td>
-                <td className="px-3 py-2 font-medium cursor-pointer hover:text-brand-600" onClick={() => router.push(`/arendatori/${r.id}/sumar`)}>{displayName(r)}</td>
-                <td className="px-3 py-2 text-gray-500">{r.type === 'NATURAL' ? 'PF' : r.type}</td>
-                <td className="px-3 py-2 font-mono text-xs">{r.cnp}</td>
-                <td className="px-3 py-2">{r.county}</td>
-                <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
-                <td className="px-3 py-2">
-                  <button
-                    onClick={() => router.push(`/arendatori/${r.id}/editeaza`)}
-                    className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                    title="Editeaza"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+
+      <ResponsiveTable
+        rows={filtered}
+        keyExtractor={r => r.id}
+        emptyMessage="Niciun arendator inregistrat"
+        onRowClick={r => router.push(`/arendatori/${r.id}/sumar`)}
+        columns={[
+          {
+            key: 'name', header: 'Nume / Denumire', mobileTitle: true,
+            cell: (r: Lessor) => <span className="font-medium text-gray-900">{displayName(r)}</span>,
+          },
+          {
+            key: 'code', header: 'Cod',
+            cell: (r: Lessor) => <span className="font-mono text-xs text-gray-500">{r.code}</span>,
+          },
+          {
+            key: 'type', header: 'Tip', hideOnMobile: true,
+            cell: (r: Lessor) => <span className="text-gray-500">{r.type === 'NATURAL' ? 'PF' : r.type}</span>,
+          },
+          {
+            key: 'cnp', header: 'CNP / CUI', hideOnMobile: true,
+            cell: (r: Lessor) => <span className="font-mono text-xs">{r.cnp}</span>,
+          },
+          {
+            key: 'county', header: 'Judet',
+            cell: (r: Lessor) => r.county,
+          },
+          {
+            key: 'status', header: 'Status',
+            cell: (r: Lessor) => <StatusBadge status={r.status} />,
+          },
+          {
+            key: 'actions', header: '', mobileLabel: false, hideOnMobile: true,
+            cell: (r: Lessor) => (
+              <button
+                onClick={e => { e.stopPropagation(); router.push(`/arendatori/${r.id}/editeaza`) }}
+                className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                title="Editeaza"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            ),
+          },
+        ]}
+        mobileActions={(r: Lessor) => (
+          <button
+            onClick={e => { e.stopPropagation(); router.push(`/arendatori/${r.id}/editeaza`) }}
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium bg-gray-50 text-gray-600 rounded-lg"
+          >
+            <Pencil className="w-4 h-4" /> Editeaza
+          </button>
+        )}
+      />
     </div>
   )
 }

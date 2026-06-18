@@ -9,6 +9,7 @@
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { AppTopbar } from '@/components/layout/AppTopbar'
 import { SidebarOverlay } from '@/components/layout/SidebarOverlay'
+import { MobileNav } from '@/components/layout/MobileNav'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,7 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Mobile overlay backdrop */}
       <SidebarOverlay />
 
-      {/* Left Sidebar */}
+      {/* Left Sidebar — hidden on mobile, visible md+ */}
       <AppSidebar />
 
       {/* Main content area */}
@@ -24,11 +25,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Top utility bar */}
         <AppTopbar />
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        {/* Page content — extra bottom padding on mobile for bottom nav */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-16 md:pb-6">
           {children}
         </main>
       </div>
+
+      {/* Mobile bottom navigation — visible only on <md */}
+      <MobileNav />
     </div>
   )
 }
