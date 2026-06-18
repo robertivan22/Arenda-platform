@@ -46,6 +46,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
         ],
       },
       { label: 'Tranzactii Arenda', href: '/plati', icon: CreditCard, permKey: 'can_facturi' },
+      { label: 'Distribuire Arendă', href: '/distribuire-arenda', icon: Wheat, permKey: 'can_facturi' },
       {
         label: 'Parcele', icon: MapPin, permKey: 'can_parcele',
         children: [
