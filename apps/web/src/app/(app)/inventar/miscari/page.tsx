@@ -85,11 +85,14 @@ export default function MiscariPage() {
   const th = 'px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide'
   const td = 'px-4 py-3 text-sm'
 
+  // Format quantity: no trailing zeros, max 2 decimals
+  const fmtQty = (n: number) => n % 1 === 0 ? String(Math.round(n)) : parseFloat(n.toFixed(2)).toString()
+
   return (
     <div>
       <PageHeader
         title="Miscari Stoc"
-        subtitle={`${displayed.length} miscari · ${totalOut.toFixed(2)} iesiri · ${totalIn.toFixed(2)} intrari`}
+        subtitle={`${displayed.length} miscari · ${fmtQty(totalOut)} iesiri · ${fmtQty(totalIn)} intrari`}
       />
 
       {/* Filters */}
@@ -149,7 +152,7 @@ export default function MiscariPage() {
                     </td>
                     <td className={td}>
                       <span className={`font-semibold ${r.mvt_type === 'OUT' ? 'text-red-600' : r.mvt_type === 'IN' ? 'text-green-600' : 'text-gray-700'}`}>
-                        {r.mvt_type === 'OUT' ? '−' : r.mvt_type === 'IN' ? '+' : ''}{Number(r.quantity).toFixed(3)} {r.unit}
+                        {r.mvt_type === 'OUT' ? '−' : r.mvt_type === 'IN' ? '+' : ''}{fmtQty(Number(r.quantity))} {r.unit}
                       </span>
                     </td>
                     <td className={td}>

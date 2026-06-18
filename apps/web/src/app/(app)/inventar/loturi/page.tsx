@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Plus, Loader2, Package, AlertTriangle, ArrowUpCircle, ArrowDownCircle, ScanLine } from 'lucide-react'
+import { Plus, Loader2, Package, AlertTriangle, ArrowUpCircle, ArrowDownCircle, ScanLine, Trash2 } from 'lucide-react'
 import type { InputLot, Supplier, InputCategory } from '@/lib/inventory-types'
 import { INPUT_CATEGORY_LABELS, INPUT_CATEGORY_COLORS } from '@/lib/inventory-types'
 import { InvoiceImportModal } from './components/InvoiceImportModal'
@@ -79,6 +79,17 @@ export default function LoturiPage() {
     toast.success('Lot inregistrat in stoc.')
     setSaving(false)
     setShowAddLot(false)
+    void load()
+  }
+
+  async function deleteLot(lot: InputLot & { supplier_name?: string | null }) {
+    if (!window.confirm(`Ștergi lotul "${lot.product_name}"?\n\nSe vor șterge și toate mișcările de stoc asociate.`)) return
+    const db = createClient()
+    // Delete movements first (FK RESTRICT), then the lot
+    await db.from('input_stock_mvt').delete().eq('lot_id', lot.id)
+    const { error } = await db.from('input_lots').delete().eq('id', lot.id)
+    if (error) { toast.error('Eroare la ștergere: ' + error.message); return }
+    toast.success(`Lot "${lot.product_name}" șters.`)
     void load()
   }
 
@@ -253,6 +264,12 @@ export default function LoturiPage() {
                           title="Intrare suplimentara">
                           <ArrowDownCircle className="w-3.5 h-3.5" />
                           Intrare
+                        </button>
+                        <button
+                          onClick={() => deleteLot(l)}
+                          className="flex items-center gap-1 px-2.5 py-1 text-xs text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Șterge lot">
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
