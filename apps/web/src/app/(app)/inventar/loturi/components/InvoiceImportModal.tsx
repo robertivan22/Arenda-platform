@@ -119,7 +119,9 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
     createClient().from('input_lots')
       .select('product_name, supplier_id, unit')
       .order('product_name')
-      .then(({ data }) => setExistingProducts((data ?? []) as ExistingProduct[]))
+      .then(({ data, error }) => {
+        if (!error && data) setExistingProducts(data as ExistingProduct[])
+      })
   }, [])
 
   const processFile = useCallback(async (f: File) => {

@@ -82,9 +82,8 @@ export default function ImportFacturaPage() {
       .order('created_at', { ascending: false })
       .limit(50)
     if (error) {
-      // Table may not exist yet (migration not run) — show empty state instead of error
-      if (error.code === '42P01') { setImports([]); setLoadingList(false); return }
-      toast.error('Eroare la încărcarea importurilor')
+      // Table may not exist yet (migration not run) — silently show empty list
+      setImports([])
       setLoadingList(false)
       return
     }
