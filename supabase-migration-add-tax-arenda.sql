@@ -28,21 +28,21 @@ CREATE OR REPLACE FUNCTION execute_arenda_distribution(
   p_contract_id       UUID,
   p_lessor_id         UUID,
   p_user_id           UUID,
-  p_from_crop_name    TEXT,
-  p_from_quantity_kg  NUMERIC,
-  p_to_crop_name      TEXT,
-  p_to_quantity_kg    NUMERIC,
-  p_price_from        NUMERIC,
-  p_price_to          NUMERIC,
-  p_conversion_rate   NUMERIC,
-  p_value_ron         NUMERIC,
-  p_delivery_method   TEXT,
-  p_distribution_date DATE,
-  p_notes             TEXT    DEFAULT NULL,
-  p_campaign_id       UUID    DEFAULT NULL,
+  p_from_crop_name       TEXT,
+  p_from_quantity_kg     NUMERIC,
+  p_to_crop_name         TEXT,
+  p_to_quantity_kg       NUMERIC,
+  p_from_price_per_kg    NUMERIC,
+  p_to_price_per_kg      NUMERIC,
+  p_conversion_rate      NUMERIC,
+  p_value_ron            NUMERIC,
+  p_delivery_method      TEXT,
+  p_distribution_date    DATE,
+  p_notes                TEXT    DEFAULT NULL,
+  p_campaign_id          UUID    DEFAULT NULL,
   -- Tax parameters
-  p_tax_applied       BOOLEAN DEFAULT FALSE,
-  p_tax_rate          NUMERIC DEFAULT 10.00
+  p_tax_applied          BOOLEAN DEFAULT FALSE,
+  p_tax_rate             NUMERIC DEFAULT 10.00
 )
 RETURNS JSON
 LANGUAGE plpgsql
@@ -110,8 +110,8 @@ BEGIN
     delivery_method, distribution_date, notes, status
   ) VALUES (
     p_user_id, p_contract_id, p_lessor_id, p_campaign_id,
-    p_from_crop_name, p_from_quantity_kg, p_price_from,
-    p_to_crop_name,   p_to_quantity_kg,   p_price_to,
+    p_from_crop_name, p_from_quantity_kg, p_from_price_per_kg,
+    p_to_crop_name,   p_to_quantity_kg,   p_to_price_per_kg,
     p_conversion_rate, p_value_ron,
     p_tax_applied, p_tax_rate, v_tax_amount, v_value_ron_net,
     p_delivery_method, p_distribution_date, p_notes, 'confirmed'
@@ -131,7 +131,7 @@ BEGIN
     p_user_id, p_contract_id, p_lessor_id,
     p_distribution_date, v_campaign_year,
     p_to_crop_name, p_to_quantity_kg, p_to_quantity_kg,
-    p_price_to,
+    p_to_price_per_kg,
     p_value_ron,      -- gross
     v_value_ron_net,  -- net (= gross when no tax)
     v_tax_amount,
