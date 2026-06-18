@@ -62,8 +62,9 @@ async function pdfToImages(file: File, onProgress: (p: string) => void): Promise
   onProgress('Se citește fișierul PDF...')
   // Dynamic import – PDF.js runs in browser
   const pdfjs = await import('pdfjs-dist')
-  // Use .js (IIFE) worker – .mjs ES module workers are not supported on iOS Safari
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
+  // .mjs ES module worker – works on all modern desktop browsers
+  // (iOS blocks this; PDF is pre-filtered before reaching here)
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
   const arrayBuffer = await file.arrayBuffer()
   const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise
@@ -134,6 +135,16 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
     setFile(f)
     setStage('processing')
     setLogs([])
+
+    // iOS Safari/Chrome does not support ES module Web Workers (needed for PDF.js).
+    // Images (JPG/PNG) work fine — suggest using camera on iOS.
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    if (isIOS && f.type === 'application/pdf') {
+      toast.error('PDF-urile nu sunt suportate pe iOS. Fă o poză facturii și încarcă ca JPG.')
+      setStage('upload')
+      return
+    }
     dbg(`Fișier: ${f.name} | ${(f.size/1024).toFixed(0)} KB | ${f.type}`)
     dbg(`User Agent: ${navigator.userAgent.slice(0, 80)}`)
 
@@ -514,7 +525,8 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
               <Upload className={`w-12 h-12 ${dragging ? 'text-brand-500' : 'text-gray-300'}`} />
               <div className="text-center">
                 <p className="font-semibold text-gray-700">Trage factura aici sau click pentru selectare</p>
-                <p className="text-sm text-gray-400 mt-1">Suportă: PDF, JPG, JPEG, PNG, WEBP · max {MAX_MB} MB</p>
+              <p className="text-sm text-gray-400 mt-1">Suportă: PDF (desktop), JPG, JPEG, PNG, WEBP · max {MAX_MB} MB</p>
+              <p className="text-xs text-gray-400 mt-1 italic">Pe iOS: fă o poză facturii și încarcă ca imagine JPG.</p>
                 <p className="text-xs text-gray-400 mt-3">
                   Sistemul va extrage automat produsele, cantitățile, prețurile și furnizorul.
                 </p>
