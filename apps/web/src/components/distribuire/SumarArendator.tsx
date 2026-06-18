@@ -464,6 +464,15 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
                     <td className="py-1.5 text-xs text-right text-green-700 font-medium">{distributed.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg</td>
                     <td className={clsx('py-1.5 text-xs text-right font-semibold', remaining === 0 ? 'text-gray-400' : 'text-amber-700')}>
                       {remaining.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* All distributions for this landlord */}
       {status && status.conversions.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
