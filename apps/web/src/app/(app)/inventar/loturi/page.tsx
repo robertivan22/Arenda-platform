@@ -5,9 +5,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Plus, Loader2, Package, AlertTriangle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
+import { Plus, Loader2, Package, AlertTriangle, ArrowUpCircle, ArrowDownCircle, ScanLine } from 'lucide-react'
 import type { InputLot, Supplier, InputCategory } from '@/lib/inventory-types'
 import { INPUT_CATEGORY_LABELS, INPUT_CATEGORY_COLORS } from '@/lib/inventory-types'
+import { InvoiceImportModal } from './components/InvoiceImportModal'
 
 const UNITS = ['kg', 'L', 't', 'buc', 'saci', 'litri']
 const CATEGORIES: InputCategory[] = ['SEED', 'FERTILIZER', 'PPP', 'FUEL', 'OTHER']
@@ -32,6 +33,7 @@ export default function LoturiPage() {
   const [lotForm, setLotForm] = useState(EMPTY_LOT())
   const [mvtForm, setMvtForm] = useState(EMPTY_MVT())
   const [saving, setSaving] = useState(false)
+  const [showInvoiceImport, setShowInvoiceImport] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -123,11 +125,18 @@ export default function LoturiPage() {
         title="Loturi Inputuri"
         subtitle={`${lots.length} loturi · valoare estimata ${totalValue.toFixed(0)} RON`}
         actions={
-          <button onClick={() => { setLotForm(EMPTY_LOT()); setShowAddLot(true) }}
-            className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition-colors">
-            <Plus className="w-4 h-4" />
-            Lot nou
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowInvoiceImport(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-brand-300 text-brand-700 hover:bg-brand-50 text-sm font-medium rounded-lg transition-colors">
+              <ScanLine className="w-4 h-4" />
+              Scanează factură
+            </button>
+            <button onClick={() => { setLotForm(EMPTY_LOT()); setShowAddLot(true) }}
+              className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition-colors">
+              <Plus className="w-4 h-4" />
+              Lot nou
+            </button>
+          </div>
         }
       />
 
@@ -382,6 +391,15 @@ export default function LoturiPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Invoice import modal */}
+      {showInvoiceImport && (
+        <InvoiceImportModal
+          suppliers={suppliers}
+          onCreated={() => void load()}
+          onClose={() => setShowInvoiceImport(false)}
+        />
       )}
     </div>
   )

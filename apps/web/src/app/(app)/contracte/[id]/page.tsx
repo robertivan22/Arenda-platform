@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Pencil, Plus, Trash2, Printer, X, FileText } from 'lucide-react'
 import DistributionTracker from '@/components/DistributionTracker'
+import { ContractDocuments } from './components/ContractDocuments'
 
 interface Contract {
   id: string; contract_number: string; contract_type: string
@@ -391,6 +392,11 @@ export default function ContractDashboardPage() {
           </form>
         )}
       </div>
+
+      {/* Documente incarcate */}
+      {contract && (
+        <ContractDocuments contractId={id} lessorId={contract.lessor_id} />
+      )}
     </div>
   )
 }
