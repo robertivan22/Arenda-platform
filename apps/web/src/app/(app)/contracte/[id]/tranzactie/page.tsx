@@ -82,7 +82,7 @@ export default function NewTransactionPage() {
       })
   }, [id, form.productName, form.campaignYear])
 
-  function setField(field: string, value: string | boolean) { setForm(prev => ({ ...prev, [field]: value })) }
+  function setField(field: string, value: string | boolean | number) { setForm(prev => ({ ...prev, [field]: value })) }
 
   // Calculations
   const level = rentLevels.find(r => r.product_name === form.productName)
