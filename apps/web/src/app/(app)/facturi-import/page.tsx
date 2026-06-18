@@ -10,88 +10,98 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { UploadZone } from './components/UploadZone'
 import { InvoiceReviewForm } from './components/InvoiceReviewForm'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 
 type ImportStatus =
-  | 'UPLOADED' | 'PROCESSING' | 'OCR_COMPLETED'
-  | 'NEEDS_REVIEW' | 'APPROVED' | 'POSTED_TO_STOCK' | 'FAILED'
+  | 'uploaded' | 'processing' | 'ocr_completed'
+  | 'needs_review' | 'approved' | 'posted_to_stock' | 'failed'
 
-interface ImportRecord {
+export interface ImportRecord {
   id: string
-  supplierName: string | null
-  supplierTaxId: string | null
-  invoiceNumber: string | null
-  invoiceDate: string | null
+  supplier_name: string | null
+  supplier_tax_id: string | null
+  invoice_number: string | null
+  invoice_date: string | null
   currency: string | null
   subtotal: number | null
-  vatTotal: number | null
+  vat_total: number | null
   total: number | null
   status: ImportStatus
-  errorMessage: string | null
-  createdAt: string
-  rawOcrJson: { validation?: { warnings?: string[] } } | null
-  items: any[]
+  error_message: string | null
+  created_at: string
+  raw_ocr_json: { validation?: { warnings?: string[] } } | null
+  items: InvoiceItem[]
+}
+
+export interface InvoiceItem {
+  id: string
+  line_no: number
+  extracted_name: string
+  quantity: number | null
+  unit: string | null
+  unit_price: number | null
+  vat_rate: number | null
+  line_total: number | null
+  match_status: 'matched' | 'unmatched' | 'new_product' | 'ignored'
+  product_id: string | null
+  confidence: number | null
 }
 
 const STATUS_ICON: Record<ImportStatus, React.ReactNode> = {
-  UPLOADED:       <Clock className="w-4 h-4 text-gray-400" />,
-  PROCESSING:     <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />,
-  OCR_COMPLETED:  <RefreshCw className="w-4 h-4 text-blue-500" />,
-  NEEDS_REVIEW:   <AlertTriangle className="w-4 h-4 text-amber-500" />,
-  APPROVED:       <CheckCircle2 className="w-4 h-4 text-green-600" />,
-  POSTED_TO_STOCK:<CheckCircle2 className="w-4 h-4 text-green-700" />,
-  FAILED:         <XCircle className="w-4 h-4 text-red-500" />,
+  uploaded:       <Clock className="w-4 h-4 text-gray-400" />,
+  processing:     <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />,
+  ocr_completed:  <RefreshCw className="w-4 h-4 text-blue-500" />,
+  needs_review:   <AlertTriangle className="w-4 h-4 text-amber-500" />,
+  approved:       <CheckCircle2 className="w-4 h-4 text-green-600" />,
+  posted_to_stock:<CheckCircle2 className="w-4 h-4 text-green-700" />,
+  failed:         <XCircle className="w-4 h-4 text-red-500" />,
 }
 
 export default function ImportFacturaPage() {
   const [token, setToken] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [imports, setImports] = useState<ImportRecord[]>([])
   const [selected, setSelected] = useState<ImportRecord | null>(null)
   const [uploading, setUploading] = useState(false)
   const [loadingList, setLoadingList] = useState(true)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Initialise Supabase token for passing to the NestJS API
   useEffect(() => {
     createClient().auth.getSession().then(({ data }) => {
       setToken(data.session?.access_token ?? null)
+      setUserId(data.session?.user.id ?? null)
     })
-  }, [])
-
-  const authHeaders = token
-    ? { Authorization: `Bearer ${token}` }
-    : {}
-
+  }, [])\n
   const loadList = useCallback(async () => {
-    if (!token) return
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/invoices/import`, { headers: authHeaders })
-      if (!res.ok) return
-      const data = await res.json()
-      setImports(data)
-    } catch {
-      // silently ignore
-    } finally {
-      setLoadingList(false)
-    }
-  }, [token])
+    if (!userId) return
+    const db = createClient()
+    const { data, error } = await db
+      .from('purchase_invoices')
+      .select('*, purchase_invoice_items(*)')
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (error) { toast.error('Eroare la încărcarea importurilor'); setLoadingList(false); return }
+    setImports((data ?? []) as any)
+    setLoadingList(false)
+  }, [userId])
 
-  useEffect(() => {
-    loadList()
-  }, [loadList])
+  useEffect(() => { loadList() }, [loadList])
 
-  // Poll while any import is in PROCESSING state
+  // Poll while any import is in processing state
   useEffect(() => {
     const hasProcessing = imports.some(
-      i => i.status === 'PROCESSING' || i.status === 'OCR_COMPLETED',
+      i => i.status === 'processing' || i.status === 'ocr_completed',
     )
     if (hasProcessing && !pollRef.current) {
-      pollRef.current = setInterval(async () => {
-        await loadList()
-        // Refresh selected if it's the one being processed
-        if (selected && (selected.status === 'PROCESSING' || selected.status === 'OCR_COMPLETED')) {
-          const res = await fetch(`${API_BASE}/api/v1/invoices/import/${selected.id}`, { headers: authHeaders })
-          if (res.ok) setSelected(await res.json())
+      pollRef.current = setInterval(() => {
+        loadList()
+        if (selected && (selected.status === 'processing' || selected.status === 'ocr_completed')) {
+          createClient()
+            .from('purchase_invoices')
+            .select('*, purchase_invoice_items(*)')
+            .eq('id', selected.id)
+            .single()
+            .then(({ data }) => { if (data) setSelected(data as any) })
         }
       }, 3000)
     } else if (!hasProcessing && pollRef.current) {
@@ -102,17 +112,15 @@ export default function ImportFacturaPage() {
   }, [imports, selected, loadList])
 
   const handleFileSelected = async (file: File) => {
-    if (!token) { toast.error('Sesiune expirată. Autentifică-te din nou.'); return }
+    if (!token || !userId) { toast.error('Sesiune expirată. Autentifică-te din nou.'); return }
 
-    // Validate file on client side
     const MAX_MB = 20
     const ALLOWED = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/jpg']
-    if (!ALLOWED.includes(file.type)) {
-      toast.error(`Tip fișier neacceptat: ${file.type}`)
-      return
-    }
-    if (file.size > MAX_MB * 1024 * 1024) {
-      toast.error(`Fișierul depășește limita de ${MAX_MB} MB`)
+    if (!ALLOWED.includes(file.type)) { toast.error(`Tip fișier neacceptat: ${file.type}`); return }
+    if (file.size > MAX_MB * 1024 * 1024) { toast.error(`Fișierul depășește limita de ${MAX_MB} MB`); return }
+
+    if (!API_BASE) {
+      toast.error('NEXT_PUBLIC_API_URL nu este configurat. OCR-ul necesită API server.')
       return
     }
 
@@ -123,7 +131,7 @@ export default function ImportFacturaPage() {
 
       const res = await fetch(`${API_BASE}/api/v1/invoices/import`, {
         method: 'POST',
-        headers: authHeaders,
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       })
 
@@ -134,14 +142,9 @@ export default function ImportFacturaPage() {
 
       const { importId } = await res.json()
       toast.success('Factura încărcată! Se procesează OCR…')
-
-      // Load the new record and select it
-      const detailRes = await fetch(`${API_BASE}/api/v1/invoices/import/${importId}`, { headers: authHeaders })
-      if (detailRes.ok) {
-        const newImport = await detailRes.json()
-        setImports(prev => [newImport, ...prev])
-        setSelected(newImport)
-      }
+      await loadList()
+      const { data } = await createClient().from('purchase_invoices').select('*, purchase_invoice_items(*)').eq('id', importId).single()
+      if (data) setSelected(data as any)
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
@@ -150,9 +153,8 @@ export default function ImportFacturaPage() {
   }
 
   const handleSelectImport = async (importId: string) => {
-    if (!token) return
-    const res = await fetch(`${API_BASE}/api/v1/invoices/import/${importId}`, { headers: authHeaders })
-    if (res.ok) setSelected(await res.json())
+    const { data } = await createClient().from('purchase_invoices').select('*, purchase_invoice_items(*)').eq('id', importId).single()
+    if (data) setSelected(data as any)
   }
 
   return (
@@ -188,18 +190,18 @@ export default function ImportFacturaPage() {
                       <div className="flex items-center gap-2 min-w-0">
                         <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
                         <span className="text-sm font-medium text-gray-800 truncate">
-                          {imp.invoiceNumber ?? imp.supplierName ?? `Import ${imp.id.slice(0, 8)}`}
+                          {imp.invoice_number ?? imp.supplier_name ?? `Import ${imp.id.slice(0, 8)}`}
                         </span>
                       </div>
                       {STATUS_ICON[imp.status]}
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5 ml-6">
-                      {new Date(imp.createdAt).toLocaleDateString('ro-RO')}
+                      {new Date(imp.created_at).toLocaleDateString('ro-RO')}
                       {imp.total && ` · ${imp.total.toFixed(2)} ${imp.currency ?? 'RON'}`}
                     </p>
-                    {imp.errorMessage && (
-                      <p className="text-xs text-red-500 mt-0.5 ml-6 truncate" title={imp.errorMessage}>
-                        {imp.errorMessage}
+                    {imp.error_message && (
+                      <p className="text-xs text-red-500 mt-0.5 ml-6 truncate" title={imp.error_message}>
+                        {imp.error_message}
                       </p>
                     )}
                   </li>
@@ -212,25 +214,14 @@ export default function ImportFacturaPage() {
         {/* Right: review form */}
         <div className="lg:col-span-2">
           {selected ? (
-            token ? (
-              <InvoiceReviewForm
-                invoice={selected as any}
-                apiBase={API_BASE}
-                token={token}
-                onUpdated={updated => {
-                  setSelected(updated as any)
-                  setImports(prev => prev.map(i => i.id === updated.id ? (updated as any) : i))
-                }}
-                onApproved={() => {
-                  loadList()
-                  setSelected(null)
-                }}
-              />
-            ) : (
-              <div className="bg-white rounded-xl border p-8 text-center text-gray-400">
-                Se inițializează sesiunea…
-              </div>
-            )
+            <InvoiceReviewForm
+              invoice={selected}
+              onUpdated={updated => {
+                setSelected(updated)
+                setImports(prev => prev.map(i => i.id === updated.id ? updated : i))
+              }}
+              onApproved={() => { loadList(); setSelected(null) }}
+            />
           ) : (
             <div className="bg-white rounded-xl border p-12 flex flex-col items-center justify-center gap-3 text-gray-400">
               <FileText className="w-12 h-12" />

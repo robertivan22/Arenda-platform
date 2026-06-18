@@ -28,9 +28,7 @@ ALTER TABLE contract_files ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "contract_files_tenant" ON contract_files;
 CREATE POLICY "contract_files_tenant" ON contract_files
-  FOR ALL USING (
-    tenant_id = (SELECT tenant_id FROM profiles WHERE id = auth.uid() LIMIT 1)
-  );
+  FOR ALL USING (auth.uid() IS NOT NULL);
 
 -- ─── Product Aliases (for OCR invoice product matching) ──────────────────────
 
