@@ -440,39 +440,6 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
         </div>
       </div>
 
-      {/* Per-crop breakdown */}
-      {cropBreakdown && Object.keys(cropBreakdown.contractedByCrop).length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Situație pe culturi</p>
-          <table className="w-full">
-            <thead>
-              <tr className="text-xs text-gray-400 border-b border-gray-100">
-                <th className="text-left pb-2 font-semibold">Cultură</th>
-                <th className="text-right pb-2 font-semibold">Contractat</th>
-                <th className="text-right pb-2 font-semibold">Distribuit</th>
-                <th className="text-right pb-2 font-semibold">Rămas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(cropBreakdown.contractedByCrop).map(([crop, total]) => {
-                const distributed = cropBreakdown.distributedByCrop[crop] ?? 0
-                const remaining = Math.max(0, total - distributed)
-                return (
-                  <tr key={crop} className="border-b border-gray-50 last:border-0">
-                    <td className="py-1.5 text-xs text-gray-700">{CROP_ICONS[crop] ?? '🌿'} {crop}</td>
-                    <td className="py-1.5 text-xs text-right text-gray-600">{total.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg</td>
-                    <td className="py-1.5 text-xs text-right text-green-700 font-medium">{distributed.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg</td>
-                    <td className={clsx('py-1.5 text-xs text-right font-semibold', remaining === 0 ? 'text-gray-400' : 'text-amber-700')}>
-                      {remaining.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
       {/* All distributions for this landlord */}
       {status && status.conversions.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-4">

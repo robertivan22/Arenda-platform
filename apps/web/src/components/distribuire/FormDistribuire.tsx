@@ -104,12 +104,36 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
   const contractId = watch('contract_id')
   const distributionDate = watch('distribution_date')
 
-  // Per-crop remaining validation
-  const remainingForCrop = fromCropName && cropBreakdown
-    ? Math.max(0, (cropBreakdown.contractedByCrop[fromCropName] ?? 0) - (cropBreakdown.distributedByCrop[fromCropName] ?? 0))
-    : null
-  const cropFullyDistributed = remainingForCrop === 0 && !!fromCropName && cropBreakdown !== null
-  const quantityExceedsRemaining = remainingForCrop !== null && remainingForCrop > 0 && fromQuantityKg > remainingForCrop
+  // Query exact remaining for selected contract+crop — same logic as DB RPC
+  // (parcel_transactions total − arenda_conversions confirmed)
+  const [contractCropRemaining, setContractCropRemaining] = useState<number | null>(null)
+  useEffect(() => {
+    if (!fromCropName || !contractId) { setContractCropRemaining(null); return }
+    let cancelled = false
+    async function fetchRemaining() {
+      const db = createClient()
+      const [{ data: ptData }, { data: convData }] = await Promise.all([
+        db.from('parcel_transactions')
+          .select('total_quantity')
+          .eq('contract_id', contractId)
+          .eq('product_type', fromCropName),
+        db.from('arenda_conversions')
+          .select('from_quantity_kg')
+          .eq('contract_id', contractId)
+          .eq('from_crop_name', fromCropName)
+          .eq('status', 'confirmed'),
+      ])
+      if (cancelled) return
+      const total = (ptData ?? []).reduce((s: number, r: any) => s + Number(r.total_quantity), 0)
+      const distributed = (convData ?? []).reduce((s: number, r: any) => s + Number(r.from_quantity_kg), 0)
+      setContractCropRemaining(Math.max(0, total - distributed))
+    }
+    void fetchRemaining()
+    return () => { cancelled = true }
+  }, [fromCropName, contractId])
+
+  const cropFullyDistributed = contractCropRemaining === 0 && !!fromCropName && contractCropRemaining !== null
+  const quantityExceedsRemaining = contractCropRemaining !== null && contractCropRemaining > 0 && fromQuantityKg > contractCropRemaining
   const deliveryMethod = watch('delivery_method')
   const toQuantityKg = watch('to_quantity_kg')
 
@@ -170,11 +194,11 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
 
   async function onSubmit(values: FormValues) {
     if (cropFullyDistributed) {
-      toast.error(`Cultura ${fromCropName} a fost distribuită complet — cantitate rămasă 0 kg`)
+      toast.error(`Cultura ${fromCropName} a fost distribuită complet — cantitate rămasă 0 kg pe acest contract`)
       return
     }
-    if (quantityExceedsRemaining && remainingForCrop !== null) {
-      toast.error(`Cantitate depășește disponibilul de ${remainingForCrop.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg pentru ${fromCropName}`)
+    if (quantityExceedsRemaining && contractCropRemaining !== null) {
+      toast.error(`Cantitate depășește disponibilul de ${contractCropRemaining.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg pentru ${fromCropName} pe acest contract`)
       return
     }
     setShowConfirmModal(true)
@@ -304,7 +328,7 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
           />
 
           {/* Per-crop availability warnings */}
-          {fromCropName && cropBreakdown && (
+          {fromCropName && contractId && (
             cropFullyDistributed ? (
               <div className="mt-3 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
@@ -317,13 +341,13 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
               <div className="mt-3 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                 Cantitate depășește disponibilul de{' '}
-                <strong>{remainingForCrop!.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg</strong>{' '}
-                pentru {fromCropName}
+                <strong>{contractCropRemaining!.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg</strong>{' '}
+                pentru {fromCropName} pe acest contract
               </div>
-            ) : remainingForCrop !== null ? (
+            ) : contractCropRemaining !== null ? (
               <p className="mt-1.5 text-xs text-amber-700 font-medium">
-                Disponibil {fromCropName}: {remainingForCrop.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg
-                {fromQuantityKg > 0 && ` · Rămas după confirmare: ${Math.max(0, remainingForCrop - fromQuantityKg).toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg`}
+                Disponibil {fromCropName} (contract): {contractCropRemaining.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg
+                {fromQuantityKg > 0 && ` · Rămas după confirmare: ${Math.max(0, contractCropRemaining - fromQuantityKg).toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg`}
               </p>
             ) : null
           )}
