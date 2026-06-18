@@ -25,6 +25,7 @@ export default function NewTransactionPage() {
   const [rentLevels, setRentLevels] = useState<RentLevel[]>([])
   const [totalHa, setTotalHa] = useState(0)
   const [paidThisYear, setPaidThisYear] = useState<Record<string, number>>({})
+  const [daConvertedThisYear, setDaConvertedThisYear] = useState<Record<string, number>>({})
   const currentYear = new Date().getFullYear()
 
   const [form, setForm] = useState({
@@ -70,16 +71,26 @@ export default function NewTransactionPage() {
 
   useEffect(() => {
     if (!form.productName || !form.campaignYear) return
-    createClient().from('transactions')
-      .select('kg_net, product_name')
-      .eq('contract_id', id)
-      .eq('campaign_year', parseInt(form.campaignYear))
-      .eq('is_previzionata', false)
-      .then(({ data }) => {
-        const map: Record<string, number> = {}
-        ;(data ?? []).forEach((t: any) => { map[t.product_name] = (map[t.product_name] ?? 0) + Number(t.kg_net) })
-        setPaidThisYear(map)
-      })
+    const db = createClient()
+    Promise.all([
+      db.from('transactions')
+        .select('kg_net, product_name')
+        .eq('contract_id', id)
+        .eq('campaign_year', parseInt(form.campaignYear))
+        .eq('is_previzionata', false)
+        .neq('payment_type', 'Distribuire Arendă'),
+      db.from('arenda_conversions')
+        .select('from_crop_name, from_quantity_kg')
+        .eq('contract_id', id)
+        .eq('status', 'confirmed'),
+    ]).then(([{ data: txns }, { data: convs }]) => {
+      const txMap: Record<string, number> = {}
+      ;(txns ?? []).forEach((t: any) => { txMap[t.product_name] = (txMap[t.product_name] ?? 0) + Number(t.kg_net) })
+      setPaidThisYear(txMap)
+      const daMap: Record<string, number> = {}
+      ;(convs ?? []).forEach((c: any) => { daMap[c.from_crop_name] = (daMap[c.from_crop_name] ?? 0) + Number(c.from_quantity_kg) })
+      setDaConvertedThisYear(daMap)
+    })
   }, [id, form.productName, form.campaignYear])
 
   function setField(field: string, value: string | boolean | number) { setForm(prev => ({ ...prev, [field]: value })) }
@@ -88,7 +99,8 @@ export default function NewTransactionPage() {
   const level = rentLevels.find(r => r.product_name === form.productName)
   const dueTotalKg = level ? level.level_per_ha * totalHa : 0
   const paidKg = paidThisYear[form.productName] ?? 0
-  const remainingKg = Math.max(0, dueTotalKg - paidKg)
+  const daKg = daConvertedThisYear[form.productName] ?? 0
+  const remainingKg = Math.max(0, dueTotalKg - paidKg - daKg)
   const kgBrut = parseFloat(form.kgBrut) || 0
   // Physical kg net (display only — does not affect RON calculation)
   const kgNet = level?.level_type === 'BRUT'

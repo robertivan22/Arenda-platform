@@ -39,7 +39,8 @@ CREATE OR REPLACE FUNCTION execute_arenda_distribution(
   p_delivery_method   TEXT,
   p_distribution_date DATE,
   p_notes             TEXT    DEFAULT NULL,
-  -- Tax parameters (new)
+  p_campaign_id       UUID    DEFAULT NULL,
+  -- Tax parameters
   p_tax_applied       BOOLEAN DEFAULT FALSE,
   p_tax_rate          NUMERIC DEFAULT 10.00
 )
@@ -101,14 +102,14 @@ BEGIN
 
   -- ── 4. Insert arenda_conversion ─────────────────────────────────────────
   INSERT INTO arenda_conversions (
-    user_id, contract_id, lessor_id,
+    user_id, contract_id, lessor_id, campaign_id,
     from_crop_name, from_quantity_kg, from_price_per_kg,
     to_crop_name,   to_quantity_kg,   to_price_per_kg,
     conversion_rate, value_ron,
     tax_applied, tax_rate, tax_amount, value_ron_net,
     delivery_method, distribution_date, notes, status
   ) VALUES (
-    p_user_id, p_contract_id, p_lessor_id,
+    p_user_id, p_contract_id, p_lessor_id, p_campaign_id,
     p_from_crop_name, p_from_quantity_kg, p_price_from,
     p_to_crop_name,   p_to_quantity_kg,   p_price_to,
     p_conversion_rate, p_value_ron,
