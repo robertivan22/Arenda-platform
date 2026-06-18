@@ -44,8 +44,11 @@ export default function DistribuireArendaPage() {
   const [sumarRefreshKey, setSumarRefreshKey] = useState(0)
   const [recentRefreshKey, setRecentRefreshKey] = useState(0)
   const [loadingStats, setLoadingStats] = useState(true)
-  // Track the from_quantity being entered in the form for live preview in SumarArendator
   const [previewFromKg, setPreviewFromKg] = useState(0)
+  const [cropBreakdown, setCropBreakdown] = useState<{
+    contractedByCrop: Record<string, number>
+    distributedByCrop: Record<string, number>
+  } | null>(null)
 
   const loadStats = useCallback(async () => {
     setLoadingStats(true)
@@ -87,11 +90,13 @@ export default function DistribuireArendaPage() {
   function handleLandlordSelect(l: LandlordSearchResult) {
     setSelectedLandlord(l)
     setPreviewFromKg(0)
+    setCropBreakdown(null)
   }
 
   function handleLandlordClear() {
     setSelectedLandlord(null)
     setPreviewFromKg(0)
+    setCropBreakdown(null)
   }
 
   function handleDistributionSuccess() {
@@ -186,7 +191,7 @@ export default function DistribuireArendaPage() {
           {selectedLandlord ? (
             <FormDistribuire
               landlord={selectedLandlord}
-              remainingKg={0}  // SumarArendator tracks remaining; pass from status if needed
+              cropBreakdown={cropBreakdown}
               onSuccess={handleDistributionSuccess}
             />
           ) : (
@@ -213,6 +218,7 @@ export default function DistribuireArendaPage() {
             landlord={selectedLandlord}
             refreshKey={sumarRefreshKey}
             currentDistributionKg={previewFromKg}
+            onCropBreakdown={setCropBreakdown}
           />
         </div>
       </div>

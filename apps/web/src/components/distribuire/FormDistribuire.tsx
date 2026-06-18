@@ -47,15 +47,20 @@ const DELIVERY_OPTIONS: DeliveryOption[] = [
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
+interface CropBreakdown {
+  contractedByCrop: Record<string, number>
+  distributedByCrop: Record<string, number>
+}
+
 interface Props {
   landlord: LandlordSearchResult
-  remainingKg: number
+  cropBreakdown: CropBreakdown | null
   onSuccess: () => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function FormDistribuire({ landlord, remainingKg, onSuccess }: Props) {
+export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [prices, setPrices] = useState<CropPrice[]>([])
   const [loadingInit, setLoadingInit] = useState(true)
@@ -98,6 +103,13 @@ export function FormDistribuire({ landlord, remainingKg, onSuccess }: Props) {
   const fromQuantityKg = watch('from_quantity_kg')
   const contractId = watch('contract_id')
   const distributionDate = watch('distribution_date')
+
+  // Per-crop remaining validation
+  const remainingForCrop = fromCropName && cropBreakdown
+    ? Math.max(0, (cropBreakdown.contractedByCrop[fromCropName] ?? 0) - (cropBreakdown.distributedByCrop[fromCropName] ?? 0))
+    : null
+  const cropFullyDistributed = remainingForCrop === 0 && !!fromCropName && cropBreakdown !== null
+  const quantityExceedsRemaining = remainingForCrop !== null && remainingForCrop > 0 && fromQuantityKg > remainingForCrop
   const deliveryMethod = watch('delivery_method')
   const toQuantityKg = watch('to_quantity_kg')
 
@@ -157,9 +169,12 @@ export function FormDistribuire({ landlord, remainingKg, onSuccess }: Props) {
   }, [fromCropName, toCropName, prices, setValue])
 
   async function onSubmit(values: FormValues) {
-    // Client-side guard: don't allow over-distribution
-    if (remainingKg > 0 && values.from_quantity_kg > remainingKg) {
-      toast.error(`Cantitate depășește rămasul de ${remainingKg.toLocaleString('ro-RO', { maximumFractionDigits: 1 })} kg`)
+    if (cropFullyDistributed) {
+      toast.error(`Cultura ${fromCropName} a fost distribuită complet — cantitate rămasă 0 kg`)
+      return
+    }
+    if (quantityExceedsRemaining && remainingForCrop !== null) {
+      toast.error(`Cantitate depășește disponibilul de ${remainingForCrop.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg pentru ${fromCropName}`)
       return
     }
     setShowConfirmModal(true)
@@ -288,13 +303,29 @@ export function FormDistribuire({ landlord, remainingKg, onSuccess }: Props) {
             onFromQuantityChange={(v) => setValue('from_quantity_kg', v, { shouldValidate: true })}
           />
 
-          {/* Remaining warning */}
-          {remainingKg > 0 && fromQuantityKg > remainingKg && (
-            <div className="mt-3 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              Cantitatea depășește rămasul de{' '}
-              <strong>{remainingKg.toLocaleString('ro-RO', { maximumFractionDigits: 1 })} kg</strong>
-            </div>
+          {/* Per-crop availability warnings */}
+          {fromCropName && cropBreakdown && (
+            cropFullyDistributed ? (
+              <div className="mt-3 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-red-700">
+                  <strong>Distribuit complet!</strong> Cantitate disponibilă pentru <strong>{fromCropName}</strong>: <strong>0 kg</strong>.
+                  Arendatorul a primit toată cantitatea contractată pentru această cultură.
+                </div>
+              </div>
+            ) : quantityExceedsRemaining ? (
+              <div className="mt-3 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                Cantitate depășește disponibilul de{' '}
+                <strong>{remainingForCrop!.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg</strong>{' '}
+                pentru {fromCropName}
+              </div>
+            ) : remainingForCrop !== null ? (
+              <p className="mt-1.5 text-xs text-amber-700 font-medium">
+                Disponibil {fromCropName}: {remainingForCrop.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg
+                {fromQuantityKg > 0 && ` · Rămas după confirmare: ${Math.max(0, remainingForCrop - fromQuantityKg).toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg`}
+              </p>
+            ) : null
           )}
 
           {errors.from_crop_name && (
