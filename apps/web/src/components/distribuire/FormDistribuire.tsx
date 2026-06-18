@@ -67,6 +67,9 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
   const [conversionResult, setConversionResult] = useState<ConversionResult | null>(null)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  // Tax state
+  const [taxApplied, setTaxApplied] = useState(false)
+  const [taxRate, setTaxRate] = useState(10)
 
   const displayName =
     landlord.type === 'LEGAL'
@@ -224,6 +227,9 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
 
       const fromPrice = prices.find((p) => p.crop_name === fromCropName)?.price_per_kg ?? 0
       const toPrice = prices.find((p) => p.crop_name === toCropName)?.price_per_kg ?? 0
+      const valueRon = fromQuantityKg * fromPrice
+      const effectiveTaxRate = taxApplied ? Math.max(0, Math.min(100, taxRate)) : 0
+      const taxAmount = taxApplied ? Math.round(valueRon * effectiveTaxRate / 100 * 100) / 100 : 0
 
       const { error } = await supabase.rpc('execute_arenda_distribution', {
         p_user_id: user.id,
@@ -237,10 +243,12 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
         p_to_quantity_kg: conversionResult?.toQuantityKg ?? 0,
         p_to_price_per_kg: toPrice,
         p_conversion_rate: conversionResult?.rate ?? 1,
-        p_value_ron: fromQuantityKg * fromPrice,
+        p_value_ron: valueRon,
         p_delivery_method: deliveryMethod,
         p_distribution_date: distributionDate,
         p_notes: watch('notes') ?? null,
+        p_tax_applied: taxApplied,
+        p_tax_rate: effectiveTaxRate,
       })
       if (error) { toast.error(error.message); return }
       toast.success('Distribuire confirmată cu succes!')
@@ -253,6 +261,11 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
 
   const selectedContract = contracts.find((c) => c.id === contractId)
   const valueRon = conversionResult?.valueRon ?? null
+  const effectiveTaxRate = taxApplied ? Math.max(0, Math.min(100, taxRate)) : 0
+  const taxAmountPreview = (valueRon != null && taxApplied)
+    ? Math.round(valueRon * effectiveTaxRate / 100 * 100) / 100
+    : 0
+  const netValueRon = valueRon != null ? valueRon - taxAmountPreview : null
 
   if (loadingInit) {
     return (
@@ -417,6 +430,56 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
           />
         </div>
 
+        {/* Tax (impozit) */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={taxApplied}
+                onChange={e => setTaxApplied(e.target.checked)}
+                className="w-4 h-4 rounded accent-orange-500 cursor-pointer"
+              />
+              <span className="text-sm font-medium text-gray-700">Aplică impozit la sursă</span>
+              <span className="text-xs text-gray-400">(Cod Fiscal art. 84 — reținere la sursă)</span>
+            </label>
+            {taxApplied && (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={taxRate}
+                  onChange={e => setTaxRate(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                  className="w-16 text-center px-2 py-1 text-sm border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 font-semibold"
+                />
+                <span className="text-sm text-gray-500">%</span>
+              </div>
+            )}
+          </div>
+          {taxApplied && valueRon != null && valueRon > 0 && (
+            <div className="mt-3 bg-orange-50 border border-orange-100 rounded-lg p-3 space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Valoare brută</span>
+                <span className="font-semibold">{valueRon.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} RON</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-orange-600">Impozit reținut ({effectiveTaxRate}%)</span>
+                <span className="font-semibold text-orange-700">− {taxAmountPreview.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} RON</span>
+              </div>
+              <div className="flex justify-between border-t border-orange-200 pt-1.5">
+                <span className="text-green-700 font-medium">Valoare netă (arendator primește)</span>
+                <span className="font-bold text-green-700">{netValueRon!.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} RON</span>
+              </div>
+              <p className="text-xs text-gray-400">Impozitul se virează la ANAF de către arendaș în numele arendatorului.</p>
+            </div>
+          )}
+          {!taxApplied && (
+            <p className="text-xs text-gray-400 mt-1">Fără impozit reținut. Valoarea totală se achită arendatorului.</p>
+          )}
+        </div>
+
         {/* Notes */}
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">
@@ -458,6 +521,22 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
                   {conversionResult.valueRon.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} RON
                 </span>
               </div>
+              {taxApplied && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-orange-600">Impozit reținut ({effectiveTaxRate}%)</span>
+                    <span className="font-medium text-orange-700">
+                      − {taxAmountPreview.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} RON
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-green-700 font-medium">Valoare netă</span>
+                    <span className="font-bold text-green-700">
+                      {netValueRon!.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} RON
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between">
                 <span className="text-gray-500">Metodă</span>
                 <span className="font-medium text-gray-900">
@@ -525,11 +604,27 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
                 </span>
               </div>
               <div className="flex justify-between border-t border-gray-200 pt-2 mt-2">
-                <span className="text-gray-500 font-medium">Valoare totală</span>
+                <span className="text-gray-500 font-medium">Valoare brută</span>
                 <span className="font-bold text-brand-700 text-base">
                   {conversionResult.valueRon.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} RON
                 </span>
               </div>
+              {taxApplied && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-orange-600">Impozit reținut ({effectiveTaxRate}%)</span>
+                    <span className="font-semibold text-orange-700">
+                      − {taxAmountPreview.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} RON
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-green-700 font-semibold">Valoare netă (arendator primește)</span>
+                    <span className="font-bold text-green-700 text-base">
+                      {netValueRon!.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} RON
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between">
                 <span className="text-gray-500">Livrare</span>
                 <span className="font-semibold">

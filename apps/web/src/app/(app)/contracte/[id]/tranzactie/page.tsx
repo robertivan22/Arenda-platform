@@ -38,6 +38,7 @@ export default function NewTransactionPage() {
     autoNr: true,
     isPrevizionata: false,
     impozitAplicat: false,
+    taxRate: 10,
     isPaid: false,
     notes: '',
   })
@@ -95,7 +96,7 @@ export default function NewTransactionPage() {
     : kgBrut
   const price = parseFloat(form.pricePerUnit) || 0
   const ronBrut = kgBrut * price
-  const taxAmount = form.impozitAplicat ? Math.round(ronBrut * 0.10 * 100) / 100 : 0
+  const taxAmount = form.impozitAplicat ? Math.round(ronBrut * (form.taxRate / 100) * 100) / 100 : 0
   const ronNet = Math.round((ronBrut - taxAmount) * 100) / 100
 
   function fillPercent(pct: number) {
@@ -167,7 +168,19 @@ export default function NewTransactionPage() {
             </label>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={form.impozitAplicat} onChange={e => setField('impozitAplicat', e.target.checked)} className="rounded" />
-              <span className="text-gray-700">Aplică impozit 10% la sursă</span>
+              <span className="text-gray-700">Aplică impozit la sursă</span>
+              {form.impozitAplicat && (
+                <span className="flex items-center gap-1">
+                  <input
+                    type="number" min="0" max="100" step="0.1"
+                    value={form.taxRate}
+                    onChange={e => setField('taxRate', Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                    className="w-14 text-center px-1.5 py-0.5 text-sm border border-orange-300 rounded focus:outline-none focus:ring-1 focus:ring-orange-400 font-semibold"
+                    onClick={e => e.stopPropagation()}
+                  />
+                  <span className="text-gray-500">%</span>
+                </span>
+              )}
             </label>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={form.isPaid as boolean} onChange={e => setField('isPaid', e.target.checked)} className="rounded accent-green-600" />
@@ -242,11 +255,11 @@ export default function NewTransactionPage() {
               <div className="flex justify-between"><span className="text-gray-500">Kg Net (fizic):</span><span className="font-semibold">{kgNet.toFixed(2)}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">RON Brut:</span><span>{ronBrut.toFixed(2)}</span></div>
               {form.impozitAplicat && (
-                <div className="flex justify-between"><span className="text-gray-500">Impozit (10%):</span><span className="text-orange-600">{taxAmount.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Impozit ({form.taxRate}%):</span><span className="text-orange-600">{taxAmount.toFixed(2)}</span></div>
               )}
               <div className="flex justify-between"><span className="text-gray-500">RON Net:</span><span className="font-semibold text-green-700">{ronNet.toFixed(2)}</span></div>
               <div className="border-t border-gray-200 pt-1 text-xs text-gray-400">
-                {form.impozitAplicat ? 'Net = Brut × 90% (impozit 10% reținut la sursă)' : 'Fără impozit reținut — bifă „Aplică impozit” de mai sus'}
+                {form.impozitAplicat ? `Net = Brut × ${(100 - form.taxRate).toFixed(1)}% (impozit ${form.taxRate}% reținut la sursă)` : 'Fără impozit reținut — bifă „Aplică impozit” de mai sus'}
               </div>
             </div>
           )}

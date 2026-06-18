@@ -74,6 +74,10 @@ export interface ArendaConversion {
   to_price_per_kg: number
   conversion_rate: number
   value_ron: number
+  tax_applied: boolean
+  tax_rate: number
+  tax_amount: number
+  value_ron_net: number
   delivery_method: DeliveryMethod
   distribution_date: string
   notes: string | null
