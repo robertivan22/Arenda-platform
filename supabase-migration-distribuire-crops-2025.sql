@@ -1,22 +1,31 @@
 -- ============================================================
--- Migration: Add more crops + updated 2025 prices
+-- Migration: Crop prices update — June 2026
 -- Run AFTER supabase-migration-distribuire-arenda.sql
+-- Prices: estimare piata Romania / UE, referinta iunie 2026
+-- (MADR nu publica in timp real; preturile reflecta media
+--  pietei spot Romania la momentul distributiei)
 -- ============================================================
 
--- Updated 2025 MADR reference prices for existing crops
 INSERT INTO crop_prices (user_id, crop_name, price_per_kg, source, effective_date, notes) VALUES
-  (NULL, 'Porumb',            0.92, 'MADR', '2025-01-01', 'MADR ref 2025'),
-  (NULL, 'Grâu',              1.05, 'MADR', '2025-01-01', 'MADR ref 2025'),
-  (NULL, 'Floarea-soarelui',  2.05, 'MADR', '2025-01-01', 'MADR ref 2025'),
-  (NULL, 'Soia',              1.75, 'MADR', '2025-01-01', 'MADR ref 2025'),
-  (NULL, 'Rapiță',            2.30, 'MADR', '2025-01-01', 'MADR ref 2025'),
-  (NULL, 'Orz',               0.88, 'MADR', '2025-01-01', 'MADR ref 2025');
+  -- Cereale paioase (wheat, barley, rye, oats) — preturi slabe in 2026
+  -- dupa 2 ani de productie record in UE + presiune din export Ucraina
+  (NULL, 'Grâu',              0.95, 'Piata', '2026-06-01', 'Ref piata Romania iun. 2026 ~950 RON/t'),
+  (NULL, 'Orz',               0.82, 'Piata', '2026-06-01', 'Ref piata Romania iun. 2026 ~820 RON/t'),
+  (NULL, 'Ovăz',              0.70, 'Piata', '2026-06-01', 'Ref piata Romania iun. 2026 ~700 RON/t'),
+  (NULL, 'Secară',            0.80, 'Piata', '2026-06-01', 'Ref piata Romania iun. 2026 ~800 RON/t'),
+  (NULL, 'Triticale',         0.78, 'Piata', '2026-06-01', 'Ref piata Romania iun. 2026 ~780 RON/t'),
 
--- New crops
-INSERT INTO crop_prices (user_id, crop_name, price_per_kg, source, effective_date, notes) VALUES
-  (NULL, 'Ovăz',              0.75, 'MADR', '2025-01-01', 'MADR ref 2025'),
-  (NULL, 'Secară',            0.85, 'MADR', '2025-01-01', 'MADR ref 2025'),
-  (NULL, 'Triticale',         0.82, 'MADR', '2025-01-01', 'MADR ref 2025'),
-  (NULL, 'Mazăre',            1.35, 'MADR', '2025-01-01', 'MADR ref 2025'),
-  (NULL, 'Sfeclă de zahăr',   0.17, 'MADR', '2025-01-01', 'MADR ref 2025'),
-  (NULL, 'Lucernă',           0.45, 'MADR', '2025-01-01', 'MADR ref 2025');
+  -- Porumb — sub presiune; CBOT corn ~4.50-4.80 $/bu in iun. 2026
+  (NULL, 'Porumb',            0.86, 'Piata', '2026-06-01', 'Ref piata Romania iun. 2026 ~860 RON/t'),
+
+  -- Oleaginoase
+  (NULL, 'Floarea-soarelui',  2.10, 'Piata', '2026-06-01', 'Ref piata Romania iun. 2026 ~2100 RON/t'),
+  (NULL, 'Rapiță',            2.40, 'Piata', '2026-06-01', 'Ref EUR 475/t, curs ~5.05 RON/EUR'),
+  (NULL, 'Soia',              1.92, 'Piata', '2026-06-01', 'Ref piata Romania iun. 2026 ~1920 RON/t'),
+
+  -- Leguminoase
+  (NULL, 'Mazăre',            1.30, 'Piata', '2026-06-01', 'Ref piata Romania iun. 2026 ~1300 RON/t'),
+
+  -- Alte culturi
+  (NULL, 'Sfeclă de zahăr',   0.16, 'Piata', '2026-06-01', 'Ref contract procesator ~160 RON/t'),
+  (NULL, 'Lucernă',           0.42, 'Piata', '2026-06-01', 'Ref piata Romania iun. 2026 fan uscat');

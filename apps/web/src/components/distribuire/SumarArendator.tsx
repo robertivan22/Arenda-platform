@@ -59,7 +59,9 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const [{ data: convData }, { data: contractsData }, { data: pricesData }] = await Promise.all([
+      const currentYear = new Date().getFullYear()
+
+      const [{ data: convData }, { data: contractsData }, { data: pricesData }, { data: txnsData }] = await Promise.all([
         supabase
           .from('arenda_conversions')
           .select('id, from_crop_name, from_quantity_kg, from_price_per_kg, to_crop_name, to_quantity_kg, to_price_per_kg, conversion_rate, value_ron, delivery_method, distribution_date, notes, status, transaction_id, created_at, contract_id, contracts(contract_number)')
@@ -73,6 +75,13 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
           .select('id, crop_name, price_per_kg, source, effective_date, notes')
           .or(`user_id.is.null,user_id.eq.${user.id}`)
           .order('effective_date', { ascending: false }),
+        // Real distributions from the transactions table (matches contract page data)
+        supabase
+          .from('transactions')
+          .select('product_name, kg_net')
+          .eq('lessor_id', id)
+          .eq('campaign_year', currentYear)
+          .eq('is_previzionata', false),
       ])
 
       const priceSeen = new Map<string, CropPrice>()
@@ -82,40 +91,43 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
       setPrices(Array.from(priceSeen.values()).sort((a, b) => a.crop_name.localeCompare(b.crop_name, 'ro')))
 
       const contractIds = (contractsData ?? []).map((c: any) => c.id)
-      let totalKg = 0
       let ptPerCrop: any[] = []
       if (contractIds.length > 0) {
+        // Filter to current campaign year to match contract page totals
         const { data: ptData } = await supabase
           .from('parcel_transactions')
-          .select('product_type, total_quantity')
+          .select('product_type, total_quantity, campaign_year')
           .in('contract_id', contractIds)
+          .eq('campaign_year', currentYear)
         ptPerCrop = ptData ?? []
-        totalKg = ptPerCrop.reduce((s: number, pt: any) => s + Number(pt.total_quantity ?? 0), 0)
       }
 
-      // Per-crop breakdown: contracted
+      // Per-crop contracted (from parcel_transactions for current year)
       const contractedByCrop: Record<string, number> = {}
       for (const pt of ptPerCrop) {
         if (pt.product_type) {
           contractedByCrop[pt.product_type] = (contractedByCrop[pt.product_type] ?? 0) + Number(pt.total_quantity)
         }
       }
+      const totalKg = Object.values(contractedByCrop).reduce((s, v) => s + v, 0)
 
-      const convRows = (convData ?? []) as any[]
-      const distributedKg = convRows.reduce((s: number, c: any) => s + Number(c.from_quantity_kg ?? 0), 0)
-      const valueRon = convRows.reduce((s: number, c: any) => s + Number(c.value_ron ?? 0), 0)
-
-      // Per-crop breakdown: distributed
+      // Per-crop distributed — from transactions table (same source as contract page)
+      const txnRows = (txnsData ?? []) as any[]
       const distributedByCrop: Record<string, number> = {}
-      for (const conv of convRows) {
-        const crop = conv.from_crop_name
-        if (crop) distributedByCrop[crop] = (distributedByCrop[crop] ?? 0) + Number(conv.from_quantity_kg)
+      for (const t of txnRows) {
+        if (t.product_name) {
+          distributedByCrop[t.product_name] = (distributedByCrop[t.product_name] ?? 0) + Number(t.kg_net)
+        }
       }
-      // Include distributed crops not in parcel_transactions (edge case)
-      for (const crop of Object.keys(distributedByCrop)) {
-        if (!(crop in contractedByCrop)) contractedByCrop[crop] = distributedByCrop[crop]
+      // Include any crops in parcel_transactions that have no transactions yet
+      for (const crop of Object.keys(contractedByCrop)) {
+        if (!(crop in distributedByCrop)) distributedByCrop[crop] = 0
       }
       setCropBreakdown({ contractedByCrop, distributedByCrop })
+
+      const convRows = (convData ?? []) as any[]
+      const distributedKg = Object.values(distributedByCrop).reduce((s, v) => s + v, 0)
+      const valueRon = convRows.reduce((s: number, c: any) => s + Number(c.value_ron ?? 0), 0)
 
       setStatus({
         total_kg: totalKg,
