@@ -81,7 +81,13 @@ export default function ImportFacturaPage() {
       .select('*, purchase_invoice_items(*)')
       .order('created_at', { ascending: false })
       .limit(50)
-    if (error) { toast.error('Eroare la încărcarea importurilor'); setLoadingList(false); return }
+    if (error) {
+      // Table may not exist yet (migration not run) — show empty state instead of error
+      if (error.code === '42P01') { setImports([]); setLoadingList(false); return }
+      toast.error('Eroare la încărcarea importurilor')
+      setLoadingList(false)
+      return
+    }
     setImports((data ?? []) as any)
     setLoadingList(false)
   }, [userId])

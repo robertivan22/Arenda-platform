@@ -57,8 +57,9 @@ async function compressPdf(file: File, onStatus: (s: string) => void): Promise<C
   try {
     onStatus('Se comprimă PDF-ul în browser...')
     const pdfjs = await import('pdfjs-dist')
+    // Use .js (IIFE) worker — .mjs ES module workers are not supported on iOS Safari
     pdfjs.GlobalWorkerOptions.workerSrc =
-      `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+      `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
 
     const { jsPDF } = await import('jspdf')
 

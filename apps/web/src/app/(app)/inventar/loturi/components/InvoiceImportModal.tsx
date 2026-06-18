@@ -41,10 +41,11 @@ async function runOcrOnImages(imageUrls: string[], onProgress: (p: string) => vo
   onProgress('Se inițializează OCR...')
   // Dynamic import – Tesseract.js runs entirely in browser
   const { createWorker } = await import('tesseract.js')
+  // Use non-SIMD core for iOS/Android compatibility (SIMD not supported on mobile Safari)
   const worker = await createWorker('ron+eng', 1, {
     workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
     langPath: 'https://tessdata.projectnaptha.com/4.0.0',
-    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-simd-lstm.wasm.js',
+    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-lstm.wasm.js',
     logger: () => {},
   })
   const texts: string[] = []
@@ -61,8 +62,8 @@ async function pdfToImages(file: File, onProgress: (p: string) => void): Promise
   onProgress('Se citește fișierul PDF...')
   // Dynamic import – PDF.js runs in browser
   const pdfjs = await import('pdfjs-dist')
-  // Use CDN worker to avoid build issues
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+  // Use .js (IIFE) worker – .mjs ES module workers are not supported on iOS Safari
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
 
   const arrayBuffer = await file.arrayBuffer()
   const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise
