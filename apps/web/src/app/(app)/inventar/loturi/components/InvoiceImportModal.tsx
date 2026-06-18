@@ -110,7 +110,11 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
   const [matchSearch, setMatchSearch] = useState<Record<number, string>>({})
   const [saveAlias, setSaveAlias] = useState<Record<number, boolean>>({})
   const [saving, setSaving] = useState(false)
+  const [logs, setLogs] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const dbg = (msg: string) =>
+    setLogs(prev => [`${new Date().toLocaleTimeString()}: ${msg}`, ...prev])
 
   const inp = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500'
 
@@ -129,14 +133,21 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
     if (f.size > MAX_MB * 1024 * 1024) { toast.error(`Fișierul depășește ${MAX_MB} MB.`); return }
     setFile(f)
     setStage('processing')
+    setLogs([])
+    dbg(`Fișier: ${f.name} | ${(f.size/1024).toFixed(0)} KB | ${f.type}`)
+    dbg(`User Agent: ${navigator.userAgent.slice(0, 80)}`)
 
     try {
       setProgress('Se pregătește fișierul...')
+      dbg(f.type === 'application/pdf' ? 'Tip: PDF → se convertește la imagini...' : 'Tip: imagine → direct OCR...')
       const images = f.type === 'application/pdf'
-        ? await pdfToImages(f, setProgress)
+        ? await pdfToImages(f, (s) => { setProgress(s); dbg(s) })
         : await fileToImages(f)
+      dbg(`Imagini generate: ${images.length}`)
 
-      const rawText = await runOcrOnImages(images, setProgress)
+      dbg('Se inițializează Tesseract.js...')
+      const rawText = await runOcrOnImages(images, (s) => { setProgress(s); dbg(s) })
+      dbg(`OCR complet. Caractere extrase: ${rawText.length}`)
       setProgress('Se extrag produsele...')
 
       const parsed = parseInvoiceText(rawText)
@@ -170,7 +181,10 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
       })
       setStage('review')
     } catch (err) {
-      toast.error(`Eroare OCR: ${(err as Error).message}`)
+      const msg = (err as Error).message
+      dbg(`EROARE: ${msg}`)
+      dbg(`Stack: ${(err as Error).stack?.slice(0, 200) ?? 'N/A'}`)
+      toast.error(`Eroare OCR: ${msg}`)
       setStage('upload')
     }
   }, [existingProducts])
@@ -480,7 +494,6 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
             <FileText className="w-5 h-5 text-brand-600" />
             <div>
               <h2 className="font-semibold text-gray-900">Scanează factură inputuri</h2>
-              <p className="text-xs text-gray-500">OCR rulează direct în browser · fără server</p>
             </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
@@ -770,6 +783,14 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
           </div>
         )}
       </div>
+
+      {/* Debug log overlay */}
+      {logs.length > 0 && (
+        <div className="flex-shrink-0 bg-black/95 text-green-400 text-xs p-3 max-h-40 overflow-y-auto font-mono border-t border-green-800">
+          <div className="text-yellow-400 font-bold mb-1">DEBUG LOG</div>
+          {logs.map((l, i) => <div key={i}>{l}</div>)}
+        </div>
+      )}
     </div>
   )
 }
