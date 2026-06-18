@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, ArrowRight, Info } from 'lucide-react'
 import { clsx } from 'clsx'
 import type { CropPrice, ConversionResult } from '@/types/distribuire'
-import { upsertManualCropPrice } from '@/app/(app)/distribuire-arenda/actions'
+import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
 const CROP_ICONS: Record<string, string> = {
@@ -123,8 +123,18 @@ export function ConversionCalculator({
     }
     setSavingPrice(cropName)
     try {
-      const res = await upsertManualCropPrice(cropName, val, 'Preț manual')
-      if (!res.ok) { toast.error(res.error ?? 'Eroare'); return }
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { toast.error('Neautentificat'); return }
+      const { error } = await supabase.from('crop_prices').insert({
+        user_id: user.id,
+        crop_name: cropName,
+        price_per_kg: val,
+        source: 'MANUAL',
+        effective_date: new Date().toISOString().split('T')[0],
+        notes: 'Preț manual',
+      })
+      if (error) { toast.error(error.message); return }
       toast.success(`Preț ${cropName} salvat`)
       await onRefreshPrices()
     } finally {

@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { Eye, X, Loader2 } from 'lucide-react'
 import { clsx } from 'clsx'
 import type { ArendaConversion } from '@/types/distribuire'
-import { getRecentDistributions } from '@/app/(app)/distribuire-arenda/actions'
+import { createClient } from '@/lib/supabase/client'
 
 const DELIVERY_LABELS: Record<string, string> = {
   siloz: 'Siloz',
@@ -38,8 +38,23 @@ export function RecentDistribuiri({ initialData = [], refreshKey }: Props) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await getRecentDistributions(10)
-      setItems(data)
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('arenda_conversions')
+        .select('id, lessor_id, contract_id, campaign_id, from_crop_name, from_quantity_kg, from_price_per_kg, to_crop_name, to_quantity_kg, to_price_per_kg, conversion_rate, value_ron, delivery_method, distribution_date, notes, status, transaction_id, created_at, lessors(first_name, last_name, company_name, type), contracts(contract_number)')
+        .order('created_at', { ascending: false })
+        .limit(10)
+      setItems(
+        ((data ?? []) as any[]).map((c) => ({
+          ...c,
+          user_id: '',
+          lessor_name:
+            c.lessors?.type === 'LEGAL'
+              ? c.lessors.company_name
+              : `${c.lessors?.last_name ?? ''} ${c.lessors?.first_name ?? ''}`.trim(),
+          contract_number: c.contracts?.contract_number ?? null,
+        })) as ArendaConversion[],
+      )
     } finally {
       setLoading(false)
     }

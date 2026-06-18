@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Search, X, ChevronRight, User, Building2, Users } from 'lucide-react'
 import { clsx } from 'clsx'
-import { searchLandlords } from '@/app/(app)/distribuire-arenda/actions'
+import { createClient } from '@/lib/supabase/client'
 import type { LandlordSearchResult, LessorType } from '@/types/distribuire'
 
 interface Props {
@@ -53,8 +53,28 @@ export function SearchArendator({ onSelect, selectedId, onClear }: Props) {
       }
       setLoading(true)
       try {
-        const data = await searchLandlords(q, f)
-        setResults(data)
+        const supabase = createClient()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let dbQuery: any = supabase
+          .from('lessors')
+          .select('id, code, type, first_name, last_name, company_name, cnp, county, locality, status')
+          .eq('status', 'ACTIVE')
+          .limit(20)
+        if (f === 'PF') dbQuery = dbQuery.in('type', ['NATURAL', 'PFA'])
+        else if (f === 'PJ') dbQuery = dbQuery.eq('type', 'LEGAL')
+        const isNumeric = /^\d+$/.test(q.trim())
+        if (isNumeric) {
+          dbQuery = dbQuery.ilike('cnp', `${q.trim()}%`)
+        } else {
+          dbQuery = dbQuery.or(
+            `last_name.ilike.%${q.trim()}%,first_name.ilike.%${q.trim()}%,company_name.ilike.%${q.trim()}%,locality.ilike.%${q.trim()}%`,
+          )
+        }
+        const { data } = await dbQuery
+        setResults((data ?? []) as LandlordSearchResult[])
+        setOpen(true)
+      } catch {
+        setResults([])
         setOpen(true)
       } finally {
         setLoading(false)

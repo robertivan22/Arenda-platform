@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, TrendingUp, User, Building2, Loader2 } from 'lucide-react'
 import { clsx } from 'clsx'
-import { getLandlordDistributionStatus, getCurrentCropPrices, upsertManualCropPrice } from '@/app/(app)/distribuire-arenda/actions'
+import { createClient } from '@/lib/supabase/client'
 import type { LandlordSearchResult, LandlordDistributionStatus, CropPrice } from '@/types/distribuire'
 import { toast } from 'sonner'
 
@@ -45,12 +45,60 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
   const load = useCallback(async (id: string) => {
     setLoading(true)
     try {
-      const [statusData, pricesData] = await Promise.all([
-        getLandlordDistributionStatus(id),
-        getCurrentCropPrices(),
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const [{ data: convData }, { data: contractsData }, { data: pricesData }] = await Promise.all([
+        supabase
+          .from('arenda_conversions')
+          .select('id, from_crop_name, from_quantity_kg, from_price_per_kg, to_crop_name, to_quantity_kg, to_price_per_kg, conversion_rate, value_ron, delivery_method, distribution_date, notes, status, transaction_id, created_at, contract_id, contracts(contract_number)')
+          .eq('lessor_id', id)
+          .eq('status', 'confirmed')
+          .order('distribution_date', { ascending: false })
+          .limit(50),
+        supabase.from('contracts').select('id').eq('lessor_id', id).eq('status', 'ACTIVE'),
+        supabase
+          .from('crop_prices')
+          .select('id, crop_name, price_per_kg, source, effective_date, notes')
+          .or(`user_id.is.null,user_id.eq.${user.id}`)
+          .order('effective_date', { ascending: false }),
       ])
-      setStatus(statusData)
-      setPrices(pricesData)
+
+      const priceSeen = new Map<string, CropPrice>()
+      for (const row of (pricesData ?? []) as CropPrice[]) {
+        if (!priceSeen.has(row.crop_name)) priceSeen.set(row.crop_name, row)
+      }
+      setPrices(Array.from(priceSeen.values()).sort((a, b) => a.crop_name.localeCompare(b.crop_name, 'ro')))
+
+      const contractIds = (contractsData ?? []).map((c: any) => c.id)
+      let totalKg = 0
+      if (contractIds.length > 0) {
+        const { data: ptData } = await supabase
+          .from('parcel_transactions')
+          .select('total_quantity')
+          .in('contract_id', contractIds)
+        totalKg = ((ptData ?? []) as any[]).reduce((s: number, pt: any) => s + Number(pt.total_quantity ?? 0), 0)
+      }
+
+      const convRows = (convData ?? []) as any[]
+      const distributedKg = convRows.reduce((s: number, c: any) => s + Number(c.from_quantity_kg ?? 0), 0)
+      const valueRon = convRows.reduce((s: number, c: any) => s + Number(c.value_ron ?? 0), 0)
+
+      setStatus({
+        total_kg: totalKg,
+        distributed_kg: distributedKg,
+        remaining_kg: Math.max(0, totalKg - distributedKg),
+        percent_distributed: totalKg > 0 ? Math.round((distributedKg / totalKg) * 100) : 0,
+        value_ron: valueRon,
+        conversions: convRows.map((c: any) => ({
+          ...c,
+          contract_number: c.contracts?.contract_number ?? null,
+          lessor_id: id,
+          user_id: user.id,
+          campaign_id: c.campaign_id ?? null,
+        })),
+      })
     } finally {
       setLoading(false)
     }
@@ -63,8 +111,18 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
   async function handleRefreshPrices() {
     setRefreshingPrices(true)
     try {
-      const data = await getCurrentCropPrices()
-      setPrices(data)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data } = await supabase
+        .from('crop_prices')
+        .select('id, crop_name, price_per_kg, source, effective_date, notes')
+        .or(user ? `user_id.is.null,user_id.eq.${user.id}` : 'user_id.is.null')
+        .order('effective_date', { ascending: false })
+      const seen = new Map<string, CropPrice>()
+      for (const row of (data ?? []) as CropPrice[]) {
+        if (!seen.has(row.crop_name)) seen.set(row.crop_name, row)
+      }
+      setPrices(Array.from(seen.values()).sort((a, b) => a.crop_name.localeCompare(b.crop_name, 'ro')))
       toast.success('Prețuri actualizate')
     } finally {
       setRefreshingPrices(false)
@@ -76,11 +134,20 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
     if (isNaN(val) || val <= 0) { toast.error('Preț invalid'); return }
     setSavingCrop(cropName)
     try {
-      const res = await upsertManualCropPrice(cropName, val)
-      if (!res.ok) { toast.error(res.error ?? 'Eroare'); return }
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { toast.error('Neautentificat'); return }
+      const { error } = await supabase.from('crop_prices').insert({
+        user_id: user.id,
+        crop_name: cropName,
+        price_per_kg: val,
+        source: 'MANUAL',
+        effective_date: new Date().toISOString().split('T')[0],
+        notes: 'Preț manual',
+      })
+      if (error) { toast.error(error.message); return }
       toast.success(`Preț ${cropName} salvat`)
-      const fresh = await getCurrentCropPrices()
-      setPrices(fresh)
+      await handleRefreshPrices()
       setManualEdit((prev) => { const n = { ...prev }; delete n[cropName]; return n })
     } finally {
       setSavingCrop(null)

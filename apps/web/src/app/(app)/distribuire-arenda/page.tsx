@@ -7,7 +7,7 @@ import { SearchArendator } from '@/components/distribuire/SearchArendator'
 import { FormDistribuire } from '@/components/distribuire/FormDistribuire'
 import { SumarArendator } from '@/components/distribuire/SumarArendator'
 import { RecentDistribuiri } from '@/components/distribuire/RecentDistribuiri'
-import { getDistribuirePageStats } from './actions'
+import { createClient } from '@/lib/supabase/client'
 import type { LandlordSearchResult, DistribuirePageStats } from '@/types/distribuire'
 
 // ─── Stat chip ────────────────────────────────────────────────────────────────
@@ -50,8 +50,31 @@ export default function DistribuireArendaPage() {
   const loadStats = useCallback(async () => {
     setLoadingStats(true)
     try {
-      const data = await getDistribuirePageStats()
-      setStats(data)
+      const supabase = createClient()
+      const [
+        { data: campaign },
+        { data: ptData },
+        { data: convData },
+        { count: activeLandlords },
+        { count: pendingCount },
+      ] = await Promise.all([
+        supabase.from('campaigns').select('id, name').eq('is_active', true).maybeSingle(),
+        supabase.from('parcel_transactions').select('total_quantity').limit(5000),
+        supabase.from('arenda_conversions').select('from_quantity_kg').eq('status', 'confirmed').limit(5000),
+        supabase.from('lessors').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('is_paid', false).eq('is_previzionata', false),
+      ])
+      const totalKg = ((ptData ?? []) as any[]).reduce((s: number, r: any) => s + Number(r.total_quantity ?? 0), 0)
+      const distributedKg = ((convData ?? []) as any[]).reduce((s: number, r: any) => s + Number(r.from_quantity_kg ?? 0), 0)
+      setStats({
+        totalToDistributeKg: totalKg,
+        distributedKg,
+        remainingKg: Math.max(0, totalKg - distributedKg),
+        activeLandlordsCount: activeLandlords ?? 0,
+        pendingPaymentsCount: pendingCount ?? 0,
+        activeCampaignName: (campaign as any)?.name ?? '',
+        activeCampaignId: (campaign as any)?.id ?? null,
+      })
     } finally {
       setLoadingStats(false)
     }

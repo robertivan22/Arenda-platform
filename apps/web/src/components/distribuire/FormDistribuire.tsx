@@ -8,7 +8,7 @@ import { clsx } from 'clsx'
 import { Warehouse, Truck, CreditCard, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { getLandlordContracts, getCurrentCropPrices, executeDistribution } from '@/app/(app)/distribuire-arenda/actions'
+import { createClient } from '@/lib/supabase/client'
 import { ConversionCalculator } from './ConversionCalculator'
 import type { Contract, CropPrice, LandlordSearchResult, ConversionResult } from '@/types/distribuire'
 
@@ -105,15 +105,29 @@ export function FormDistribuire({ landlord, remainingKg, onSuccess }: Props) {
   useEffect(() => {
     async function init() {
       setLoadingInit(true)
-      const [contractsData, pricesData] = await Promise.all([
-        getLandlordContracts(landlord.id),
-        getCurrentCropPrices(),
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const [{ data: contractsData }, { data: rawPrices }] = await Promise.all([
+        supabase
+          .from('contracts')
+          .select('id, contract_number, contract_type, start_date, end_date, status, zone, annual_rent, lessor_id')
+          .eq('lessor_id', landlord.id)
+          .eq('status', 'ACTIVE')
+          .order('contract_number'),
+        supabase
+          .from('crop_prices')
+          .select('id, crop_name, price_per_kg, source, effective_date, notes')
+          .or(user ? `user_id.is.null,user_id.eq.${user.id}` : 'user_id.is.null')
+          .order('effective_date', { ascending: false }),
       ])
-      setContracts(contractsData)
-      setPrices(pricesData)
-      if (contractsData.length === 1) {
-        setValue('contract_id', contractsData[0].id)
+      const contracts = (contractsData ?? []) as Contract[]
+      setContracts(contracts)
+      if (contracts.length === 1) setValue('contract_id', contracts[0].id)
+      const seen = new Map<string, CropPrice>()
+      for (const row of (rawPrices ?? []) as CropPrice[]) {
+        if (!seen.has(row.crop_name)) seen.set(row.crop_name, row)
       }
+      setPrices(Array.from(seen.values()).sort((a, b) => a.crop_name.localeCompare(b.crop_name, 'ro')))
       setLoadingInit(false)
     }
     void init()
@@ -153,27 +167,35 @@ export function FormDistribuire({ landlord, remainingKg, onSuccess }: Props) {
 
   async function handleConfirm() {
     setSubmitting(true)
-    const values = {
-      lessor_id: landlord.id,
-      contract_id: contractId,
-      from_crop_name: fromCropName,
-      from_quantity_kg: fromQuantityKg,
-      to_crop_name: toCropName,
-      to_quantity_kg: conversionResult?.toQuantityKg ?? 0,
-      conversion_rate: conversionResult?.rate ?? 1,
-      from_price_per_kg: prices.find((p) => p.crop_name === fromCropName)?.price_per_kg ?? 0,
-      to_price_per_kg: prices.find((p) => p.crop_name === toCropName)?.price_per_kg ?? 0,
-      distribution_date: distributionDate,
-      delivery_method: deliveryMethod,
-      notes: watch('notes'),
-    }
-
     try {
-      const result = await executeDistribution(values)
-      if ('error' in result) {
-        toast.error(result.error)
-        return
-      }
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { toast.error('Neautentificat'); return }
+
+      const { data: campaign } = await supabase
+        .from('campaigns').select('id').eq('is_active', true).maybeSingle()
+
+      const fromPrice = prices.find((p) => p.crop_name === fromCropName)?.price_per_kg ?? 0
+      const toPrice = prices.find((p) => p.crop_name === toCropName)?.price_per_kg ?? 0
+
+      const { error } = await supabase.rpc('execute_arenda_distribution', {
+        p_user_id: user.id,
+        p_lessor_id: landlord.id,
+        p_contract_id: contractId,
+        p_campaign_id: campaign?.id ?? null,
+        p_from_crop_name: fromCropName,
+        p_from_quantity_kg: fromQuantityKg,
+        p_from_price_per_kg: fromPrice,
+        p_to_crop_name: toCropName,
+        p_to_quantity_kg: conversionResult?.toQuantityKg ?? 0,
+        p_to_price_per_kg: toPrice,
+        p_conversion_rate: conversionResult?.rate ?? 1,
+        p_value_ron: fromQuantityKg * fromPrice,
+        p_delivery_method: deliveryMethod,
+        p_distribution_date: distributionDate,
+        p_notes: watch('notes') ?? null,
+      })
+      if (error) { toast.error(error.message); return }
       toast.success('Distribuire confirmată cu succes!')
       setShowConfirmModal(false)
       onSuccess()
@@ -248,8 +270,18 @@ export function FormDistribuire({ landlord, remainingKg, onSuccess }: Props) {
             loading={false}
             onResult={handleConversionResult}
             onRefreshPrices={async () => {
-              const fresh = await getCurrentCropPrices()
-              setPrices(fresh)
+              const supabase = createClient()
+              const { data: { user } } = await supabase.auth.getUser()
+              const { data } = await supabase
+                .from('crop_prices')
+                .select('id, crop_name, price_per_kg, source, effective_date, notes')
+                .or(user ? `user_id.is.null,user_id.eq.${user.id}` : 'user_id.is.null')
+                .order('effective_date', { ascending: false })
+              const seen = new Map<string, CropPrice>()
+              for (const row of (data ?? []) as CropPrice[]) {
+                if (!seen.has(row.crop_name)) seen.set(row.crop_name, row)
+              }
+              setPrices(Array.from(seen.values()).sort((a, b) => a.crop_name.localeCompare(b.crop_name, 'ro')))
             }}
             onFromCropChange={(v) => setValue('from_crop_name', v, { shouldValidate: true })}
             onToCropChange={(v) => setValue('to_crop_name', v, { shouldValidate: true })}
