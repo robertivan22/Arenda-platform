@@ -174,7 +174,17 @@ CREATE TRIGGER trg_contract_docs_updated_at
   BEFORE UPDATE ON contract_documents
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- ─── Storage buckets (run separately if bucket does not exist) ────────────────
--- INSERT INTO storage.buckets (id, name, public)
--- VALUES ('documents', 'documents', false)
--- ON CONFLICT (id) DO NOTHING;
+-- ─── Storage bucket + policy ──────────────────────────────────────────────────
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'documents', 'documents', false, 31457280,
+  ARRAY['application/pdf','image/jpeg','image/jpg','image/png','image/webp']
+)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "documents_auth" ON storage.objects;
+CREATE POLICY "documents_auth" ON storage.objects
+  FOR ALL
+  USING     (bucket_id = 'documents' AND auth.uid() IS NOT NULL)
+  WITH CHECK (bucket_id = 'documents' AND auth.uid() IS NOT NULL);

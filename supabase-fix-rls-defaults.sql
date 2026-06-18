@@ -10,6 +10,40 @@ ALTER TABLE fuel_logs         ALTER COLUMN user_id SET DEFAULT auth.uid();
 ALTER TABLE maintenance_tasks ALTER COLUMN user_id SET DEFAULT auth.uid();
 ALTER TABLE machine_work_logs ALTER COLUMN user_id SET DEFAULT auth.uid();
 
+-- ─── REAL FIX: "new row violates row-level security policy" on document upload
+-- The error comes from storage.objects, not contract_documents.
+-- The "documents" bucket must exist AND have an access policy.
+-- Run these 2 blocks in Supabase Dashboard → SQL Editor ────────────────────────
+
+-- Step 1: Create the bucket (safe to re-run)
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'documents',
+  'documents',
+  false,
+  31457280,
+  ARRAY['application/pdf','image/jpeg','image/jpg','image/png','image/webp']
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Step 2: Allow authenticated users to read/write their files
+DROP POLICY IF EXISTS "documents_auth" ON storage.objects;
+CREATE POLICY "documents_auth" ON storage.objects
+  FOR ALL
+  USING     (bucket_id = 'documents' AND auth.uid() IS NOT NULL)
+  WITH CHECK (bucket_id = 'documents' AND auth.uid() IS NOT NULL);
+
+-- ─── Fix contract_documents table + policy (run only if table already exists) ─
+
+ALTER TABLE contract_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contract_documents ALTER COLUMN user_id SET DEFAULT auth.uid();
+
+DROP POLICY IF EXISTS "contract_docs_own" ON contract_documents;
+CREATE POLICY "contract_docs_own" ON contract_documents
+  FOR ALL
+  USING     (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
 -- ─── Fix RLS: contract_documents WITH CHECK ───────────────────────────────────
 -- Fixes "new row violates row-level security policy" on INSERT.
 -- Run ALL lines below in Supabase Dashboard → SQL Editor
