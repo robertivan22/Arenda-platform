@@ -105,14 +105,14 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
   const distributionDate = watch('distribution_date')
 
   // Query exact remaining for selected contract+crop — same logic as DB RPC
-  // (parcel_transactions total − arenda_conversions confirmed)
+  // (parcel_transactions total − arenda_conversions confirmed − direct transactions)
   const [contractCropRemaining, setContractCropRemaining] = useState<number | null>(null)
   useEffect(() => {
     if (!fromCropName || !contractId) { setContractCropRemaining(null); return }
     let cancelled = false
     async function fetchRemaining() {
       const db = createClient()
-      const [{ data: ptData }, { data: convData }] = await Promise.all([
+      const [{ data: ptData }, { data: convData }, { data: txData }] = await Promise.all([
         db.from('parcel_transactions')
           .select('total_quantity')
           .eq('contract_id', contractId)
@@ -122,11 +122,19 @@ export function FormDistribuire({ landlord, cropBreakdown, onSuccess }: Props) {
           .eq('contract_id', contractId)
           .eq('from_crop_name', fromCropName)
           .eq('status', 'confirmed'),
+        // Direct deliveries (non-DA) for this crop — must also be subtracted
+        db.from('transactions')
+          .select('kg_net')
+          .eq('contract_id', contractId)
+          .eq('product_name', fromCropName)
+          .eq('is_previzionata', false)
+          .neq('payment_type', 'Distribuire Arendă'),
       ])
       if (cancelled) return
-      const total = (ptData ?? []).reduce((s: number, r: any) => s + Number(r.total_quantity), 0)
-      const distributed = (convData ?? []).reduce((s: number, r: any) => s + Number(r.from_quantity_kg), 0)
-      setContractCropRemaining(Math.max(0, total - distributed))
+      const total      = (ptData  ?? []).reduce((s: number, r: any) => s + Number(r.total_quantity),    0)
+      const daUsed     = (convData ?? []).reduce((s: number, r: any) => s + Number(r.from_quantity_kg), 0)
+      const directUsed = (txData   ?? []).reduce((s: number, r: any) => s + Number(r.kg_net),           0)
+      setContractCropRemaining(Math.max(0, total - daUsed - directUsed))
     }
     void fetchRemaining()
     return () => { cancelled = true }

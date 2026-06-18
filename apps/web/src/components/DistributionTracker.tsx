@@ -5,6 +5,14 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { ChevronDown, ChevronRight, Download, Package, RefreshCw } from 'lucide-react'
 
+interface DAConversion {
+  id: string
+  distribution_date: string
+  from_quantity_kg: number
+  to_crop_name: string
+  to_quantity_kg: number
+}
+
 interface Allocation {
   id: string
   product_type: string
@@ -12,6 +20,8 @@ interface Allocation {
   quantity_unit: string
   campaign_year: number | null
   distributed_total: number
+  /** kg consumed via Distribuire Arendă conversions (FROM this crop) */
+  da_converted: number
 }
 
 interface Distribution {
@@ -27,6 +37,7 @@ interface Distribution {
 export default function DistributionTracker({ contractId }: { contractId: string }) {
   const [allocations, setAllocations] = useState<Allocation[]>([])
   const [distributions, setDistributions] = useState<Record<string, Distribution[]>>({})
+  const [daConversions, setDaConversions] = useState<Record<string, DAConversion[]>>({})
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [status, setStatus] = useState<'loading' | 'syncing' | 'ready'>('loading')
 
@@ -155,7 +166,7 @@ export default function DistributionTracker({ contractId }: { contractId: string
     const { data: { user } } = await db.auth.getUser()
     if (!user) return
 
-    const [{ data: pts }, { data: dists }] = await Promise.all([
+    const [{ data: pts }, { data: dists }, { data: daConvData }] = await Promise.all([
       db.from('parcel_transactions')
         .select('*')
         .eq('contract_id', contractId)
@@ -165,6 +176,11 @@ export default function DistributionTracker({ contractId }: { contractId: string
         .select('*, lessors(first_name, last_name, company_name, type)')
         .eq('user_id', user.id)
         .is('deleted_at', null),
+      db.from('arenda_conversions')
+        .select('id, from_crop_name, from_quantity_kg, to_crop_name, to_quantity_kg, distribution_date')
+        .eq('contract_id', contractId)
+        .eq('status', 'confirmed')
+        .order('distribution_date', { ascending: true }),
     ])
 
     const distMap: Record<string, Distribution[]> = {}
@@ -178,16 +194,36 @@ export default function DistributionTracker({ contractId }: { contractId: string
       distMap[d.transaction_id].push(dist)
     })
 
+    // DA conversions grouped by FROM crop name
+    const daMap: Record<string, DAConversion[]> = {}
+    for (const c of (daConvData ?? []) as any[]) {
+      if (!c.from_crop_name) continue
+      if (!daMap[c.from_crop_name]) daMap[c.from_crop_name] = []
+      daMap[c.from_crop_name].push({
+        id: c.id,
+        distribution_date: c.distribution_date,
+        from_quantity_kg: Number(c.from_quantity_kg),
+        to_crop_name: c.to_crop_name,
+        to_quantity_kg: Number(c.to_quantity_kg),
+      })
+    }
+    const daTotalByCrop: Record<string, number> = {}
+    for (const [crop, convs] of Object.entries(daMap)) {
+      daTotalByCrop[crop] = convs.reduce((s, c) => s + c.from_quantity_kg, 0)
+    }
+
     const withTotals: Allocation[] = (pts ?? []).map((t: any) => ({
       ...t,
       distributed_total: (distMap[t.id] ?? []).reduce(
         (s: number, d: Distribution) => s + Number(d.quantity_given),
         0
       ),
+      da_converted: daTotalByCrop[t.product_type] ?? 0,
     }))
 
     setAllocations(withTotals)
     setDistributions(distMap)
+    setDaConversions(daMap)
   }, [contractId])
 
   useEffect(() => {
@@ -258,9 +294,11 @@ export default function DistributionTracker({ contractId }: { contractId: string
 
       {allocations.map(alloc => {
         const dists = distributions[alloc.id] ?? []
-        const remaining = Math.max(0, alloc.total_quantity - alloc.distributed_total)
+        const daConvs = daConversions[alloc.product_type] ?? []
+        const totalConsumed = alloc.distributed_total + alloc.da_converted
+        const remaining = Math.max(0, alloc.total_quantity - totalConsumed)
         const pct = alloc.total_quantity > 0
-          ? Math.min(100, (alloc.distributed_total / alloc.total_quantity) * 100)
+          ? Math.min(100, (totalConsumed / alloc.total_quantity) * 100)
           : 0
         const isExpanded = expanded.has(alloc.id)
         const done = remaining <= 0.00001
@@ -306,7 +344,7 @@ export default function DistributionTracker({ contractId }: { contractId: string
                     />
                   </div>
                   <span className="text-xs text-gray-400">
-                    {alloc.distributed_total.toFixed(0)} / {Number(alloc.total_quantity).toFixed(0)} {alloc.quantity_unit}
+                    {totalConsumed.toFixed(0)} / {Number(alloc.total_quantity).toFixed(0)} {alloc.quantity_unit}
                   </span>
                 </div>
               </div>
@@ -322,7 +360,7 @@ export default function DistributionTracker({ contractId }: { contractId: string
 
             {isExpanded && (
               <div className="border-t border-gray-50 bg-gray-50">
-                {dists.length === 0 ? (
+                {dists.length === 0 && daConvs.length === 0 ? (
                   <p className="px-4 py-4 text-xs text-center text-gray-400">
                     Nicio distributie inregistrata.
                   </p>
@@ -331,7 +369,7 @@ export default function DistributionTracker({ contractId }: { contractId: string
                     <thead>
                       <tr className="border-b border-gray-100">
                         <th className="px-4 py-2 text-left text-gray-500 font-semibold uppercase tracking-wide">Data</th>
-                        <th className="px-4 py-2 text-left text-gray-500 font-semibold uppercase tracking-wide">Arendator</th>
+                        <th className="px-4 py-2 text-left text-gray-500 font-semibold uppercase tracking-wide">Arendator / Tip</th>
                         <th className="px-4 py-2 text-right text-gray-500 font-semibold uppercase tracking-wide">Cantitate</th>
                         <th className="px-4 py-2 text-left text-gray-500 font-semibold uppercase tracking-wide">Observatii</th>
                       </tr>
@@ -351,12 +389,25 @@ export default function DistributionTracker({ contractId }: { contractId: string
                             <td className="px-4 py-2 text-gray-500">{d.notes ?? '-'}</td>
                           </tr>
                         ))}
+                      {/* DA conversions that consumed FROM this crop */}
+                      {daConvs.map(c => (
+                        <tr key={c.id} className="border-b border-amber-50 bg-amber-50/40 hover:bg-amber-50">
+                          <td className="px-4 py-2 text-gray-600">{c.distribution_date}</td>
+                          <td className="px-4 py-2 text-amber-700 font-medium">
+                            → {c.to_crop_name} ({c.to_quantity_kg.toFixed(0)} kg)
+                          </td>
+                          <td className="px-4 py-2 text-right font-semibold text-amber-800">
+                            {c.from_quantity_kg.toFixed(0)} {alloc.quantity_unit}
+                          </td>
+                          <td className="px-4 py-2 text-amber-600 text-[10px]">Distribuire Arendă</td>
+                        </tr>
+                      ))}
                     </tbody>
                     <tfoot>
                       <tr className="bg-gray-100 font-semibold">
                         <td className="px-4 py-2 text-gray-600" colSpan={2}>Total distribuit</td>
                         <td className="px-4 py-2 text-right text-brand-700">
-                          {alloc.distributed_total.toFixed(0)} {alloc.quantity_unit}
+                          {totalConsumed.toFixed(0)} {alloc.quantity_unit}
                         </td>
                         <td className="px-4 py-2 text-gray-500">
                           {!done && (

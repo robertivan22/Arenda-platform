@@ -95,7 +95,7 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
 
       if (contractIds.length > 0) {
         // Step 2: queries that need contractIds — run in parallel
-        const [{ data: rentData }, { data: ptData }, { data: txData }] = await Promise.all([
+        const [{ data: rentData }, { data: ptData }, { data: txData }, { data: daData }] = await Promise.all([
           // Contracted crops from the rent agreement (source of truth for what is owed)
           supabase
             .from('contract_rent_levels')
@@ -116,6 +116,12 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
             .eq('campaign_year', currentYear)
             .eq('is_previzionata', false)
             .neq('payment_type', 'Distribuire Arendă'),
+          // DA conversions — FROM_crop quantities (also consume the contracted amount)
+          supabase
+            .from('arenda_conversions')
+            .select('from_crop_name, from_quantity_kg')
+            .in('contract_id', contractIds)
+            .eq('status', 'confirmed'),
         ])
 
         // Contracted product names — only crops explicitly in the rent agreement
@@ -134,6 +140,12 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
         for (const t of (txData ?? []) as any[]) {
           if (t.product_name && contractedProducts.has(t.product_name)) {
             distributedByCrop[t.product_name] = (distributedByCrop[t.product_name] ?? 0) + Number(t.kg_net)
+          }
+        }
+        // DA conversions FROM contracted crops also consume the contracted amount
+        for (const c of (daData ?? []) as any[]) {
+          if (c.from_crop_name && contractedProducts.has(c.from_crop_name)) {
+            distributedByCrop[c.from_crop_name] = (distributedByCrop[c.from_crop_name] ?? 0) + Number(c.from_quantity_kg)
           }
         }
         // Ensure every contracted crop has an entry (even if 0 distributed)
