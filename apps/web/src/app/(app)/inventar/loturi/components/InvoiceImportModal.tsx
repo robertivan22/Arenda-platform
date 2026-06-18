@@ -200,6 +200,41 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
     return (data?.length ?? 0) > 0
   }
 
+  // ── Find or create supplier ────────────────────────────────────────────────
+  async function resolveSupplier(userId: string): Promise<string | null> {
+    const db = createClient()
+    // 1. User manually selected a supplier
+    if (supplierId) return supplierId
+    // 2. Try to match by CUI
+    const cui = header.supplier_tax_id?.replace(/^RO/i, '').trim()
+    if (cui) {
+      const { data: byCui } = await db.from('suppliers')
+        .select('id').ilike('cui', `%${cui}%`).eq('is_active', true).limit(1)
+      if (byCui?.[0]) return byCui[0].id
+    }
+    // 3. Try to match by name
+    const name = header.supplier_name?.trim()
+    if (name) {
+      const { data: byName } = await db.from('suppliers')
+        .select('id').ilike('name', name).eq('is_active', true).limit(1)
+      if (byName?.[0]) return byName[0].id
+    }
+    // 4. Create new supplier from OCR data
+    if (name) {
+      const { data: newSup } = await db.from('suppliers').insert({
+        user_id: userId,
+        name,
+        cui: header.supplier_tax_id || null,
+        is_active: true,
+      }).select('id').single()
+      if (newSup) {
+        toast.success(`Furnizor nou înregistrat: ${name}`)
+        return newSup.id
+      }
+    }
+    return null
+  }
+
   // ── Save draft ────────────────────────────────────────────────────────────
   async function saveDraft() {
     setSaving(true)
@@ -321,10 +356,8 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
 
       if (impErr || !imp) throw new Error(impErr?.message ?? 'Eroare la salvare')
 
-      // Find supplier id from name
-      const sup = suppliers.find(s =>
-        s.name.toLowerCase() === (header.supplier_name ?? '').toLowerCase()
-      )
+      // Find or create supplier from OCR data
+      const resolvedSupplierId = await resolveSupplier(user.id)
 
       // Create lots
       const createdLots: string[] = []
@@ -332,7 +365,7 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
         const productName = it.matched_input_id ?? it.description
         const { data: lot, error: lotErr } = await db.from('input_lots').insert({
           user_id: user.id,
-          supplier_id: supplierId || sup?.id || null,
+          supplier_id: resolvedSupplierId,
           category: it.category ?? 'OTHER',
           product_name: productName,
           unit: it.unit!,

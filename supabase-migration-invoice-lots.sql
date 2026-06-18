@@ -134,7 +134,14 @@ CREATE INDEX IF NOT EXISTS idx_contract_docs_user     ON contract_documents(user
 ALTER TABLE contract_documents ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "contract_docs_own" ON contract_documents;
 CREATE POLICY "contract_docs_own" ON contract_documents
-  FOR ALL USING (user_id = auth.uid());
+  FOR ALL
+  USING     (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- If the table already exists and the old policy is blocking, re-run just these lines:
+-- DROP POLICY IF EXISTS "contract_docs_own" ON contract_documents;
+-- CREATE POLICY "contract_docs_own" ON contract_documents
+--   FOR ALL USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
 -- ─── Extend input_lots ────────────────────────────────────────────────────────
 
