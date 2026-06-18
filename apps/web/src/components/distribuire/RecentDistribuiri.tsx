@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Eye, X, Loader2, TrendingRight } from 'lucide-react'
+import { Eye, X, Loader2 } from 'lucide-react'
 import { clsx } from 'clsx'
 import type { ArendaConversion } from '@/types/distribuire'
 import { getRecentDistributions } from '@/app/(app)/distribuire-arenda/actions'
