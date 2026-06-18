@@ -1435,3 +1435,119 @@ model DeclarationRunItemDetail {
   @@map("declaration_run_item_details")
 }
 
+// ─────────────────────────────────────────────
+// INVOICE IMPORT (OCR)
+// ─────────────────────────────────────────────
+
+enum InvoiceImportStatus {
+  UPLOADED
+  PROCESSING
+  OCR_COMPLETED
+  NEEDS_REVIEW
+  APPROVED
+  POSTED_TO_STOCK
+  FAILED
+}
+
+enum MatchStatus {
+  MATCHED
+  UNMATCHED
+  NEW_PRODUCT
+  IGNORED
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+model PurchaseInvoice {
+  id                   String              @id @default(uuid())
+  tenantId             String
+  supplierName         String?
+  supplierTaxId        String?
+  supplierRegNo        String?
+  supplierAddress      String?
+  invoiceNumber        String?
+  invoiceDate          DateTime?
+  dueDate              DateTime?
+  currency             String?             @default("RON")
+  subtotal             Decimal?            @db.Decimal(14, 2)
+  vatTotal             Decimal?            @db.Decimal(14, 2)
+  total                Decimal?            @db.Decimal(14, 2)
+  sourceFilePath       String?
+  searchablePdfPath    String?
+  ocrProvider          String?             @default("tesseract")
+  rawOcrText           String?             @db.Text
+  rawOcrJson           Json?
+  status               InvoiceImportStatus @default(UPLOADED)
+  errorMessage         String?
+  createdBy            String?
+  postedAt             DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  items PurchaseInvoiceItem[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, supplierTaxId, invoiceNumber])
+  @@map("purchase_invoices")
+}
+
+model PurchaseInvoiceItem {
+  id             String      @id @default(uuid())
+  invoiceId      String
+  lineNo         Int
+  productId      String?
+  extractedName  String
+  normalizedName String?
+  sku            String?
+  quantity       Decimal?    @db.Decimal(14, 4)
+  unit           String?
+  unitPrice      Decimal?    @db.Decimal(14, 4)
+  vatRate        Decimal?    @db.Decimal(5, 2)
+  vatAmount      Decimal?    @db.Decimal(14, 2)
+  lineTotal      Decimal?    @db.Decimal(14, 2)
+  confidence     Decimal?    @db.Decimal(5, 2)
+  matchStatus    MatchStatus @default(UNMATCHED)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  invoice PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("purchase_invoice_items")
+}
+
+model ProductAlias {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  productId           String
+  supplierTaxId       String?
+  aliasName           String
+  normalizedAliasName String
+  createdAt           DateTime @default(now())
+
+  @@unique([tenantId, normalizedAliasName])
+  @@index([tenantId, productId])
+  @@map("product_aliases")
+}
+
+model StockMovement {
+  id           String            @id @default(uuid())
+  tenantId     String
+  productId    String
+  sourceType   String
+  sourceId     String
+  movementType StockMovementType
+  quantity     Decimal           @db.Decimal(14, 4)
+  unitCost     Decimal?          @db.Decimal(14, 4)
+  createdBy    String?
+  createdAt    DateTime          @default(now())
+
+  @@index([tenantId, productId])
+  @@index([sourceType, sourceId])
+  @@map("stock_movements")
+}

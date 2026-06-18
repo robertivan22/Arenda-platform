@@ -1,5 +1,18 @@
-FROM node:20-alpine AS base
+# Use slim (Debian) for apt-get package support (OCR tools require it)
+FROM node:20-slim AS base
 RUN npm install -g pnpm
+
+# Install system packages for OCR and PDF processing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-ron \
+    ghostscript \
+    poppler-utils \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && pip3 install --no-cache-dir --break-system-packages ocrmypdf \
+    && rm -rf /var/lib/apt/lists/*
 
 # ── Dependencies ──────────────────────────────────────────────────
 FROM base AS deps

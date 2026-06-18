@@ -14,6 +14,7 @@ import { AuditModule } from './audit/audit.module'
 import { DocumentsModule } from './documents/documents.module'
 import { StorageModule } from './storage/storage.module'
 import { DeclarationsModule } from './declarations/declarations.module'
+import { InvoicesImportModule } from './invoices-import/invoices-import.module'
 import { configValidation } from './config/config.validation'
 
 @Module({
@@ -47,6 +48,7 @@ import { configValidation } from './config/config.validation'
     ParcelsModule,
     DocumentsModule,
     DeclarationsModule,
+    InvoicesImportModule,
   ],
 })
 export class AppModule {}

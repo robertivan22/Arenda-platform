@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FileText, Wheat, MapPin, CreditCard } from 'lucide-react'
+import { LayoutDashboard, FileText, Wheat, MapPin, ScanLine } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Contracte', href: '/contracte', icon: FileText },
-  { label: 'Distribuire', href: '/distribuire-arenda', icon: Wheat },
-  { label: 'Parcele', href: '/parcele', icon: MapPin },
-  { label: 'Plăți', href: '/plati', icon: CreditCard },
+  { label: 'Dashboard',  href: '/dashboard',         icon: LayoutDashboard },
+  { label: 'Contracte',  href: '/contracte',          icon: FileText },
+  { label: 'Distribuire',href: '/distribuire-arenda', icon: Wheat },
+  { label: 'Parcele',    href: '/parcele',            icon: MapPin },
+  { label: 'Facturi',    href: '/facturi-import',     icon: ScanLine },
 ]
 
 export function MobileNav() {

@@ -71,6 +71,16 @@ export const PERMISSIONS = {
   ADMIN_SETTINGS_MANAGE: 'admin:settings:manage',
   ADMIN_AUDIT_READ: 'admin:audit:read',
 
+  // Invoice Import (OCR)
+  INVOICE_IMPORT_READ: 'invoice:import:read',
+  INVOICE_IMPORT_CREATE: 'invoice:import:create',
+  INVOICE_IMPORT_REVIEW: 'invoice:import:review',
+  INVOICE_IMPORT_APPROVE: 'invoice:import:approve',
+
+  // Contract Files
+  CONTRACT_FILE_UPLOAD: 'contract:file:upload',
+  CONTRACT_FILE_READ: 'contract:file:read',
+
   // Tenants (SUPER_ADMIN only)
   TENANT_READ: 'tenant:read',
   TENANT_CREATE: 'tenant:create',
