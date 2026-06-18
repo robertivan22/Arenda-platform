@@ -359,9 +359,49 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
       // Find or create supplier from OCR data
       const resolvedSupplierId = await resolveSupplier(user.id)
 
-      // Create lots
+      const invoiceDate = header.invoice_date || new Date().toISOString().split('T')[0]
+      const invoiceNotes = `Import OCR factură ${header.invoice_number ?? ''}`.trim()
+
+      // Create lots / movements
       const createdLots: string[] = []
       for (const it of validItems) {
+
+        // ── Matched product: add as IN movement to existing lot ──────────────
+        if (it.match_status === 'matched' && it.matched_input_id) {
+          const { data: existingLot } = await db.from('input_lots')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('product_name', it.matched_input_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+
+          if (existingLot) {
+            // The trigger update_lot_quantity_available() handles quantity_available += qty
+            await db.from('input_stock_mvt').insert({
+              user_id: user.id,
+              lot_id:  existingLot.id,
+              mvt_type: 'IN',
+              quantity: it.quantity!,
+              mvt_date: invoiceDate,
+              notes:    invoiceNotes,
+            })
+            createdLots.push(existingLot.id)
+            if (saveAlias[it.line_no]) {
+              await db.from('input_product_aliases').upsert({
+                user_id: user.id,
+                lot_product_name: it.matched_input_id,
+                supplier_tax_id: header.supplier_tax_id || null,
+                alias_name: it.description,
+                normalized_alias_name: normalizeProductName(it.description),
+              }, { onConflict: 'user_id,normalized_alias_name', ignoreDuplicates: true })
+            }
+            continue  // skip new lot creation
+          }
+          // Fallthrough: no existing lot found — create one below
+        }
+
+        // ── New input or matched-but-no-lot: create new lot ──────────────────
         const productName = it.matched_input_id ?? it.description
         const { data: lot, error: lotErr } = await db.from('input_lots').insert({
           user_id: user.id,
@@ -374,13 +414,13 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
           unit_price: it.unit_price,
           batch_number: it.lot_number,
           expiry_date: it.expiration_date,
-          received_date: header.invoice_date || new Date().toISOString().split('T')[0],
+          received_date: invoiceDate,
           invoice_ref: header.invoice_number,
           source_invoice_import_id: imp.id,
           source_invoice_number: header.invoice_number,
           source_invoice_date: header.invoice_date || null,
           ocr_created: true,
-          notes: `Import OCR factura ${header.invoice_number ?? ''}`.trim(),
+          notes: invoiceNotes,
         }).select('id').single()
 
         if (!lotErr && lot) createdLots.push(lot.id)
@@ -408,7 +448,14 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
       }))
       await db.from('input_invoice_import_items').insert(itemRows)
 
-      toast.success(`${createdLots.length} lot(uri) create din factură.`)
+      const newLots = validItems.filter(i => i.match_status === 'new_input' || !existingProducts.find(p => p.product_name === i.matched_input_id)).length
+      const movements = createdLots.length - newLots
+      if (movements > 0 && newLots > 0)
+        toast.success(`${newLots} lot(uri) create + ${movements} intrare(i) adăugate din factură.`)
+      else if (movements > 0)
+        toast.success(`${movements} intrare(i) adăugate în loturi existente.`)
+      else
+        toast.success(`${createdLots.length} lot(uri) create din factură.`)
       onCreated()
       onClose()
     } catch (e) {
