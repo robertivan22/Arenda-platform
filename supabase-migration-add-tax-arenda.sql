@@ -24,6 +24,10 @@ ALTER TABLE arenda_conversions
 
 -- ── 2. Update execute_arenda_distribution RPC with tax + availability fix ─────
 
+-- Drop old signature first (parameter names changed)
+DROP FUNCTION IF EXISTS execute_arenda_distribution(uuid,uuid,uuid,text,numeric,text,numeric,numeric,numeric,numeric,numeric,text,date,text,uuid,boolean,numeric);
+DROP FUNCTION IF EXISTS execute_arenda_distribution(uuid,uuid,uuid,text,numeric,text,numeric,numeric,numeric,numeric,numeric,text,date,text,boolean,numeric);
+
 CREATE OR REPLACE FUNCTION execute_arenda_distribution(
   p_contract_id       UUID,
   p_lessor_id         UUID,
