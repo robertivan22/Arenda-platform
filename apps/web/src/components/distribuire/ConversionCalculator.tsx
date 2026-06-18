@@ -14,6 +14,12 @@ const CROP_ICONS: Record<string, string> = {
   'Rapiță': '🌿',
   'Soia': '🫘',
   'Orz': '🌾',
+  'Ovăz': '🌾',
+  'Secară': '🌾',
+  'Triticale': '🌾',
+  'Mazăre': '🟢',
+  'Sfeclă de zahăr': '🌱',
+  'Lucernă': '🌿',
 }
 const CROP_COLORS: Record<string, string> = {
   'Porumb': 'text-orange-600',
@@ -22,6 +28,12 @@ const CROP_COLORS: Record<string, string> = {
   'Rapiță': 'text-green-600',
   'Soia': 'text-lime-600',
   'Orz': 'text-teal-600',
+  'Ovăz': 'text-blue-600',
+  'Secară': 'text-slate-600',
+  'Triticale': 'text-stone-600',
+  'Mazăre': 'text-emerald-600',
+  'Sfeclă de zahăr': 'text-pink-600',
+  'Lucernă': 'text-green-700',
 }
 
 interface Props {
@@ -195,7 +207,7 @@ export function ConversionCalculator({
           </div>
           {fromCropName && fromPrice && (
             <p className="mt-1 text-xs text-gray-500">
-              {fromPrice.toFixed(2)} RON/kg · MADR
+              {fromPrice.toFixed(2)} RON/kg
             </p>
           )}
         </div>
@@ -229,7 +241,7 @@ export function ConversionCalculator({
           </div>
           {toCropName && toPrice && (
             <p className="mt-1 text-xs text-gray-500">
-              {toPrice.toFixed(2)} RON/kg · MADR
+              {toPrice.toFixed(2)} RON/kg
             </p>
           )}
         </div>
@@ -284,7 +296,7 @@ export function ConversionCalculator({
                 {CROP_ICONS[fromCropName]} {fromCropName}
               </div>
               <div className="text-xs text-gray-500 mt-0.5">
-                {fromPrice?.toFixed(2)} RON/kg · MADR 02/2024
+                {fromPrice?.toFixed(2)} RON/kg
               </div>
             </div>
 
@@ -303,7 +315,7 @@ export function ConversionCalculator({
                 {CROP_ICONS[toCropName]} {toCropName}
               </div>
               <div className="text-xs text-gray-500 mt-0.5">
-                {toPrice?.toFixed(2)} RON/kg · MADR 02/2024
+                {toPrice?.toFixed(2)} RON/kg
               </div>
             </div>
           </div>

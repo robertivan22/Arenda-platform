@@ -14,6 +14,12 @@ const CROP_ICONS: Record<string, string> = {
   'Rapiță': '🌿',
   'Soia': '🫘',
   'Orz': '🌾',
+  'Ovăz': '🌾',
+  'Secară': '🌾',
+  'Triticale': '🌾',
+  'Mazăre': '🟢',
+  'Sfeclă de zahăr': '🌱',
+  'Lucernă': '🌿',
 }
 
 interface Props {
@@ -29,6 +35,10 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
   const [refreshingPrices, setRefreshingPrices] = useState(false)
   const [manualEdit, setManualEdit] = useState<Record<string, string>>({})
   const [savingCrop, setSavingCrop] = useState<string | null>(null)
+  const [cropBreakdown, setCropBreakdown] = useState<{
+    contractedByCrop: Record<string, number>
+    distributedByCrop: Record<string, number>
+  } | null>(null)
 
   const displayName = landlord
     ? landlord.type === 'LEGAL'
@@ -73,17 +83,39 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
 
       const contractIds = (contractsData ?? []).map((c: any) => c.id)
       let totalKg = 0
+      let ptPerCrop: any[] = []
       if (contractIds.length > 0) {
         const { data: ptData } = await supabase
           .from('parcel_transactions')
-          .select('total_quantity')
+          .select('product_type, total_quantity')
           .in('contract_id', contractIds)
-        totalKg = ((ptData ?? []) as any[]).reduce((s: number, pt: any) => s + Number(pt.total_quantity ?? 0), 0)
+        ptPerCrop = ptData ?? []
+        totalKg = ptPerCrop.reduce((s: number, pt: any) => s + Number(pt.total_quantity ?? 0), 0)
+      }
+
+      // Per-crop breakdown: contracted
+      const contractedByCrop: Record<string, number> = {}
+      for (const pt of ptPerCrop) {
+        if (pt.product_type) {
+          contractedByCrop[pt.product_type] = (contractedByCrop[pt.product_type] ?? 0) + Number(pt.total_quantity)
+        }
       }
 
       const convRows = (convData ?? []) as any[]
       const distributedKg = convRows.reduce((s: number, c: any) => s + Number(c.from_quantity_kg ?? 0), 0)
       const valueRon = convRows.reduce((s: number, c: any) => s + Number(c.value_ron ?? 0), 0)
+
+      // Per-crop breakdown: distributed
+      const distributedByCrop: Record<string, number> = {}
+      for (const conv of convRows) {
+        const crop = conv.from_crop_name
+        if (crop) distributedByCrop[crop] = (distributedByCrop[crop] ?? 0) + Number(conv.from_quantity_kg)
+      }
+      // Include distributed crops not in parcel_transactions (edge case)
+      for (const crop of Object.keys(distributedByCrop)) {
+        if (!(crop in contractedByCrop)) contractedByCrop[crop] = distributedByCrop[crop]
+      }
+      setCropBreakdown({ contractedByCrop, distributedByCrop })
 
       setStatus({
         total_kg: totalKg,
@@ -317,7 +349,7 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
               </div>
             ))}
             <p className="text-xs text-gray-400 mt-2">
-              Actualizat {prices[0]?.effective_date ?? '—'} · Sursa: MADR
+              Sursa: MADR · actualizat periodic
             </p>
           </div>
         )}
@@ -358,14 +390,47 @@ export function SumarArendator({ landlord, refreshKey, currentDistributionKg = 0
         </div>
       </div>
 
-      {/* Recent conversions for this landlord */}
+      {/* Per-crop breakdown */}
+      {cropBreakdown && Object.keys(cropBreakdown.contractedByCrop).length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Situație pe culturi</p>
+          <table className="w-full">
+            <thead>
+              <tr className="text-xs text-gray-400 border-b border-gray-100">
+                <th className="text-left pb-2 font-semibold">Cultură</th>
+                <th className="text-right pb-2 font-semibold">Contractat</th>
+                <th className="text-right pb-2 font-semibold">Distribuit</th>
+                <th className="text-right pb-2 font-semibold">Rămas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(cropBreakdown.contractedByCrop).map(([crop, total]) => {
+                const distributed = cropBreakdown.distributedByCrop[crop] ?? 0
+                const remaining = Math.max(0, total - distributed)
+                return (
+                  <tr key={crop} className="border-b border-gray-50 last:border-0">
+                    <td className="py-1.5 text-xs text-gray-700">{CROP_ICONS[crop] ?? '🌿'} {crop}</td>
+                    <td className="py-1.5 text-xs text-right text-gray-600">{total.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg</td>
+                    <td className="py-1.5 text-xs text-right text-green-700 font-medium">{distributed.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg</td>
+                    <td className={clsx('py-1.5 text-xs text-right font-semibold', remaining === 0 ? 'text-gray-400' : 'text-amber-700')}>
+                      {remaining.toLocaleString('ro-RO', { maximumFractionDigits: 0 })} kg
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* All distributions for this landlord */}
       {status && status.conversions.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Distribuiri recente
+            Distribuiri anterioare ({status.conversions.length})
           </p>
           <div className="space-y-2">
-            {status.conversions.slice(0, 5).map((conv) => (
+            {status.conversions.map((conv) => (
               <div
                 key={conv.id}
                 className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0 text-sm"

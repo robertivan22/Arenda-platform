@@ -23,6 +23,12 @@ const CROP_ICONS: Record<string, string> = {
   'Rapiță': '🌿',
   'Soia': '🫘',
   'Orz': '🌾',
+  'Ovăz': '🌾',
+  'Secară': '🌾',
+  'Triticale': '🌾',
+  'Mazăre': '🟢',
+  'Sfeclă de zahăr': '🌱',
+  'Lucernă': '🌿',
 }
 
 interface Props {
