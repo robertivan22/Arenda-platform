@@ -196,13 +196,13 @@ importers:
         specifier: ^8.17.0
         version: 8.21.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@turf/area':
-        specifier: ^7.3.5
+        specifier: ^7.2.0
         version: 7.3.5
       '@turf/bbox':
-        specifier: ^7.3.5
+        specifier: ^7.2.0
         version: 7.3.5
       '@turf/kinks':
-        specifier: ^7.3.5
+        specifier: ^7.2.0
         version: 7.3.5
       autoprefixer:
         specifier: ^10.4.19
@@ -322,6 +322,9 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.0
         version: 18.3.7(@types/react@18.3.28)
+      '@types/shpjs':
+        specifier: ^3.4.7
+        version: 3.4.7
       eslint:
         specifier: ^8.57.0
         version: 8.57.1
@@ -2335,6 +2338,9 @@ packages:
 
   '@types/serve-static@2.2.0':
     resolution: {integrity: sha512-8mam4H1NHLtu7nmtalF7eyBH14QyOASmcxHhSfEoRyr0nP/YdoesEtU+uSRvMe96TW/HPTtkoKqQLl53N7UXMQ==}
+
+  '@types/shpjs@3.4.7':
+    resolution: {integrity: sha512-/6PjggpFsq9NFxar6ZpXsnYZ+nQJR8Cv03Gne1enIJuMZ/eFVOpu0orHxL9D7RT3ciJElzF2H6l+49US23ydUw==}
 
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
@@ -8263,6 +8269,11 @@ snapshots:
   '@types/serve-static@2.2.0':
     dependencies:
       '@types/http-errors': 2.0.5
+      '@types/node': 20.19.40
+
+  '@types/shpjs@3.4.7':
+    dependencies:
+      '@types/geojson': 7946.0.16
       '@types/node': 20.19.40
 
   '@types/trusted-types@2.0.7':
