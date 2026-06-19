@@ -1699,29 +1699,13 @@ export default function MapParcelSelector({
   return (
     <div className={isModal ? 'flex flex-col-reverse gap-4' : 'flex flex-col-reverse gap-3'}>
 
-      {/* ── Mobile panel toggle button (shown below map on mobile) ── */}
-      {showList && (
-        <button
-          className="md:hidden flex items-center justify-center gap-2 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-medium text-gray-700"
-          onClick={() => setShowMobilePanel(v => !v)}
-        >
-          <MapPin className="w-4 h-4 text-green-600" />
-          {showMobilePanel ? 'Ascunde panoul' : `Parcele mele (${parcels.length})`}
-        </button>
-      )}
+
 
       {/* ── Sidebar ── */}
       {showList && (
         <>
-        {/* Mobile overlay backdrop */}
-        {showMobilePanel && (
-          <div
-            className="md:hidden fixed inset-0 z-[1500] bg-black/40"
-            onClick={() => setShowMobilePanel(false)}
-          />
-        )}
         <aside className={isModal
-          ? `flex flex-col gap-3 md:block ${showMobilePanel ? 'fixed inset-x-0 bottom-0 z-[1600] bg-white rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto p-4 flex flex-col gap-3' : 'hidden md:flex md:flex-col'}`
+          ? 'flex flex-col gap-3'
           : 'space-y-3'
         }>
 
