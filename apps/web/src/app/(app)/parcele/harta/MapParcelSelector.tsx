@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
-  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers, Pencil,
+  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers, Pencil, Navigation, Tractor,
 } from 'lucide-react'
 import type { ParceleFitosanitar, GeoJSONPolygon, MapSearchResult, RegistryParcel } from '@/lib/parcele-types'
 import {
@@ -83,6 +83,32 @@ const DEFAULT_LEGEND_ITEMS: LegendItem[] = [
   { id: 'grau', label: 'Grau', color: '#ef4444' },
   { id: 'porumb', label: 'Porumb', color: '#f59e0b' },
 ]
+
+const OPERATION_TYPES = [
+  { value: 'ARAT', label: 'Arat' },
+  { value: 'DISCUIT', label: 'Discuit' },
+  { value: 'GRAPAT', label: 'Grăpat' },
+  { value: 'SEMANAT', label: 'Semănat' },
+  { value: 'FERTILIZAT', label: 'Fertilizat' },
+  { value: 'ERBICIDAT', label: 'Erbicidat' },
+  { value: 'FUNGICIDAT', label: 'Fungicidat' },
+  { value: 'INSECTICID', label: 'Insecticid' },
+  { value: 'IRIGAT', label: 'Irigat' },
+  { value: 'RECOLTAT', label: 'Recoltat' },
+  { value: 'TRANSPORT', label: 'Transport' },
+  { value: 'ALTELE', label: 'Altele' },
+]
+
+const STATUS_OPTS = [
+  { value: 'PLANIFICAT', label: 'Planificat' },
+  { value: 'IN_EXECUTIE', label: 'În execuție' },
+  { value: 'FINALIZAT', label: 'Finalizat' },
+  { value: 'ANULAT', label: 'Anulat' },
+]
+
+const INPUT_TYPES_MAP: Record<string, string> = {
+  SEED: 'SAMANTA', FERTILIZER: 'INGRASAMANT', PPP: 'ERBICID', FUEL: 'CARBURANT', OTHER: 'ALTELE',
+}
 
 // ─── Nominatim address search ────────────────────────────────────────────────
 async function searchNominatim(query: string): Promise<MapSearchResult[]> {
@@ -240,7 +266,7 @@ function makeRegistryIcon(color: string): L.DivIcon {
 }
 
 // ─── Parcel details popup ─────────────────────────────────────────────────────
-function ParcelMapPopup({ parcel, onClose }: { parcel: RegistryParcel; onClose: () => void }) {
+function ParcelMapPopup({ parcel, onClose, onRegisterActivity }: { parcel: RegistryParcel; onClose: () => void; onRegisterActivity?: () => void }) {
   const statusColors: Record<string, string> = {
     ACTIVE: 'bg-green-100 text-green-700 border-green-200',
     INACTIVE: 'bg-gray-100 text-gray-600 border-gray-200',
@@ -312,6 +338,17 @@ function ParcelMapPopup({ parcel, onClose }: { parcel: RegistryParcel; onClose: 
           {parcel.contract_end_date && (
             <span className="text-gray-400">· exp. {parcel.contract_end_date}</span>
           )}
+        </div>
+      )}
+      {onRegisterActivity && (
+        <div className="px-4 py-3 border-t border-gray-100">
+          <button
+            onClick={onRegisterActivity}
+            className="w-full py-2.5 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+          >
+            <Tractor className="w-4 h-4" />
+            Înregistrare activitate
+          </button>
         </div>
       )}
     </div>
@@ -392,6 +429,273 @@ function ParcelItem({
   )
 }
 
+// ─── Quick Activity Modal (launched from map parcel popup) ───────────────────
+interface QuickActivityModalProps {
+  parcelId: string | null
+  parcelName: string
+  parcelSurface?: number | null
+  onClose: () => void
+}
+
+function QuickActivityModal({ parcelId, parcelName, parcelSurface, onClose }: QuickActivityModalProps) {
+  const [campaign, setCampaign] = useState<{ id: string; name: string; year: number } | null>(null)
+  const [machines, setMachines] = useState<{ id: string; name: string; type: string }[]>([])
+  const [parcelsForSelect, setParcelsForSelect] = useState<{ id: string; bloc_fizic: string | null; locality: string | null; surface: number }[]>([])
+  const [inventoryLots, setInventoryLots] = useState<{ id: string; product_name: string; unit: string; category: string; quantity_available: number; unit_price: number | null }[]>([])
+  const [form, setForm] = useState({
+    parcel_id: parcelId ?? '',
+    operation_type: 'SEMANAT',
+    machine_id: '',
+    planned_date: new Date().toISOString().split('T')[0],
+    area_ha: parcelSurface != null ? String(parcelSurface) : '',
+    status: 'FINALIZAT',
+    notes: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [showMaterials, setShowMaterials] = useState(false)
+  const [materials, setMaterials] = useState<Array<{ lot_id: string; product_name: string; quantity: string; unit: string; input_type: string; cost_per_unit: string }>>([])
+  const [matForm, setMatForm] = useState({ lot_id: '', product_name: '', quantity: '', unit: 'kg', input_type: 'SAMANTA', cost_per_unit: '' })
+
+  useEffect(() => {
+    const db = createClient()
+    db.from('campaigns').select('id,name,year').order('year', { ascending: false }).limit(1).maybeSingle()
+      .then(({ data }) => { if (data) setCampaign(data as { id: string; name: string; year: number }) })
+    db.from('machines').select('id,name,type').eq('is_active', true).order('name')
+      .then(({ data }) => { if (data) setMachines(data as { id: string; name: string; type: string }[]) })
+    db.from('input_lots').select('id,product_name,unit,category,quantity_available,unit_price').gt('quantity_available', 0).order('product_name')
+      .then(({ data }) => { if (data) setInventoryLots(data as { id: string; product_name: string; unit: string; category: string; quantity_available: number; unit_price: number | null }[]) })
+    if (!parcelId) {
+      db.from('parcels').select('id,bloc_fizic,locality,surface').eq('status', 'ACTIVE').order('bloc_fizic')
+        .then(({ data }) => { if (data) setParcelsForSelect(data as { id: string; bloc_fizic: string | null; locality: string | null; surface: number }[]) })
+    }
+  }, [parcelId])
+
+  function addMaterial() {
+    if (!matForm.product_name.trim() || !matForm.quantity) return
+    setMaterials(prev => [...prev, { ...matForm }])
+    setMatForm({ lot_id: '', product_name: '', quantity: '', unit: 'kg', input_type: 'SAMANTA', cost_per_unit: '' })
+  }
+
+  async function handleSave(e: { preventDefault(): void }) {
+    e.preventDefault()
+    if (!campaign) { toast.error('Nu s-a putut detecta campania activă.'); return }
+    setSaving(true)
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) { toast.error('Neautentificat.'); setSaving(false); return }
+    const today = form.planned_date || new Date().toISOString().split('T')[0]
+    const { data: wo, error } = await db.from('work_orders').insert({
+      user_id: user.id,
+      campaign_id: campaign.id,
+      parcel_id: form.parcel_id || null,
+      machine_id: form.machine_id || null,
+      operation_type: form.operation_type,
+      planned_date: today,
+      executed_date: form.status === 'FINALIZAT' ? today : null,
+      area_ha: form.area_ha ? parseFloat(form.area_ha) : null,
+      status: form.status,
+      notes: form.notes || null,
+    }).select('id').single()
+    if (error || !wo) { toast.error(error?.message ?? 'Eroare la salvare.'); setSaving(false); return }
+
+    for (const mat of materials) {
+      const { error: iErr } = await db.from('work_order_inputs').insert({
+        user_id: user.id,
+        work_order_id: wo.id,
+        input_type: mat.input_type,
+        product_name: mat.product_name.trim(),
+        quantity: parseFloat(mat.quantity),
+        unit: mat.unit,
+        cost_per_unit: mat.cost_per_unit ? parseFloat(mat.cost_per_unit) : null,
+        lot_id: mat.lot_id || null,
+      })
+      if (!iErr && mat.lot_id) {
+        await db.from('input_stock_mvt').insert({
+          user_id: user.id,
+          lot_id: mat.lot_id,
+          work_order_id: wo.id,
+          campaign_id: campaign.id,
+          mvt_type: 'OUT',
+          quantity: parseFloat(mat.quantity),
+          mvt_date: today,
+          notes: `Consum campanie: ${mat.product_name.trim()}`,
+        })
+      }
+    }
+    setSaving(false)
+    toast.success('Activitate înregistrată în campanie!')
+    onClose()
+  }
+
+  const inputCls = 'w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500'
+  const labelCls = 'block text-xs font-medium text-gray-700 mb-1'
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+              <Tractor className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-800">Înregistrare activitate</h2>
+              <p className="text-xs text-gray-500 truncate max-w-[220px]">{parcelName || 'Selectează parcela'}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {campaign && (
+          <div className="mx-5 mt-3 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700 flex items-center gap-2 flex-shrink-0">
+            <Check className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>Campania: <strong>{campaign.name}</strong></span>
+          </div>
+        )}
+
+        <form onSubmit={e => void handleSave(e)} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {!parcelId && (
+            <div>
+              <label className={labelCls}>Parcelă *</label>
+              <select className={inputCls} required value={form.parcel_id} onChange={e => {
+                const p = parcelsForSelect.find(x => x.id === e.target.value)
+                setForm(f => ({ ...f, parcel_id: e.target.value, area_ha: p ? String(p.surface) : f.area_ha }))
+              }}>
+                <option value="">— Selectează parcela —</option>
+                {parcelsForSelect.map(p => (
+                  <option key={p.id} value={p.id}>{p.bloc_fizic ?? p.id.slice(0, 8)}{p.locality ? ` — ${p.locality}` : ''}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Tip operație *</label>
+              <select className={inputCls} required value={form.operation_type}
+                onChange={e => setForm(f => ({ ...f, operation_type: e.target.value }))}>
+                {OPERATION_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Status</label>
+              <select className={inputCls} value={form.status}
+                onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                {STATUS_OPTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Dată</label>
+              <input className={inputCls} type="date" value={form.planned_date}
+                onChange={e => setForm(f => ({ ...f, planned_date: e.target.value || new Date().toISOString().split('T')[0] }))} />
+            </div>
+            <div>
+              <label className={labelCls}>Suprafață (ha)</label>
+              <input className={inputCls} type="number" step="0.01" min="0" placeholder="ha"
+                value={form.area_ha} onChange={e => setForm(f => ({ ...f, area_ha: e.target.value }))} />
+            </div>
+          </div>
+
+          {machines.length > 0 && (
+            <div>
+              <label className={labelCls}>Utilaj</label>
+              <select className={inputCls} value={form.machine_id}
+                onChange={e => setForm(f => ({ ...f, machine_id: e.target.value }))}>
+                <option value="">— Fără utilaj —</option>
+                {machines.map(m => <option key={m.id} value={m.id}>{m.name} ({m.type})</option>)}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className={labelCls}>Observații</label>
+            <input className={inputCls} placeholder="Opțional..." value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+
+          <div>
+            <button type="button" onClick={() => setShowMaterials(v => !v)}
+              className="flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-800 transition-colors">
+              <Plus className="w-4 h-4" />
+              {showMaterials ? 'Ascunde materiale' : 'Adaugă materiale consumate'}
+            </button>
+          </div>
+
+          {showMaterials && (
+            <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+              {materials.length > 0 && (
+                <div className="space-y-2 pb-2 border-b border-gray-100">
+                  {materials.map((m, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-700 font-medium">{m.product_name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500">{m.quantity} {m.unit}</span>
+                        <button type="button" onClick={() => setMaterials(prev => prev.filter((_, j) => j !== i))}
+                          className="text-gray-300 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {inventoryLots.length > 0 && (
+                <div>
+                  <label className={labelCls}>Din inventar</label>
+                  <select className={inputCls} value={matForm.lot_id} onChange={e => {
+                    const lot = inventoryLots.find(l => l.id === e.target.value)
+                    if (lot) setMatForm(f => ({ ...f, lot_id: lot.id, product_name: lot.product_name, unit: lot.unit, input_type: INPUT_TYPES_MAP[lot.category] ?? 'ALTELE', cost_per_unit: lot.unit_price != null ? String(lot.unit_price) : '' }))
+                    else setMatForm(f => ({ ...f, lot_id: '' }))
+                  }}>
+                    <option value="">— Selectează din stoc —</option>
+                    {inventoryLots.map(l => (
+                      <option key={l.id} value={l.id}>{l.product_name} ({l.quantity_available} {l.unit})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={labelCls}>Produs *</label>
+                  <input className={inputCls} placeholder="ex: Uree" value={matForm.product_name}
+                    onChange={e => setMatForm(f => ({ ...f, product_name: e.target.value }))} />
+                </div>
+                <div>
+                  <label className={labelCls}>Cantitate *</label>
+                  <div className="flex gap-1">
+                    <input className="flex-1 px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none" type="number" step="0.01" placeholder="0"
+                      value={matForm.quantity} onChange={e => setMatForm(f => ({ ...f, quantity: e.target.value }))} />
+                    <select className="px-2 text-sm border border-gray-300 rounded-lg focus:outline-none" value={matForm.unit}
+                      onChange={e => setMatForm(f => ({ ...f, unit: e.target.value }))}>
+                      {['kg', 'L', 't', 'buc'].map(u => <option key={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <button type="button" onClick={addMaterial} disabled={!matForm.product_name.trim() || !matForm.quantity}
+                className="w-full py-2 text-sm bg-brand-50 border border-brand-200 text-brand-700 rounded-lg hover:bg-brand-100 disabled:opacity-50 font-medium transition-colors">
+                + Adaugă material
+              </button>
+            </div>
+          )}
+
+          <div className="sticky bottom-0 bg-white pt-2 pb-2">
+            <button type="submit" disabled={saving || !campaign}
+              className="w-full py-3.5 text-sm font-semibold bg-brand-600 hover:bg-brand-700 text-white rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+              {saving
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Se salvează...</>
+                : <><Check className="w-4 h-4" />Înregistrează activitatea</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function MapParcelSelector({
   mode = 'modal',
@@ -419,6 +723,8 @@ export default function MapParcelSelector({
   const [selectedId, setSelectedId] = useState<string | null>(initialParcelId ?? null)
   const [registryParcels, setRegistryParcels] = useState<RegistryParcel[]>([])
   const [popupParcel, setPopupParcel] = useState<RegistryParcel | null>(null)
+  const [popupRegistryParcelId, setPopupRegistryParcelId] = useState<string | null>(null)
+  const [showActivityModal, setShowActivityModal] = useState(false)
 
   // Drawing — ring stored in Stereo 70
   const [drawnRingStereo, setDrawnRingStereo] = useState<number[][] | null>(null)
@@ -525,9 +831,9 @@ export default function MapParcelSelector({
     const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenTopoMap', maxZoom: 17,
     })
-    osm.addTo(map)
+    satellite.addTo(map)
     L.control.layers(
-      { OpenStreetMap: osm, Satelit: satellite, Teren: topo },
+      { Satelit: satellite, OpenStreetMap: osm, Teren: topo },
       {},
       { position: 'topright' },
     ).addTo(map)
@@ -757,6 +1063,7 @@ export default function MapParcelSelector({
           const linked = registryParcels.find(rp => rp.id === parcel.parcela_id)
           if (linked) {
             setPopupParcel(linked)
+            setPopupRegistryParcelId(linked.id)
           } else {
             setPopupParcel({
               id: parcel.id,
@@ -766,6 +1073,7 @@ export default function MapParcelSelector({
               surface: parcel.suprafata_ha ?? undefined,
               culture: parcel.cultura_label ?? undefined,
             })
+            setPopupRegistryParcelId(null)
           }
         })
         centreGroup.addLayer(centreMarker)
@@ -786,7 +1094,7 @@ export default function MapParcelSelector({
       if (linkedIds.has(rp.id)) return  // polygon centre marker already covers this
       const marker = L.marker([rp.lat, rp.lng], { icon: makeRegistryIcon('#16a34a') })
       marker.bindTooltip(rp.bloc_fizic ?? rp.id.slice(0, 8), { sticky: true })
-      marker.on('click', () => setPopupParcel(rp))
+      marker.on('click', () => { setPopupParcel(rp); setPopupRegistryParcelId(rp.id) })
       regGroup.addLayer(marker)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -801,6 +1109,21 @@ export default function MapParcelSelector({
     } else if (parcel.centru_lat && parcel.centru_lng && mapRef.current) {
       mapRef.current.setView([parcel.centru_lat, parcel.centru_lng], 14)
     }
+  }
+
+  // ── GPS – my location ───────────────────────────────────────────────────
+  function handleMyLocation() {
+    if (!mapRef.current) return
+    if (!navigator.geolocation) { toast.error('GPS indisponibil pe acest dispozitiv.'); return }
+    toast('Se caută locația GPS...')
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        mapRef.current!.setView([pos.coords.latitude, pos.coords.longitude], 15)
+        toast.success('Locație găsită.')
+      },
+      () => toast.error('Nu s-a putut obține locația. Verificați permisiunile GPS.'),
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
   }
 
   // ── Address search ──────────────────────────────────────────────────────
@@ -1041,12 +1364,12 @@ export default function MapParcelSelector({
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className={isModal ? 'flex gap-4 h-[calc(100vh-160px)] min-h-[500px]' : 'flex flex-col gap-3'}>
+    <div className={isModal ? 'flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-160px)] lg:min-h-[500px]' : 'flex flex-col gap-3'}>
 
       {/* ── Sidebar ── */}
       {showList && (
         <aside className={isModal
-          ? 'w-72 xl:w-80 flex-shrink-0 flex flex-col gap-3 overflow-hidden'
+          ? 'lg:w-72 xl:w-80 lg:flex-shrink-0 flex flex-col gap-3 order-2 lg:order-1'
           : 'space-y-3'
         }>
 
@@ -1252,7 +1575,7 @@ export default function MapParcelSelector({
           </div>
 
           {/* Parcel list */}
-          <div className={isModal ? 'flex-1 overflow-y-auto pr-1 space-y-2' : 'space-y-2 max-h-64 overflow-y-auto'}>
+          <div className={isModal ? 'max-h-44 lg:flex-1 overflow-y-auto pr-1 space-y-2' : 'space-y-2 max-h-64 overflow-y-auto'}>
             {loading ? (
               <div className="text-center py-10">
                 <div className="inline-block w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
@@ -1295,7 +1618,7 @@ export default function MapParcelSelector({
 
       {/* ── Map + status bar ── */}
       <div
-        className="relative flex-1 flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm"
+        className={`relative flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm order-1 lg:order-2${isModal ? ' h-[55vh] lg:h-auto lg:flex-1' : ''}`}
         style={!isModal ? { height } : undefined}
       >
         <div
@@ -1304,10 +1627,24 @@ export default function MapParcelSelector({
           style={!isModal ? { minHeight: height } : undefined}
         />
 
+        {/* GPS – My location button */}
+        <button
+          onClick={handleMyLocation}
+          className="absolute top-[52px] right-2 z-[1000] bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-green-50 active:bg-green-100 transition-colors"
+          title="Locația mea"
+          aria-label="Locația mea"
+        >
+          <Navigation className="w-4 h-4 text-green-700" />
+        </button>
+
         {/* Parcel detail popup – click centre marker or registry marker */}
         {popupParcel && (
           <div className="absolute bottom-12 right-3 z-[2000]">
-            <ParcelMapPopup parcel={popupParcel} onClose={() => setPopupParcel(null)} />
+            <ParcelMapPopup
+              parcel={popupParcel}
+              onClose={() => { setPopupParcel(null); setPopupRegistryParcelId(null) }}
+              onRegisterActivity={() => setShowActivityModal(true)}
+            />
           </div>
         )}
 
@@ -1557,6 +1894,16 @@ export default function MapParcelSelector({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Quick activity modal ── */}
+      {showActivityModal && (
+        <QuickActivityModal
+          parcelId={popupRegistryParcelId}
+          parcelName={popupParcel?.bloc_fizic ?? ''}
+          parcelSurface={popupParcel?.surface}
+          onClose={() => setShowActivityModal(false)}
+        />
       )}
     </div>
   )
