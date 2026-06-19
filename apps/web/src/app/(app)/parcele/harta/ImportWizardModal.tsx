@@ -185,7 +185,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
         const attrs = (f.properties ?? {}) as Record<string, unknown>
         const geom = f.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon
 
-        const calcAreaM2 = turfArea(f as GeoJSON.GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>)
+        const calcAreaM2 = turfArea(f as GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>)
         const calcAreaHa = calcAreaM2 / 10000
         const declaredHa = detectDeclaredAreaHa(attrs)
         const diffPct = declaredHa != null && declaredHa > 0
@@ -207,7 +207,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
         // Self-intersection check (only Polygon/MultiPolygon)
         if (isValid && (geom.type === 'Polygon' || geom.type === 'MultiPolygon')) {
           try {
-            const kResult = turfKinks(f as GeoJSON.GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>)
+            const kResult = turfKinks(f as GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>)
             if (kResult.features.length > 0) {
               isValid = false
               validationMsg = `Auto-intersecție detectată (${kResult.features.length} punct${kResult.features.length > 1 ? 'e' : ''})`
@@ -300,7 +300,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
         const localitate = get(fieldMapping.localitate) || null
         const suprafataDeclared = fieldMapping.suprafata_ha && attrs[fieldMapping.suprafata_ha]
           ? Number(attrs[fieldMapping.suprafata_ha]) : null
-        const calcArea = turfArea(f as GeoJSON.GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>) / 10000
+        const calcArea = turfArea(f as GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>) / 10000
         const suprafata = suprafataDeclared && suprafataDeclared > 0 ? suprafataDeclared : calcArea
 
         results[i].name = bloc_fizic
