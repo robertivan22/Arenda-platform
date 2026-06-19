@@ -11,13 +11,13 @@ import { kinks as turfKinks } from '@turf/kinks'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { ringWgs84ToStereo70, stereo70ToLeaflet, centroidStereo70 } from '@/lib/stereo70'
-import type { FeatureCollection, Feature, Polygon, MultiPolygon } from 'geojson'
+// GeoJSON namespace types come from @types/geojson (transitive dep of @types/leaflet)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ParsedFeature {
   idx: number
-  geometry: Polygon | MultiPolygon
+  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
   attributes: Record<string, unknown>
   areaHa: number          // calculated from geometry
   declaredHa: number | null  // from DBF (best-guess field)
@@ -64,9 +64,9 @@ interface ImportWizardModalProps {
   open: boolean
   onClose: () => void
   /** Called with GeoJSON when user clicks Preview (closes wizard, shows on map) */
-  onPreview: (fc: FeatureCollection, features: ParsedFeature[]) => void
+  onPreview: (fc: GeoJSON.FeatureCollection, features: ParsedFeature[]) => void
   /** Potentially vertex-edited FC from the map — used instead of rawFC for saving */
-  currentFC?: FeatureCollection
+  currentFC?: GeoJSON.FeatureCollection
   /** Called after all features saved successfully */
   onSaveComplete?: () => void
 }
@@ -105,7 +105,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
   const [parsing, setParsing] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
   const [features, setFeatures] = useState<ParsedFeature[]>([])
-  const [rawFC, setRawFC] = useState<FeatureCollection | null>(null)
+  const [rawFC, setRawFC] = useState<GeoJSON.FeatureCollection | null>(null)
   const [fileName, setFileName] = useState('')
   const [columnNames, setColumnNames] = useState<string[]>([])
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>(loadMapping)
@@ -120,7 +120,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
     setFileName(file.name)
 
     try {
-      let fc: FeatureCollection
+      let fc: GeoJSON.FeatureCollection
 
       const nameLower = file.name.toLowerCase()
       const isZip = nameLower.endsWith('.zip') || file.type === 'application/zip'
@@ -135,26 +135,26 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
         const result = await shp(ab)
         if (Array.isArray(result)) {
           fc = {
-            type: 'FeatureCollection',
-            features: result.flatMap((r: FeatureCollection) => r.features ?? []),
+            type: 'GeoJSON.FeatureCollection',
+            features: result.flatMap((r: GeoJSON.FeatureCollection) => r.features ?? []),
           }
         } else {
-          fc = result as FeatureCollection
+          fc = result as GeoJSON.FeatureCollection
         }
       } else if (isGeoJSON) {
         const text = await file.text()
-        const parsed = JSON.parse(text) as { type: string; features?: Feature[]; geometry?: Polygon | MultiPolygon; coordinates?: unknown }
-        if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
-          fc = parsed as FeatureCollection
-        } else if (parsed.type === 'Feature') {
-          fc = { type: 'FeatureCollection', features: [parsed as Feature] }
+        const parsed = JSON.parse(text) as { type: string; features?: GeoJSON.Feature[]; geometry?: GeoJSON.Polygon | GeoJSON.MultiPolygon; coordinates?: unknown }
+        if (parsed.type === 'GeoJSON.FeatureCollection' && Array.isArray(parsed.features)) {
+          fc = parsed as GeoJSON.FeatureCollection
+        } else if (parsed.type === 'GeoJSON.Feature') {
+          fc = { type: 'GeoJSON.FeatureCollection', features: [parsed as GeoJSON.Feature] }
         } else if (parsed.type === 'Polygon' || parsed.type === 'MultiPolygon') {
           fc = {
-            type: 'FeatureCollection',
-            features: [{ type: 'Feature', geometry: parsed as Polygon | MultiPolygon, properties: {} }],
+            type: 'GeoJSON.FeatureCollection',
+            features: [{ type: 'GeoJSON.Feature', geometry: parsed as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: {} }],
           }
         } else {
-          throw new Error('Format GeoJSON nerecunoscut. Așteptăm FeatureCollection, Feature sau Polygon/MultiPolygon.')
+          throw new Error('Format GeoJSON nerecunoscut. Așteptăm GeoJSON.FeatureCollection, GeoJSON.Feature sau Polygon/MultiPolygon.')
         }
       } else if (isKML) {
         throw new Error(
@@ -170,7 +170,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
 
       const validFeatures = (fc.features ?? []).filter(f => f?.geometry != null)
       if (validFeatures.length === 0) {
-        throw new Error('Fișierul nu conține niciun poligon / feature.')
+        throw new Error('Fișierul nu conține niciun poligon / GeoJSON.Feature.')
       }
 
       // Collect all attribute column names (from first few features)
@@ -180,12 +180,12 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
       })
       setColumnNames(Array.from(colSet))
 
-      // Parse each feature
+      // Parse each GeoJSON.Feature
       const parsed: ParsedFeature[] = validFeatures.map((f, idx) => {
         const attrs = (f.properties ?? {}) as Record<string, unknown>
-        const geom = f.geometry as Polygon | MultiPolygon
+        const geom = f.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon
 
-        const calcAreaM2 = turfArea(f as Feature<Polygon | MultiPolygon>)
+        const calcAreaM2 = turfArea(f as GeoJSON.GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>)
         const calcAreaHa = calcAreaM2 / 10000
         const declaredHa = detectDeclaredAreaHa(attrs)
         const diffPct = declaredHa != null && declaredHa > 0
@@ -207,7 +207,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
         // Self-intersection check (only Polygon/MultiPolygon)
         if (isValid && (geom.type === 'Polygon' || geom.type === 'MultiPolygon')) {
           try {
-            const kResult = turfKinks(f as Feature<Polygon | MultiPolygon>)
+            const kResult = turfKinks(f as GeoJSON.GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>)
             if (kResult.features.length > 0) {
               isValid = false
               validationMsg = `Auto-intersecție detectată (${kResult.features.length} punct${kResult.features.length > 1 ? 'e' : ''})`
@@ -300,13 +300,13 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
         const localitate = get(fieldMapping.localitate) || null
         const suprafataDeclared = fieldMapping.suprafata_ha && attrs[fieldMapping.suprafata_ha]
           ? Number(attrs[fieldMapping.suprafata_ha]) : null
-        const calcArea = turfArea(f as Feature<Polygon | MultiPolygon>) / 10000
+        const calcArea = turfArea(f as GeoJSON.GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>) / 10000
         const suprafata = suprafataDeclared && suprafataDeclared > 0 ? suprafataDeclared : calcArea
 
         results[i].name = bloc_fizic
 
         // Convert WGS84 polygon → Stereo 70 for storage
-        const geom = f.geometry as Polygon | MultiPolygon
+        const geom = f.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon
         let ringStereo: number[][]
         if (geom.type === 'Polygon') {
           ringStereo = ringWgs84ToStereo70(geom.coordinates[0] as [number, number][])
@@ -575,7 +575,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
                 </div>
               )}
 
-              {/* Feature table */}
+              {/* GeoJSON.Feature table */}
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
@@ -634,7 +634,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
                 </div>
               </div>
 
-              {/* Error-feature legend */}
+              {/* Error-GeoJSON.Feature legend */}
               {warnCount > 0 && (
                 <div className="space-y-1">
                   {features.filter(f => f.validationMsg).slice(0, 5).map(f => (
@@ -762,7 +762,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
                 />
               </div>
 
-              {/* Per-feature log */}
+              {/* Per-GeoJSON.Feature log */}
               <div className="border border-gray-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
                 {saveResults.map(r => (
                   <div key={r.idx} className={`flex items-center justify-between px-3 py-2 text-xs border-b border-gray-100 last:border-0 ${
