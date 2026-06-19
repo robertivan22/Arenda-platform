@@ -144,22 +144,25 @@ function CampaignTabs({ year }: { year: number }) {
   const isActivitati = pathname.endsWith('/activitati')
   const isStocuri = pathname.endsWith('/stocuri')
   return (
-    <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
-      {[
-        { label: 'Planuri culturi', href: `/campanie/${year}` },
-        { label: 'Activități câmp', href: `/campanie/${year}/activitati` },
-        { label: 'Stocuri & Inputuri', href: `/campanie/${year}/stocuri` },
-      ].map(t => {
-        const active = (isActivitati && t.href.endsWith('activitati')) || (isStocuri && t.href.endsWith('stocuri')) || (!isActivitati && !isStocuri && t.href === `/campanie/${year}`)
-        return (
-          <a key={t.href} href={t.href}
-            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-              active ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
-            }`}>
-            {t.label}
-          </a>
-        )
-      })}
+    /* mobile: scrollable tab bar without layout shift */
+    <div className="overflow-x-auto mb-6" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        {[
+          { label: 'Planuri culturi', href: `/campanie/${year}` },
+          { label: 'Activități câmp', href: `/campanie/${year}/activitati` },
+          { label: 'Stocuri & Inputuri', href: `/campanie/${year}/stocuri` },
+        ].map(t => {
+          const active = (isActivitati && t.href.endsWith('activitati')) || (isStocuri && t.href.endsWith('stocuri')) || (!isActivitati && !isStocuri && t.href === `/campanie/${year}`)
+          return (
+            <a key={t.href} href={t.href}
+              className={`px-4 py-1.5 text-sm rounded-md transition-colors whitespace-nowrap ${
+                active ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+              }`}>
+              {t.label}
+            </a>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -578,8 +581,117 @@ export default function ActivitatiPage() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* Mobile cards – activități câmp (ascuns ≥md) */}
+      <div className="md:hidden bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
+        {loading && (
+          <div className="px-4 py-12 text-center text-gray-400">
+            <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />Încărcare...
+          </div>
+        )}
+        {!loading && filtered.length === 0 && (
+          <div className="px-4 py-12 text-center text-gray-400 text-sm">
+            {orders.length === 0 ? 'Nicio activitate înregistrată pentru această campanie.' : 'Niciun rezultat pentru filtrele aplicate.'}
+          </div>
+        )}
+        {!loading && filtered.map(o => {
+          const st = statusInfo(o.status)
+          const opCls = OP_COLORS[o.operation_type] ?? 'bg-gray-100 text-gray-600'
+          return (
+            <div key={o.id} className="p-4 space-y-2">
+              {/* Header: tip operație + status + acțiuni */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${opCls}`}>
+                  {opLabel(o.operation_type)}
+                </span>
+                <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${st.cls}`}>{st.label}</span>
+                <div className="flex items-center gap-1 ml-auto">
+                  <button onClick={() => void toggleExpand(o.id)}
+                    className={`p-1.5 rounded transition-colors ${expandedId === o.id ? 'text-brand-600 bg-brand-50' : 'text-gray-400 hover:text-brand-600'}`}
+                    title="Materiale">
+                    <ChevronRight className={`w-4 h-4 transition-transform ${expandedId === o.id ? 'rotate-90' : ''}`} />
+                  </button>
+                  <button onClick={() => startEdit(o)} className="p-1.5 text-gray-400 hover:text-brand-600 rounded" title="Editează">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => void handleDelete(o.id)} className="p-1.5 text-gray-400 hover:text-red-500 rounded" title="Șterge">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              {/* Parcelă */}
+              <div className="text-sm font-medium text-gray-800">
+                {o.parcel_name ?? <span className="text-gray-400 italic">Fără parcelă</span>}
+                {o.parcel_surface != null && (
+                  <span className="text-xs text-gray-400 font-normal ml-1">({o.parcel_surface} ha)</span>
+                )}
+              </div>
+              {/* Meta */}
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
+                {o.machine_name && <span>{o.machine_name}</span>}
+                {o.planned_date && <span>Plan: {fmtDate(o.planned_date)}</span>}
+                {o.executed_date && <span>Exec: {fmtDate(o.executed_date)}</span>}
+                {o.area_ha != null && <span>{o.area_ha} ha</span>}
+              </div>
+              {o.notes && <div className="text-xs text-gray-400">{o.notes}</div>}
+              {/* Inputuri expandate */}
+              {expandedId === o.id && (
+                <div className="pt-3 border-t border-gray-100 space-y-2">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Materiale / Inputuri consumate</div>
+                  {(inputsCache.get(o.id) ?? []).map(inp => (
+                    <div key={inp.id} className="flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-medium text-gray-700">{inp.product_name}</span>
+                        {inp.lot_id && <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-green-100 text-green-700">stoc</span>}
+                        <span className="text-gray-400 ml-1">{inp.quantity} {inp.unit}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {inp.cost_per_unit != null && (
+                          <span className="font-semibold text-gray-700">{(inp.quantity * inp.cost_per_unit).toFixed(2)} RON</span>
+                        )}
+                        <button onClick={() => void deleteInput(o.id, inp.id)} className="text-gray-300 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Formular adăugare material */}
+                  <div className="space-y-2 pt-1">
+                    {inventoryLots.length > 0 && (
+                      <select className="w-full text-xs border border-brand-300 rounded px-2 py-1.5 bg-brand-50 text-brand-700"
+                        value={addInputForm.lot_id}
+                        onChange={e => {
+                          const lot = inventoryLots.find(l => l.id === e.target.value)
+                          if (lot) {
+                            const catToType: Record<string,string> = { SEED:'SAMANTA', FERTILIZER:'INGRASAMANT', PPP:'ERBICID', FUEL:'CARBURANT', OTHER:'ALTELE' }
+                            setAddInputForm(f => ({ ...f, lot_id: lot.id, product_name: lot.product_name, unit: lot.unit, input_type: catToType[lot.category] ?? 'ALTELE', cost_per_unit: lot.unit_price != null ? String(lot.unit_price) : f.cost_per_unit }))
+                          } else setAddInputForm(f => ({ ...f, lot_id: '' }))
+                        }}>
+                        <option value="">+ Din inventar</option>
+                        {inventoryLots.map(l => <option key={l.id} value={l.id}>{l.product_name} ({l.quantity_available} {l.unit})</option>)}
+                      </select>
+                    )}
+                    <div className="flex gap-1">
+                      <input className="flex-1 min-w-0 text-xs border border-gray-300 rounded px-2 py-1.5" placeholder="Produs *"
+                        value={addInputForm.product_name} onChange={e => setAddInputForm(f => ({ ...f, product_name: e.target.value }))} />
+                      <input className="w-16 text-xs border border-gray-300 rounded px-2 py-1.5" type="number" step="0.01" placeholder="Cant."
+                        value={addInputForm.quantity} onChange={e => setAddInputForm(f => ({ ...f, quantity: e.target.value }))} />
+                      <select className="text-xs border border-gray-300 rounded px-1 py-1.5"
+                        value={addInputForm.unit} onChange={e => setAddInputForm(f => ({ ...f, unit: e.target.value }))}>
+                        {['kg','L','t','buc'].map(u => <option key={u}>{u}</option>)}
+                      </select>
+                    </div>
+                    <button onClick={() => void saveInput(o.id)} disabled={savingInput}
+                      className="w-full flex items-center justify-center gap-1 text-xs px-3 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">
+                      {savingInput ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />} Adaugă material
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Table (ascuns pe mobil <md) */}
+      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-medium uppercase tracking-wide">

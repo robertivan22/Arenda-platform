@@ -61,18 +61,20 @@ function CampaignTabs({ year }: { year: number }) {
     { label: 'Stocuri & Inputuri', href: `/campanie/${year}/stocuri` },
   ]
   return (
-    <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
-      {tabs.map(t => {
-        const active = pathname === t.href || (t.href !== `/campanie/${year}` && pathname.startsWith(t.href))
-        return (
-          <a key={t.href} href={t.href}
-            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-              active ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
-            }`}>
-            {t.label}
-          </a>
-        )
-      })}
+    <div className="overflow-x-auto mb-6" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        {tabs.map(t => {
+          const active = pathname === t.href || (t.href !== `/campanie/${year}` && pathname.startsWith(t.href))
+          return (
+            <a key={t.href} href={t.href}
+              className={`px-4 py-1.5 text-sm rounded-md transition-colors whitespace-nowrap ${
+                active ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+              }`}>
+              {t.label}
+            </a>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -266,8 +268,32 @@ export default function StocuriPage() {
                   </div>
                 </div>
 
-                {/* Rows */}
-                <table className="w-full text-sm">
+                {/* Mobile cards (ascuns ≥md) */}
+                <div className="md:hidden divide-y divide-gray-50">
+                  {typeRows.map(r => {
+                    const rowPct = totalCost > 0 ? (r.total_cost / totalCost) * 100 : 0
+                    return (
+                      <div key={r.product_name + r.unit} className="px-4 py-3 space-y-1.5">
+                        <div className="text-sm font-medium text-gray-800">{r.product_name}</div>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>Cant.: <span className="font-medium text-gray-700">{r.total_qty % 1 === 0 ? r.total_qty : r.total_qty.toFixed(2)} {r.unit}</span></span>
+                          <span>{r.avg_price != null ? `${r.avg_price.toFixed(2)} RON/${r.unit}` : '—'}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-gray-800">{r.total_cost > 0 ? `${r.total_cost.toFixed(2)} RON` : '—'}</span>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-purple-400 rounded-full" style={{ width: `${rowPct}%` }} />
+                            </div>
+                            <span className="text-gray-500 w-7 text-right">{rowPct.toFixed(0)}%</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {/* Table (ascuns pe mobil <md) */}
+                <table className="w-full text-sm hidden md:table">
                   <thead>
                     <tr className="text-xs text-gray-400 border-b border-gray-100">
                       <th className="px-4 py-2 text-left font-medium">Produs</th>

@@ -657,7 +657,7 @@ function QuickActivityModal({ parcelId, parcelName, parcelSurface, onClose }: Qu
                   </select>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className={labelCls}>Produs *</label>
                   <input className={inputCls} placeholder="ex: Uree" value={matForm.product_name}

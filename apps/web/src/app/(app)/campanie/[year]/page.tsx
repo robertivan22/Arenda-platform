@@ -89,22 +89,25 @@ function CampaignTabs({ year }: { year: number }) {
   const isActivitati = pathname.endsWith('/activitati')
   const isStocuri = pathname.endsWith('/stocuri')
   return (
-    <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
-      {[
-        { label: 'Planuri culturi', href: `/campanie/${year}` },
-        { label: 'Activități câmp', href: `/campanie/${year}/activitati` },
-        { label: 'Stocuri & Inputuri', href: `/campanie/${year}/stocuri` },
-      ].map(t => {
-        const active = pathname === t.href || (!pathname.endsWith('/activitati') && !isStocuri && t.href === `/campanie/${year}`) || (isActivitati && t.href.endsWith('activitati')) || (isStocuri && t.href.endsWith('stocuri'))
-        return (
-          <a key={t.href} href={t.href}
-            className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-              active ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
-            }`}>
-            {t.label}
-          </a>
-        )
-      })}
+    /* mobile: scrollable tab bar */
+    <div className="overflow-x-auto mb-6" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        {[
+          { label: 'Planuri culturi', href: `/campanie/${year}` },
+          { label: 'Activități câmp', href: `/campanie/${year}/activitati` },
+          { label: 'Stocuri & Inputuri', href: `/campanie/${year}/stocuri` },
+        ].map(t => {
+          const active = pathname === t.href || (!pathname.endsWith('/activitati') && !isStocuri && t.href === `/campanie/${year}`) || (isActivitati && t.href.endsWith('activitati')) || (isStocuri && t.href.endsWith('stocuri'))
+          return (
+            <a key={t.href} href={t.href}
+              className={`px-4 py-1.5 text-sm rounded-md transition-colors whitespace-nowrap ${
+                active ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+              }`}>
+              {t.label}
+            </a>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -382,8 +385,191 @@ export default function CampaniePage() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* Mobile cards – planuri culturi (ascuns ≥md) */}
+      <div className="md:hidden bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
+        {loading && (
+          <div className="px-4 py-12 text-center text-gray-400">
+            <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />Încărcare...
+          </div>
+        )}
+        {!loading && filtered.length === 0 && (
+          <div className="px-4 py-12 text-center text-gray-400 text-sm">
+            {rows.length === 0 ? 'Nu există parcele active în registru.' : 'Niciun rezultat pentru filtrul aplicat.'}
+          </div>
+        )}
+        {!loading && filtered.map(row => {
+          const st = row.plan ? statusInfo(row.plan.status) : null
+          const isEditing = editing?.parcel_id === row.id
+
+          if (isEditing) {
+            return (
+              <div key={row.id} className="p-4 bg-brand-50 space-y-3">
+                <div className="text-sm font-semibold text-gray-700">{row.bloc_fizic}</div>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Cultură</label>
+                    <select className="w-full text-sm border border-brand-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white"
+                      value={editing.crop} onChange={e => setEditing(p => p && ({ ...p, crop: e.target.value }))}>
+                      {CROP_OPTIONS.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Soi / Varietate</label>
+                      <input className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        placeholder="Soi" value={editing.seed_variety}
+                        onChange={e => setEditing(p => p && ({ ...p, seed_variety: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Plan (t/ha)</label>
+                      <input className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-500 text-right" type="number" step="0.1" placeholder="t/ha"
+                        value={editing.planned_yield_t_ha} onChange={e => setEditing(p => p && ({ ...p, planned_yield_t_ha: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Status</label>
+                    <select className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white"
+                      value={editing.status} onChange={e => setEditing(p => p && ({ ...p, status: e.target.value as CropPlan['status'] }))}>
+                      {STATUS_OPTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => void savePlan()} disabled={saving}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Salvează
+                  </button>
+                  <button onClick={() => setEditing(null)}
+                    className="px-4 py-2 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
+                    Anulează
+                  </button>
+                </div>
+              </div>
+            )
+          }
+
+          if (harvesting === row.id) {
+            return (
+              <div key={row.id + '_harvest'} className="p-4 bg-green-50 space-y-3">
+                <div className="text-xs font-semibold text-green-700">
+                  Recoltare — {row.bloc_fizic ?? ''} {row.plan?.crop ? `· ${row.plan.crop}` : ''}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Dată recoltare</label>
+                    <input type="date" className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-500"
+                      value={harvestForm.harvested_date} onChange={e => setHarvestForm(f => ({ ...f, harvested_date: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Suprafață (ha)</label>
+                    <input type="number" step="0.01" min="0" className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-500"
+                      value={harvestForm.area_ha} onChange={e => setHarvestForm(f => ({ ...f, area_ha: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Producție (t/ha)</label>
+                    <input type="number" step="0.1" min="0" className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-500"
+                      value={harvestForm.yield_t_ha} onChange={e => setHarvestForm(f => ({ ...f, yield_t_ha: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Observații</label>
+                    <input type="text" className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-500" placeholder="Opțional..."
+                      value={harvestForm.notes} onChange={e => setHarvestForm(f => ({ ...f, notes: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => void saveHarvest(row)} disabled={savingHarvest}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
+                    {savingHarvest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Salvează
+                  </button>
+                  <button onClick={() => setHarvesting(null)}
+                    className="px-4 py-2 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
+                    Anulează
+                  </button>
+                </div>
+              </div>
+            )
+          }
+
+          return (
+            <div key={row.id} className="p-4 space-y-2">
+              {/* Header: parcelă + status + acțiuni */}
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium text-gray-800">
+                    {row.bloc_fizic ?? row.id.slice(0, 8)}
+                    {row.tarla_nr && <span className="text-xs text-gray-400 ml-1">T{row.tarla_nr}</span>}
+                  </div>
+                  {(row.locality || row.county) && (
+                    <div className="text-xs text-gray-500">{[row.locality, row.county].filter(Boolean).join(', ')}</div>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {st
+                    ? <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${st.cls}`}>{st.label}</span>
+                    : <span className="text-gray-300 text-xs">Neplanificat</span>
+                  }
+                  <button onClick={() => startEdit(row)}
+                    className="p-1.5 text-gray-400 hover:text-brand-600 rounded" title="Editează">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  {row.plan && (
+                    <button onClick={() => void deletePlan(row.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 rounded" title="Șterge">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              {/* Detalii */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Suprafață</span>
+                  <span className="font-medium text-gray-700">{ha(row.surface)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Cultură</span>
+                  <span className={`font-medium ${CROP_COLORS[row.plan?.crop ?? ''] ?? 'text-gray-700'}`}>
+                    {row.plan?.crop ?? '—'}
+                  </span>
+                </div>
+                {row.plan?.seed_variety && (
+                  <div className="flex justify-between col-span-2">
+                    <span className="text-gray-400">Soi</span>
+                    <span className="text-gray-600">{row.plan.seed_variety}</span>
+                  </div>
+                )}
+                {row.plan?.planned_yield_t_ha && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Plan</span>
+                    <span className="text-gray-500">{row.plan.planned_yield_t_ha} t/ha</span>
+                  </div>
+                )}
+                {row.harvest?.yield_t_ha != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Recoltat</span>
+                    <span className="text-green-600 font-medium">{row.harvest.yield_t_ha} t/ha ✓</span>
+                  </div>
+                )}
+                {row.totalCost != null && (
+                  <div className="flex justify-between col-span-2">
+                    <span className="text-gray-400">Cost</span>
+                    <span className="font-medium text-gray-700">{row.totalCost.toFixed(0)} RON</span>
+                  </div>
+                )}
+              </div>
+              {row.plan && (
+                <button onClick={() => startHarvest(row)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-green-300 text-green-700 rounded-lg hover:bg-green-50">
+                  <ArrowDownToLine className="w-3.5 h-3.5" /> Înregistrează recoltare
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Table (ascuns pe mobil <md) */}
+      <div className="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-medium uppercase tracking-wide">
