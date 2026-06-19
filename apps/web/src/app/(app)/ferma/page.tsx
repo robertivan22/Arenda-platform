@@ -150,7 +150,7 @@ function ParcelCard({ result, name, selected, onClick }: {
           </span>
         )}
       </div>
-      <div className="grid grid-cols-5 gap-2 mb-3">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
         <ParcelKpiMini label="Temp" icon={Thermometer} iconClass="text-orange-500"
           value={fmt(result.weather.temp_current, '°C', 1)}
           sub={result.weather.temp_min_48h != null ? `Min: ${result.weather.temp_min_48h}°C` : undefined} />
@@ -395,7 +395,7 @@ export default function FermaPage() {
       )}
 
       {(loading || data || parcelsDb.length > 0) && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-5" style={{ height: 560 }}>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-5" style={{ height: 'clamp(300px, 55vw, 560px)' }}>
           {loadingDb ? (
             <div className="flex flex-col items-center justify-center h-full bg-gray-50">
               <Satellite className="w-10 h-10 text-gray-300 mb-3 animate-pulse" />
@@ -418,7 +418,7 @@ export default function FermaPage() {
                 <div className="h-4 bg-gray-100 rounded w-1/2 mb-2" />
                 <div className="h-3 bg-gray-100 rounded w-3/4 mb-4" />
                 <div className="grid grid-cols-5 gap-2">
-                  {Array.from({ length: 5 }).map((_, j) => <div key={j} className="h-16 bg-gray-100 rounded-lg" />)}
+                  {Array.from({ length: 5 }).map((_, j) => <div key={j} className="hidden sm:block h-16 bg-gray-100 rounded-lg" />)}
                 </div>
               </div>
             ))}
