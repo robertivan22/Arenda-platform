@@ -196,7 +196,7 @@ export default function TranzactiiArendaPage() {
   return (
     <div>
       {/* ─── Header + view toggle ─────────────────────────────────────────── */}
-      <div className="flex items-start justify-between mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
         <PageHeader
           title="Tranzactii Arenda"
           subtitle={`${filtered.length} inregistrari · ${filtered.reduce((s,r) => s + Number(r.kg_net), 0).toLocaleString('ro-RO')} kg net`}
@@ -222,12 +222,12 @@ export default function TranzactiiArendaPage() {
       {view === 'tabel' ? (
         <>
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 mb-4">
             <input
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 w-56"
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 w-full sm:w-56"
               placeholder="Cauta arendator, contract, produs..."
               value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               {['all', ...years].map(y => (
                 <button key={y} onClick={() => { setYearFilter(y); setPage(1) }}
                   className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${yearFilter === y ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
@@ -235,7 +235,7 @@ export default function TranzactiiArendaPage() {
                 </button>
               ))}
             </div>
-            <div className="ml-auto">
+            <div className="sm:ml-auto">
               <button onClick={exportCsv}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600">
                 <Download className="w-3.5 h-3.5" /> Export
@@ -248,7 +248,7 @@ export default function TranzactiiArendaPage() {
             <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-brand-600" /></div>
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
@@ -331,6 +331,59 @@ export default function TranzactiiArendaPage() {
                 </table>
               </div>
 
+              {/* Mobile cards */}
+              <div className="sm:hidden divide-y divide-gray-100">
+                {paginated.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400 text-sm">Nicio tranzactie gasita</div>
+                ) : paginated.map(r => (
+                  <div key={r.id} className="p-3">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0
+                          ${r.lessor_type === 'LEGAL' ? 'bg-purple-100 text-purple-700'
+                            : r.lessor_type === 'PFA' ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-600'}`}>
+                          {r.lessor_type === 'LEGAL' ? 'F' : r.lessor_type === 'PFA' ? 'P' : 'R'}
+                        </span>
+                        <span className="font-medium text-gray-900 text-sm truncate">{r.lessor_name}</span>
+                      </div>
+                      {r.is_paid
+                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 flex-shrink-0">Platit</span>
+                        : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 flex-shrink-0">Neplatit</span>}
+                    </div>
+                    <div className="flex items-center flex-wrap gap-2 mb-2">
+                      <span className="text-xs text-gray-400">{r.transaction_date}</span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${productColor(r.product_name)}`}>
+                        {r.product_name}
+                      </span>
+                      {r.contract_number && r.contract_id && (
+                        <button onClick={() => router.push(`/contracte/${r.contract_id}`)} className="text-brand-600 font-mono text-xs hover:underline">
+                          #{r.contract_number}
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                      <div><span className="text-gray-400">RON Net </span><span className="font-semibold text-green-700">{fmtRON(Number(r.ron_net))}</span></div>
+                      <div><span className="text-gray-400">RON Brut </span>{fmtRON(Number(r.ron_brut))}</div>
+                      <div><span className="text-gray-400">Kg Net </span>{Number(r.kg_net).toLocaleString('ro-RO')}</div>
+                      <div><span className="text-gray-400">Impozit </span><span className="text-red-500">{fmtRON(Number(r.tax_amount))}</span></div>
+                      <div className="col-span-2"><span className="text-gray-400">Tip plată </span>{r.payment_type}{r.pv_number ? ` #${r.pv_number}` : ''}</div>
+                    </div>
+                  </div>
+                ))}
+                {filtered.length > 0 && (
+                  <div className="p-3 bg-gray-50 border-t-2 border-gray-200">
+                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Total ({filtered.length})</div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <div><span className="text-gray-400">RON Net </span><span className="font-bold text-green-700">{fmtRON(totalNet)}</span></div>
+                      <div><span className="text-gray-400">RON Brut </span>{fmtRON(totalBrut)}</div>
+                      <div><span className="text-gray-400">Kg Net </span>{filtered.reduce((s, r) => s + Number(r.kg_net), 0).toLocaleString('ro-RO')}</div>
+                      <div><span className="text-gray-400">Impozit </span><span className="text-red-500">{fmtRON(totalImpozit)}</span></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-500">
@@ -394,7 +447,7 @@ export default function TranzactiiArendaPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-1">Pe Produs</h3>
               <p className="text-xs text-gray-400 mb-4">RON Net per cultura</p>
-              <div className="flex items-center gap-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-6">
                 <PieChart width={160} height={160}>
                   <Pie data={productData} cx={75} cy={75} innerRadius={46} outerRadius={70}
                     dataKey="value" paddingAngle={2} startAngle={90} endAngle={-270}>
