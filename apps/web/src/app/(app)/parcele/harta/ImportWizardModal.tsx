@@ -135,7 +135,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
         const result = await shp(ab)
         if (Array.isArray(result)) {
           fc = {
-            type: 'GeoJSON.FeatureCollection',
+            type: 'FeatureCollection',
             features: result.flatMap((r: GeoJSON.FeatureCollection) => r.features ?? []),
           }
         } else {
@@ -144,14 +144,14 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
       } else if (isGeoJSON) {
         const text = await file.text()
         const parsed = JSON.parse(text) as { type: string; features?: GeoJSON.Feature[]; geometry?: GeoJSON.Polygon | GeoJSON.MultiPolygon; coordinates?: unknown }
-        if (parsed.type === 'GeoJSON.FeatureCollection' && Array.isArray(parsed.features)) {
+        if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
           fc = parsed as GeoJSON.FeatureCollection
-        } else if (parsed.type === 'GeoJSON.Feature') {
-          fc = { type: 'GeoJSON.FeatureCollection', features: [parsed as GeoJSON.Feature] }
+        } else if (parsed.type === 'Feature') {
+          fc = { type: 'FeatureCollection', features: [parsed as GeoJSON.Feature] }
         } else if (parsed.type === 'Polygon' || parsed.type === 'MultiPolygon') {
           fc = {
-            type: 'GeoJSON.FeatureCollection',
-            features: [{ type: 'GeoJSON.Feature', geometry: parsed as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: {} }],
+            type: 'FeatureCollection',
+            features: [{ type: 'Feature', geometry: parsed as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: {} }],
           }
         } else {
           throw new Error('Format GeoJSON nerecunoscut. Așteptăm GeoJSON.FeatureCollection, GeoJSON.Feature sau Polygon/MultiPolygon.')
