@@ -19,8 +19,27 @@ export interface Machine {
   rca_active: boolean | null
   rca_price: number | null
   rca_expiry_date: string | null
+  // TARIC fields
+  taric_code: string | null
+  taric_validated: boolean | null
+  taric_description: string | null
+  taric_checked_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface TaricValidationResult {
+  code: string
+  normalized_code: string
+  code_level: 'HS' | 'CN' | 'TARIC' | null
+  format_valid: boolean
+  exists_in_taric: boolean | null
+  valid_for_reference_date: boolean | null
+  description: string | null
+  valid_from?: string | null
+  valid_to?: string | null
+  message: string
+  error?: boolean
 }
 
 export interface Implement {

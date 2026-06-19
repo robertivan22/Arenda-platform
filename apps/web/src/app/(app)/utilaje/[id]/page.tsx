@@ -9,9 +9,10 @@ import { toast } from 'sonner'
 import {
   ArrowLeft, Plus, Loader2, Pencil, Save, X, Trash2,
   Fuel, Wrench, ClipboardList, Settings2,
-  CheckCircle2, AlertTriangle, Clock,
+  CheckCircle2, AlertTriangle, Clock, ShieldCheck, HelpCircle, Cpu,
 } from 'lucide-react'
-import type { Machine, FuelLog, MaintenanceTask, MachineWorkLog, Operator, Implement } from '@/lib/fleet-types'
+import type { Machine, FuelLog, MaintenanceTask, MachineWorkLog, Operator, Implement, TaricValidationResult } from '@/lib/fleet-types'
+import { classifyMachine } from '@/lib/taric-classifier'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,11 @@ export default function MachineDetailPage() {
   const [editForm, setEditForm] = useState<Partial<Machine>>({})
   const [saving,   setSaving]   = useState(false)
 
+  // ── TARIC tab
+  const [taricResult,   setTaricResult]   = useState<TaricValidationResult | null>(null)
+  const [taricChecking, setTaricChecking] = useState(false)
+  const [taricCode,     setTaricCode]     = useState('')
+
   // ── Jurnal lucru tab
   const [workLogs,    setWorkLogs]    = useState<MachineWorkLog[]>([])
   const [operators,   setOperators]   = useState<Operator[]>([])
@@ -100,6 +106,7 @@ export default function MachineDetailPage() {
         if (error || !data) { toast.error('Utilaj negăsit'); router.push('/utilaje'); return }
         setMachine(data as Machine)
         setEditForm(data as Machine)
+        setTaricCode((data as Machine).taric_code ?? '')
         setLoading(false)
       })
   }, [id, router])
@@ -141,6 +148,45 @@ export default function MachineDetailPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, id, machine])
+
+  // ── TARIC: verify ──────────────────────────────────────────────────────────
+  async function verifyTaric(codeOverride?: string) {
+    if (!machine) return
+    const codeToCheck = codeOverride ?? taricCode ?? machine.taric_code ?? ''
+    if (!codeToCheck) return
+    setTaricChecking(true)
+    try {
+      const res = await fetch('/api/taric/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: codeToCheck, reference_date: new Date().toISOString().split('T')[0] }),
+      })
+      const data = await res.json() as TaricValidationResult
+      setTaricResult(data)
+      if (data.exists_in_taric && data.valid_for_reference_date && !data.error) {
+        await createClient().from('machines').update({
+          taric_code: data.normalized_code,
+          taric_validated: true,
+          taric_description: data.description,
+          taric_checked_at: new Date().toISOString(),
+        }).eq('id', machine.id)
+        setMachine(m => m ? { ...m, taric_code: data.normalized_code, taric_validated: true, taric_description: data.description, taric_checked_at: new Date().toISOString() } : m)
+        toast.success('Cod TARIC validat și salvat')
+      }
+    } catch {
+      toast.error('Verificarea TARIC a eșuat.')
+    } finally {
+      setTaricChecking(false)
+    }
+  }
+
+  function suggestTaricCode() {
+    if (!machine) return
+    const s = classifyMachine({ type: machine.type, engine_hp: machine.engine_hp, brand: machine.brand, model: machine.model, name: machine.name })
+    setTaricCode(s.code)
+    setTaricResult(null)
+    toast.info(`Cod sugerat: ${s.code} (${s.description}) — Confidență: ${Math.round(s.confidence * 100)}%`)
+  }
 
   // ── General: save ──────────────────────────────────────────────────────────
   async function saveMachine(e: React.FormEvent) {
@@ -465,6 +511,76 @@ export default function MachineDetailPage() {
                 </div>
               )}
             </div>          </div>
+
+          {/* ── TARIC section ─────────────────────────────────────────────── */}
+          <div className="mt-5 border border-indigo-100 bg-indigo-50/40 rounded-lg p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Cpu className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                <span className="text-sm font-semibold text-indigo-700">Cod Vamal TARIC</span>
+              </div>
+              {machine.taric_validated && machine.taric_code && (
+                <span className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                  <ShieldCheck className="w-3 h-3" /> Validat
+                </span>
+              )}
+              {machine.taric_code && !machine.taric_validated && (
+                <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">
+                  <AlertTriangle className="w-3 h-3" /> Nevalidat
+                </span>
+              )}
+            </div>
+
+            {machine.taric_code && (
+              <div className="mb-3 p-2.5 bg-white border border-indigo-100 rounded-lg">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-sm font-semibold text-indigo-800">{machine.taric_code}</span>
+                  {machine.taric_description && <span className="text-sm text-gray-600">— {machine.taric_description}</span>}
+                </div>
+                {machine.taric_checked_at && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    Verificat: {new Date(machine.taric_checked_at).toLocaleDateString('ro-RO')}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                placeholder="ex. 8701941000 (10 cifre)"
+                maxLength={10}
+                value={taricCode}
+                onChange={e => { setTaricCode(e.target.value); setTaricResult(null) }}
+              />
+              <button type="button" onClick={suggestTaricCode}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-indigo-300 text-indigo-600 rounded-lg hover:bg-indigo-50 whitespace-nowrap">
+                <HelpCircle className="w-3.5 h-3.5" /> Sugerează
+              </button>
+              <button type="button" onClick={() => void verifyTaric(taricCode || undefined)} disabled={taricChecking || !taricCode}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap">
+                {taricChecking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                Verifică &amp; Salvează
+              </button>
+            </div>
+
+            {taricResult && (
+              <div className={`mt-2 p-2.5 rounded-lg text-xs border flex items-start gap-2 ${
+                taricResult.error ? 'bg-amber-50 border-amber-200 text-amber-800' :
+                taricResult.exists_in_taric && taricResult.valid_for_reference_date ? 'bg-green-50 border-green-200 text-green-800' :
+                'bg-red-50 border-red-200 text-red-800'
+              }`}>
+                {taricResult.error ? <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> :
+                 taricResult.exists_in_taric && taricResult.valid_for_reference_date ? <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> :
+                 <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />}
+                <div>
+                  {taricResult.description && <div className="font-medium">{taricResult.description}</div>}
+                  <div>{taricResult.message}</div>
+                  {taricResult.code_level && <div className="opacity-70 mt-0.5">Nivel: {taricResult.code_level}</div>}
+                </div>
+              </div>
+            )}
+          </div>
         </form>
       )}
 

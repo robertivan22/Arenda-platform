@@ -7,8 +7,9 @@ import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Plus, Loader2, ChevronRight, Power, Trash2 } from 'lucide-react'
-import type { Machine } from '@/lib/fleet-types'
+import { Plus, Loader2, ChevronRight, Power, Trash2, ShieldCheck, AlertTriangle, HelpCircle, Cpu } from 'lucide-react'
+import type { Machine, TaricValidationResult } from '@/lib/fleet-types'
+import { classifyMachine } from '@/lib/taric-classifier'
 
 const MACHINE_TYPES = [
   { value: 'TRACTOR',    label: 'Tractor' },
@@ -32,6 +33,7 @@ const EMPTY = () => ({
   name: '', type: 'TRACTOR', brand: '', model: '',
   year: '', plate: '', fuel_type: 'motorina', engine_hp: '', notes: '',
   rca_active: false, rca_price: '', rca_expiry_date: '',
+  taric_code: '', taric_validated: false, taric_description: '', taric_checked_at: '',
 })
 
 export default function UtilajePage() {
@@ -41,6 +43,8 @@ export default function UtilajePage() {
   const [form, setForm] = useState(EMPTY())
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState('ALL')
+  const [taricResult, setTaricResult] = useState<TaricValidationResult | null>(null)
+  const [taricChecking, setTaricChecking] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -71,13 +75,53 @@ export default function UtilajePage() {
       rca_active: form.rca_active,
       rca_price: form.rca_price ? Number(form.rca_price) : null,
       rca_expiry_date: form.rca_expiry_date || null,
+      taric_code: form.taric_code || null,
+      taric_validated: form.taric_validated || false,
+      taric_description: form.taric_description || null,
+      taric_checked_at: form.taric_checked_at || null,
     })
     if (error) { toast.error(error.message); setSaving(false); return }
     toast.success('Utilaj adăugat')
     setForm(EMPTY())
     setShowAdd(false)
+    setTaricResult(null)
     void load()
     setSaving(false)
+  }
+
+  async function checkTaric() {
+    const suggested = classifyMachine({ type: form.type, engine_hp: form.engine_hp ? Number(form.engine_hp) : null, brand: form.brand, model: form.model, name: form.name })
+    const codeToCheck = form.taric_code || suggested.code
+    setForm(f => ({ ...f, taric_code: codeToCheck }))
+    setTaricChecking(true)
+    try {
+      const res = await fetch('/api/taric/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: codeToCheck, reference_date: new Date().toISOString().split('T')[0] }),
+      })
+      const data = await res.json() as TaricValidationResult
+      setTaricResult(data)
+      if (data.exists_in_taric && data.valid_for_reference_date) {
+        setForm(f => ({
+          ...f,
+          taric_code: data.normalized_code,
+          taric_validated: true,
+          taric_description: data.description ?? '',
+          taric_checked_at: new Date().toISOString(),
+        }))
+      }
+    } catch {
+      toast.error('Verificarea TARIC a eșuat. Încearcă din nou.')
+    } finally {
+      setTaricChecking(false)
+    }
+  }
+
+  function suggestTaricCode() {
+    const s = classifyMachine({ type: form.type, engine_hp: form.engine_hp ? Number(form.engine_hp) : null, brand: form.brand, model: form.model, name: form.name })
+    setForm(f => ({ ...f, taric_code: s.code }))
+    setTaricResult(null)
   }
 
   async function toggleActive(m: Machine) {
@@ -193,12 +237,54 @@ export default function UtilajePage() {
                 onChange={e => setForm(f => ({ ...f, rca_expiry_date: e.target.value }))} />
             </div>
           </div>
+          {/* TARIC section */}
+          <div className="border border-indigo-100 bg-indigo-50/50 rounded-lg p-3 mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Cpu className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="text-xs font-semibold text-indigo-700">Cod Vamal TARIC</span>
+              <span className="text-xs text-indigo-400">— pentru import / declarații vamale</span>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                placeholder="ex. 8701941000 (10 cifre)"
+                maxLength={10}
+                value={form.taric_code}
+                onChange={e => { setForm(f => ({ ...f, taric_code: e.target.value, taric_validated: false })); setTaricResult(null) }}
+              />
+              <button type="button" onClick={suggestTaricCode}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-indigo-300 text-indigo-600 rounded-lg hover:bg-indigo-50 whitespace-nowrap">
+                <HelpCircle className="w-3.5 h-3.5" /> Sugerează cod
+              </button>
+              <button type="button" onClick={() => void checkTaric()} disabled={taricChecking || !form.type}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap">
+                {taricChecking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                Verifică TARIC
+              </button>
+            </div>
+            {taricResult && (
+              <div className={`mt-2 p-2.5 rounded-lg text-xs border flex items-start gap-2 ${
+                taricResult.error ? 'bg-amber-50 border-amber-200 text-amber-800' :
+                taricResult.exists_in_taric && taricResult.valid_for_reference_date ? 'bg-green-50 border-green-200 text-green-800' :
+                'bg-red-50 border-red-200 text-red-800'
+              }`}>
+                {taricResult.error ? <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> :
+                 taricResult.exists_in_taric && taricResult.valid_for_reference_date ? <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> :
+                 <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />}
+                <div>
+                  {taricResult.description && <div className="font-medium">{taricResult.description}</div>}
+                  <div>{taricResult.message}</div>
+                  {taricResult.code_level && <div className="text-xs opacity-70 mt-0.5">Nivel: {taricResult.code_level} · Cod: {taricResult.normalized_code}</div>}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="flex gap-2">
             <button type="submit" disabled={saving}
               className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg hover:bg-brand-700 disabled:opacity-50">
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Salvează
             </button>
-            <button type="button" onClick={() => { setShowAdd(false); setForm(EMPTY()) }}
+            <button type="button" onClick={() => { setShowAdd(false); setForm(EMPTY()); setTaricResult(null) }}
               className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
               Anulează
             </button>
@@ -242,6 +328,7 @@ export default function UtilajePage() {
                 <th className="px-4 py-3 text-left">Nr. înm.</th>
                 <th className="px-4 py-3 text-left">Combustibil</th>
                 <th className="px-4 py-3 text-left">RCA</th>
+                <th className="px-4 py-3 text-left">TARIC</th>
                 <th className="px-4 py-3 text-center">Status</th>
                 <th className="px-4 py-3 text-center">Acțiuni</th>
               </tr>
@@ -267,6 +354,16 @@ export default function UtilajePage() {
                             {m.rca_expiry_date && new Date(m.rca_expiry_date) < new Date() ? 'Expirat' : 'Activ'}
                           </span>
                           {m.rca_expiry_date && <div className="text-xs text-gray-400">{m.rca_expiry_date}</div>}
+                        </div>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {m.taric_code ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs text-gray-700">{m.taric_code}</span>
+                          {m.taric_validated
+                            ? <ShieldCheck className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                            : <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
                         </div>
                       ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
@@ -327,6 +424,15 @@ export default function UtilajePage() {
                         {m.rca_expiry_date && new Date(m.rca_expiry_date) < new Date() ? 'Expirat' : 'Activ'}
                       </span>
                       {m.rca_expiry_date && <span className="text-gray-400 ml-1">{m.rca_expiry_date}</span>}
+                    </div>
+                  )}
+                  {m.taric_code && (
+                    <div className="col-span-2 flex items-center gap-1.5">
+                      <span className="text-gray-400">TARIC </span>
+                      <span className="font-mono text-xs">{m.taric_code}</span>
+                      {m.taric_validated
+                        ? <ShieldCheck className="w-3 h-3 text-green-500" />
+                        : <AlertTriangle className="w-3 h-3 text-amber-400" />}
                     </div>
                   )}
                 </div>
