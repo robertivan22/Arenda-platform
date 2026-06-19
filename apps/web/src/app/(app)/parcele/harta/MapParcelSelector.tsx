@@ -252,9 +252,10 @@ function makeCentreIcon(color: string): L.DivIcon {
   const c = sanitizeColor(color)
   return L.divIcon({
     className: '',
-    html: `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="34" viewBox="0 0 26 34"><path d="M13 0C5.82 0 0 5.82 0 13c0 9.75 13 21 13 21S26 22.75 26 13C26 5.82 20.18 0 13 0z" fill="${c}" stroke="white" stroke-width="2"/><circle cx="13" cy="13" r="5" fill="white" opacity="0.9"/></svg>`,
+    html: `<div style="overflow:visible;line-height:0"><svg xmlns="http://www.w3.org/2000/svg" width="26" height="34" viewBox="0 0 26 34"><path d="M13 0C5.82 0 0 5.82 0 13c0 9.75 13 21 13 21S26 22.75 26 13C26 5.82 20.18 0 13 0z" fill="${c}" stroke="white" stroke-width="2"/><circle cx="13" cy="13" r="5" fill="white" opacity="0.9"/></svg></div>`,
     iconSize: [26, 34],
     iconAnchor: [13, 34],
+    popupAnchor: [0, -34],
   })
 }
 
@@ -262,7 +263,7 @@ function makeRegistryIcon(color: string): L.DivIcon {
   const c = sanitizeColor(color)
   return L.divIcon({
     className: '',
-    html: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="${c}" stroke="white" stroke-width="2.5"/><circle cx="11" cy="11" r="4" fill="white"/></svg>`,
+    html: `<div style="overflow:visible;line-height:0"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="9" fill="${c}" stroke="white" stroke-width="2.5"/><circle cx="11" cy="11" r="4" fill="white"/></svg></div>`,
     iconSize: [22, 22],
     iconAnchor: [11, 11],
   })
@@ -1146,12 +1147,14 @@ export default function MapParcelSelector({
   }, [parcels, selectedId, parcelLegendMap, legendItems, registryParcels])
 
   // ── Render registry-parcel markers (parcels with coords but no polygon) ─
+  const hasFitToMarkers = useRef(false)
   useEffect(() => {
     const map = mapRef.current
     const regGroup = registryMarkersGroupRef.current
     if (!map || !regGroup) return
     regGroup.clearLayers()
     const linkedIds = new Set(parcels.map(p => p.parcela_id).filter(Boolean))
+    const latlngs: L.LatLngTuple[] = []
     registryParcels.forEach(rp => {
       if (!rp.lat || !rp.lng) return
       if (linkedIds.has(rp.id)) return  // polygon centre marker already covers this
@@ -1159,7 +1162,15 @@ export default function MapParcelSelector({
       marker.bindTooltip(rp.bloc_fizic ?? rp.id.slice(0, 8), { sticky: true })
       marker.on('click', () => { setPopupParcel(rp); setPopupRegistryParcelId(rp.id) })
       regGroup.addLayer(marker)
+      latlngs.push([rp.lat, rp.lng])
     })
+    // Auto-fit to all markers on first load
+    if (!hasFitToMarkers.current && latlngs.length > 0) {
+      hasFitToMarkers.current = true
+      try {
+        map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40], maxZoom: 14 })
+      } catch { /* ignore */ }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registryParcels, parcels])
 
@@ -2017,7 +2028,7 @@ export default function MapParcelSelector({
       {/* ── Map + status bar ── */}
       <div
         className={`relative flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm${isModal ? ' h-[65vh] min-h-[400px]' : ' order-1'}`}
-        style={!isModal ? { height } : undefined}
+        style={!isModal ? { height, isolation: 'isolate' } : { isolation: 'isolate' }}
       >
         <div
           ref={containerRef}
