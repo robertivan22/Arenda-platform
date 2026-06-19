@@ -172,7 +172,7 @@ export default function FitosanitarPage() {
         title="Registru Fitosanitar"
         subtitle={`${totalCount} înregistrări · conform Ordinul MADR/MMAP/ANSVSA nr. 54/570/32/2023`}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowBBCHRef(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 text-gray-600"
@@ -235,15 +235,15 @@ export default function FitosanitarPage() {
 
       {activeTab === 'detaliat' && (
       <>
-      <div className="bg-white rounded-lg border border-gray-200 p-3 mb-4 flex flex-wrap gap-3 items-end">
-        <div className="relative">
+      <div className="bg-white rounded-lg border border-gray-200 p-3 mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-3 items-start sm:items-end">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             placeholder="Caută produs, agent, teren..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500 min-w-[220px]"
+            className="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500 w-full sm:min-w-[220px]"
           />
         </div>
         <div>
@@ -309,9 +309,11 @@ export default function FitosanitarPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1200px]">
-              <thead>
+        <>
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm min-w-[1200px]">
+            <thead>
                 <tr className="border-b border-gray-200">
                   <th className={thCls}>
                     <button onClick={() => toggleSort('numar_inregistrare')} className="hover:text-gray-700">
@@ -463,11 +465,64 @@ export default function FitosanitarPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
 
-      {/* ── Pagination ───────────────────────────────────────────────────── */}
-      {totalPages > 1 && (
+        {/* Mobile cards */}
+        <div className="sm:hidden divide-y divide-gray-100">
+          {rows.map(row => {
+            const isOverDose = row.doza_omologata_max != null && row.doza_folosita > row.doza_omologata_max
+            const isReplaced = typeof row.observatii === 'string' && row.observatii.startsWith('[\u00ceNLOCUIT]')
+            return (
+              <div key={row.id}
+                className={`p-3 cursor-pointer hover:bg-gray-50 ${isReplaced ? 'opacity-60 bg-gray-50' : ''}`}
+                onClick={() => { setSelectedEntry(row); setModalMode('view') }}>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="font-mono text-xs text-gray-400">#{row.numar_inregistrare}</span>
+                      {isReplaced && <span className="bg-gray-200 text-gray-600 text-[9px] font-medium px-1.5 py-0.5 rounded">Inactiv</span>}
+                    </div>
+                    <div className="font-medium text-gray-900 text-sm truncate">{row.denumire_produs}</div>
+                    {row.substanta_activa && <div className="text-xs text-gray-400 truncate">{row.substanta_activa}</div>}
+                  </div>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0 ${
+                    row.tip_agent === 'boala' ? 'bg-purple-100 text-purple-700' :
+                    row.tip_agent === 'daunator' ? 'bg-red-100 text-red-700' :
+                    row.tip_agent === 'buruiana' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    {TIP_AGENT_LABELS[row.tip_agent]}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 mb-2">
+                  <div><span className="text-gray-400">Data </span>{formatDateRO(row.data_tratament)}</div>
+                  <div><span className="text-gray-400">Cultură </span>{row.cultura}</div>
+                  <div>
+                    <span className="text-gray-400">Doză </span>
+                    <span className={isOverDose ? 'text-orange-600 font-semibold' : ''}>
+                      {isOverDose && <AlertTriangle className="w-3 h-3 inline mr-0.5" />}
+                      {row.doza_folosita} {row.unitate_doza}
+                    </span>
+                  </div>
+                  <div><span className="text-gray-400">Suprafață </span>{row.suprafata_tratata.toFixed(2)} ha</div>
+                  <div><span className="text-gray-400">Agent </span><span className="truncate">{row.agent_daunare}</span></div>
+                  {row.locul_terenului && <div><span className="text-gray-400">Teren </span><span className="truncate">{row.locul_terenului}</span></div>}
+                </div>
+                <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={() => { setSelectedEntry(row); setModalMode('view') }}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs border border-blue-100 text-blue-500 hover:bg-blue-50 rounded-lg">
+                    <Eye className="w-3 h-3" /> Vizualizează
+                  </button>
+                  <button
+                    onClick={() => { setSelectedEntry(row); setModalMode('correct') }}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs border border-amber-100 text-amber-500 hover:bg-amber-50 rounded-lg">
+                    <Copy className="w-3 h-3" /> Corectează
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
         <div className="flex items-center justify-between mt-3 px-1">
           <p className="text-xs text-gray-500">
             Pagina {page + 1} din {totalPages} · {totalCount} înregistrări totale
@@ -506,7 +561,9 @@ export default function FitosanitarPage() {
             </button>
           </div>
         </div>
+        </>
       )}
+      </div>
 
       {/* ── Form modal ───────────────────────────────────────────────────── */}
       {modalMode !== null && (
