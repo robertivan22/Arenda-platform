@@ -395,7 +395,7 @@ export default function FermaPage() {
       )}
 
       {(loading || data || parcelsDb.length > 0) && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-5" style={{ height: 'clamp(300px, 55vw, 560px)' }}>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-5" style={{ height: 'clamp(300px, 55vw, 560px)', isolation: 'isolate' }}>
           {loadingDb ? (
             <div className="flex flex-col items-center justify-center h-full bg-gray-50">
               <Satellite className="w-10 h-10 text-gray-300 mb-3 animate-pulse" />
