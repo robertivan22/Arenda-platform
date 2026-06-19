@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
-  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers, Pencil, Navigation, Tractor, Upload, Download, Move,
+  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers, Pencil, Navigation, Tractor, Upload, Download, Move, ChevronDown,
 } from 'lucide-react'
 import { area as turfArea } from '@turf/area'
 import ImportWizardModal from './ImportWizardModal'
@@ -375,63 +375,69 @@ function ParcelItem({
   const ring = parcel.geometry_geojson?.coordinates?.[0] ?? []
   const isStereo = ring.length > 0 && isLikelyStereo70(ring[0])
   return (
-    <div className={`p-3 rounded-lg border transition-all ${isSelected
-      ? 'border-blue-500 bg-blue-50 shadow-sm'
-      : 'border-gray-200 bg-white hover:border-green-300 hover:bg-green-50'}`}>
-      <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm text-gray-800 truncate">{parcel.nume_parcela}</div>
-          {(parcel.localitate || parcel.judet) && (
-            <div className="text-xs text-gray-500 mt-0.5 truncate">
-              {[parcel.localitate, parcel.judet].filter(Boolean).join(', ')}
+    <div className={`rounded-xl border bg-white shadow-sm transition-all flex flex-col ${
+      isSelected ? 'border-blue-400 ring-2 ring-blue-100' : 'border-gray-200 hover:border-green-300 hover:shadow-md'
+    }`}>
+      {/* Card header */}
+      <div className="px-3 pt-3 pb-2 flex-1">
+        <div className="flex items-start justify-between gap-2 mb-0.5">
+          <div className="font-semibold text-sm text-gray-900 leading-tight truncate">{parcel.nume_parcela}</div>
+          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border flex-shrink-0 ${
+            isStereo ? 'text-blue-600 bg-blue-50 border-blue-200' : 'text-orange-600 bg-orange-50 border-orange-200'
+          }`}>
+            {isStereo ? 'Stereo 70' : 'WGS84'}
+          </span>
+        </div>
+        {(parcel.localitate || parcel.judet) && (
+          <p className="text-xs text-gray-500 mb-2 truncate">{[parcel.localitate, parcel.judet].filter(Boolean).join(', ')}</p>
+        )}
+        {/* Metrics row */}
+        <div className="flex items-center gap-4 mt-2">
+          {parcel.suprafata_ha != null && (
+            <div>
+              <div className="text-[10px] text-gray-400 uppercase tracking-wide">Suprafața</div>
+              <div className="text-sm font-bold text-green-700">{Number(parcel.suprafata_ha).toFixed(2)} ha</div>
             </div>
           )}
-          <div className="flex items-center gap-2 mt-1">
-            {parcel.suprafata_ha != null && (
-              <span className="text-xs font-semibold text-green-700 bg-green-50 px-1.5 py-0.5 rounded">
-                {Number(parcel.suprafata_ha).toFixed(2)} ha
-              </span>
-            )}
-            {legendLabel && (
-              <span className="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: legendColor ?? '#22c55e' }} />
+          {legendLabel ? (
+            <div>
+              <div className="text-[10px] text-gray-400 uppercase tracking-wide">Cultură</div>
+              <div className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: legendColor ?? '#22c55e' }} />
                 {legendLabel}
-              </span>
-            )}
-            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${isStereo
-              ? 'text-blue-600 bg-blue-50 border-blue-200'
-              : 'text-orange-600 bg-orange-50 border-orange-200'}`}>
-              {isStereo ? 'Stereo 70' : 'WGS84'}
-            </span>
-          </div>
-          <div className="text-xs text-gray-400 mt-1">
-            {new Date(parcel.created_at).toLocaleDateString('ro-RO')}
+              </div>
+            </div>
+          ) : null}
+          <div className="ml-auto">
+            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Adăugat</div>
+            <div className="text-xs text-gray-600">{new Date(parcel.created_at).toLocaleDateString('ro-RO')}</div>
           </div>
         </div>
-        <div className="flex flex-col gap-0.5 flex-shrink-0">
-          <button onClick={onView} title="Vizualizează pe hartă"
-            className="p-1.5 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50 transition-colors">
-            <Eye className="w-3.5 h-3.5" />
+      </div>
+      {/* Action row */}
+      <div className="border-t border-gray-100 px-2 py-1.5 flex items-center gap-0.5">
+        <button onClick={onView} title="Vizualizează pe hartă"
+          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium">
+          <Eye className="w-3.5 h-3.5" /> Vizualizează
+        </button>
+        <button onClick={onEdit} title="Editează parcela"
+          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+          <Pencil className="w-3.5 h-3.5" /> Editează
+        </button>
+        <button onClick={onEditGeometry} title="Editează geometria"
+          className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 transition-colors">
+          <Move className="w-3.5 h-3.5" />
+        </button>
+        {onSelect && (
+          <button onClick={onSelect} title="Selecteaza"
+            className="p-1.5 text-gray-400 hover:text-green-600 rounded-lg hover:bg-green-50 transition-colors">
+            <Check className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onEdit} title="Editează parcela"
-            className="p-1.5 text-gray-400 hover:text-green-600 rounded hover:bg-green-50 transition-colors">
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={onEditGeometry} title="Editează geometria (mută vârfurile)"
-            className="p-1.5 text-gray-400 hover:text-amber-600 rounded hover:bg-amber-50 transition-colors">
-            <Move className="w-3.5 h-3.5" />
-          </button>
-          {onSelect && (
-            <button onClick={onSelect} title="Selecteaza"
-              className="p-1.5 text-gray-400 hover:text-green-600 rounded hover:bg-green-50 transition-colors">
-              <Check className="w-3.5 h-3.5" />
-            </button>
-          )}
-          <button onClick={onDelete} title="Sterge"
-            className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        )}
+        <button onClick={onDelete} title="Sterge"
+          className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors">
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   )
@@ -792,6 +798,7 @@ export default function MapParcelSelector({
   const [parcelLegendMap, setParcelLegendMap] = useState<Record<string, string>>({})
   const [saveLegendId, setSaveLegendId] = useState(DEFAULT_LEGEND_ITEMS[0].id)
   const [showLegendAdd, setShowLegendAdd] = useState(false)
+  const [legendCollapsed, setLegendCollapsed] = useState(false)
   const [newLegendLabel, setNewLegendLabel] = useState('')
   const [newLegendColor, setNewLegendColor] = useState('#22c55e')
   const [showCulturePicker, setShowCulturePicker] = useState(false)
@@ -1744,55 +1751,66 @@ export default function MapParcelSelector({
 
           <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
             <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Legenda culturi</p>
               <button
-                onClick={() => setShowLegendAdd(v => !v)}
-                className="inline-flex items-center justify-center w-6 h-6 rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
-                title="Adauga legenda"
+                onClick={() => setLegendCollapsed(v => !v)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wide hover:text-gray-800 transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${legendCollapsed ? '-rotate-90' : ''}`} />
+                Legenda culturi
+                <span className="font-normal text-gray-400 normal-case tracking-normal">({legendItems.length})</span>
               </button>
-            </div>
-            <div className="p-3 space-y-2 bg-white">
-              {legendItems.map(item => (
-                <div key={item.id} className="flex items-center gap-2 text-sm text-gray-700 group">
-                  <span className="inline-block w-3 h-3 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="flex-1">{item.label}</span>
-                  <button
-                    onClick={() => deleteLegendItem(item.id)}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                    title="Șterge"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-              {showLegendAdd && (
-                <div className="mt-2 pt-2 border-t border-gray-100 space-y-2">
-                  <input
-                    type="text"
-                    value={newLegendLabel}
-                    onChange={e => setNewLegendLabel(e.target.value)}
-                    placeholder="Ex: Rapita"
-                    className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={newLegendColor}
-                      onChange={e => setNewLegendColor(e.target.value)}
-                      className="w-10 h-8 p-0 border border-gray-300 rounded cursor-pointer"
-                    />
-                    <button
-                      onClick={addLegendItem}
-                      className="px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded"
-                    >
-                      Adauga
-                    </button>
-                  </div>
-                </div>
+              {!legendCollapsed && (
+                <button
+                  onClick={() => setShowLegendAdd(v => !v)}
+                  className="inline-flex items-center justify-center w-6 h-6 rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
+                  title="Adauga legenda"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
               )}
             </div>
+            {!legendCollapsed && (
+              <div className="p-3 space-y-2 bg-white">
+                {legendItems.map(item => (
+                  <div key={item.id} className="flex items-center gap-2 text-sm text-gray-700 group">
+                    <span className="inline-block w-3 h-3 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="flex-1">{item.label}</span>
+                    <button
+                      onClick={() => deleteLegendItem(item.id)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                      title="Șterge"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                {showLegendAdd && (
+                  <div className="mt-2 pt-2 border-t border-gray-100 space-y-2">
+                    <input
+                      type="text"
+                      value={newLegendLabel}
+                      onChange={e => setNewLegendLabel(e.target.value)}
+                      placeholder="Ex: Rapita"
+                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={newLegendColor}
+                        onChange={e => setNewLegendColor(e.target.value)}
+                        className="w-10 h-8 p-0 border border-gray-300 rounded cursor-pointer"
+                      />
+                      <button
+                        onClick={addLegendItem}
+                        className="px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded"
+                      >
+                        Adauga
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Projection badge */}
@@ -1875,7 +1893,7 @@ export default function MapParcelSelector({
           )}
 
           {/* Parcel list */}
-          <div className={isModal ? 'max-h-44 lg:flex-1 overflow-y-auto pr-1 space-y-2' : 'space-y-2 max-h-64 overflow-y-auto'}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {loading ? (
               <div className="text-center py-10">
                 <div className="inline-block w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
