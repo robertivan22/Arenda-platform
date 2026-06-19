@@ -111,6 +111,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>(loadMapping)
   const [saveResults, setSaveResults] = useState<SaveResult[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ── Parse uploaded file ───────────────────────────────────────────────────
 

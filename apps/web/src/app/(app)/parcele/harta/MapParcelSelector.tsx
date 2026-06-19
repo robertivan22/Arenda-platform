@@ -1145,7 +1145,7 @@ export default function MapParcelSelector({
         const rings = geom.coordinates.map(ring =>
           (ring[0] as [number, number][]).map(([lng, lat]) => L.latLng(lat, lng))
         )
-        poly = L.polygon(rings as L.LatLngTuple[][], style)
+        poly = L.polygon(rings as unknown as L.LatLngTuple[][], style)
       }
       if (poly) {
         poly.bindTooltip(tooltipHtml, { sticky: true })
