@@ -563,6 +563,12 @@ export default function MachineDetailPage() {
                 Verifică &amp; Salvează
               </button>
             </div>
+            {/* How-it-works note */}
+            <div className="mt-3 p-2.5 bg-white border border-indigo-100 rounded-lg text-xs text-gray-500 space-y-1">
+              <p><span className="font-medium text-indigo-600">Sugerează</span> — generează un cod candidat din tipul și puterea utilajului (reguli deterministe: ex. Tractor 75–130 CP → 8701941000, Combină → 8433510000).</p>
+              <p><span className="font-medium text-indigo-600">Verifică &amp; Salvează</span> — confirmă codul în nomenclatorul vamal UE (CN/TARIC) și salvează automat descrierea oficială și data verificării.</p>
+              <p className="text-gray-400">Formate acceptate: 6 cifre HS · 8 cifre CN · 10 cifre TARIC. Sursa: UK Trade Tariff API (nomenclator combinat identic cu cel UE).</p>
+            </div>
 
             {taricResult && (
               <div className={`mt-2 p-2.5 rounded-lg text-xs border flex items-start gap-2 ${

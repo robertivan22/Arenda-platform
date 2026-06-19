@@ -244,6 +244,12 @@ export default function UtilajePage() {
               <span className="text-xs font-semibold text-indigo-700">Cod Vamal TARIC</span>
               <span className="text-xs text-indigo-400">— pentru import / declarații vamale</span>
             </div>
+            {/* How-it-works note */}
+            <div className="mb-3 p-2.5 bg-white border border-indigo-100 rounded-lg text-xs text-gray-600 space-y-1">
+              <p><span className="font-semibold text-indigo-700">Sugerează cod</span> — generează automat un cod candidat pe baza tipului de utilaj și puterii motorului (reguli deterministe: TRACTOR 75–130 CP → 8701941000, Combină → 8433510000 etc.).</p>
+              <p><span className="font-semibold text-indigo-700">Verifică TARIC</span> — validează codul în nomenclatorul vamal combinat UE (CN/TARIC) via UK Trade Tariff API și returnează descrierea oficială și perioada de validitate.</p>
+              <p className="text-gray-400">Coduri acceptate: 6 cifre (HS) · 8 cifre (CN/NC) · 10 cifre (TARIC). Câmpul este opțional și poate fi completat ulterior din fișa utilajului.</p>
+            </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
