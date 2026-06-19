@@ -2,6 +2,7 @@
 export const runtime = 'edge'
 
 import { useState, useEffect, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
@@ -88,8 +89,28 @@ export default function MiscariPage() {
   // Format quantity: no trailing zeros, max 2 decimals
   const fmtQty = (n: number) => n % 1 === 0 ? String(Math.round(n)) : parseFloat(n.toFixed(2)).toString()
 
+  const pathname = usePathname()
+  const inventarTabs = [
+    { label: 'Stoc Curent', href: '/inventar/stoc' },
+    { label: 'Loturi', href: '/inventar/loturi' },
+    { label: 'Mișcări', href: '/inventar/miscari' },
+    { label: 'Furnizori', href: '/inventar/furnizori' },
+  ]
+
   return (
     <div>
+      <div className="overflow-x-auto mb-4" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+          {inventarTabs.map(t => (
+            <a key={t.href} href={t.href}
+              className={`px-4 py-1.5 text-sm rounded-md transition-colors whitespace-nowrap ${
+                pathname === t.href ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+              }`}>
+              {t.label}
+            </a>
+          ))}
+        </div>
+      </div>
       <PageHeader
         title="Miscari Stoc"
         subtitle={`${displayed.length} miscari · ${fmtQty(totalOut)} iesiri · ${fmtQty(totalIn)} intrari`}
