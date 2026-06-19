@@ -9,6 +9,13 @@ import { toast } from 'sonner'
 import { Pencil, Plus, Trash2, Printer, X, FileText } from 'lucide-react'
 import DistributionTracker from '@/components/DistributionTracker'
 import { ContractDocuments } from './components/ContractDocuments'
+import { StatusBadge } from '@/components/data-display/StatusBadge'
+
+function effectiveStatus(status: string, endDate: string): string {
+  if (status === 'TERMINATED' || status === 'ARCHIVED') return status
+  if (new Date(endDate) < new Date()) return 'EXPIRED'
+  return status
+}
 
 interface Contract {
   id: string; contract_number: string; contract_type: string
@@ -192,7 +199,7 @@ export default function ContractDashboardPage() {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-xl font-bold text-gray-900">{contract.lessor_name}</h1>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${contract.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{contract.status}</span>
+              <StatusBadge status={effectiveStatus(contract.status, contract.end_date)} size="md" />
             </div>
             <div className="text-sm text-gray-500 space-y-0.5">
               <div className="font-mono text-gray-600">#{contract.contract_number} · {contract.localities ?? contract.zone ?? '—'}</div>
@@ -239,7 +246,7 @@ export default function ContractDashboardPage() {
                 <td className={tdCls}>{lc.id === id ? (parcels.map(p => p.tarla_nr).filter(Boolean).join(', ') || '—') : '—'}</td>
                 <td className={tdCls}>{lc.id === id ? (parcels.map(p => p.parcel_nr).filter(Boolean).join(', ') || '—') : '—'}</td>
                 <td className={tdCls + ' font-semibold'}>{lc.id === id ? Number(totalHa.toFixed(4)) : ''}</td>
-                <td className={tdCls}><span className={`text-xs px-1.5 py-0.5 rounded ${lc.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{lc.status}</span></td>
+                <td className={tdCls}><StatusBadge status={effectiveStatus(lc.status, lc.end_date)} /></td>
               </tr>
             ))}
             {amendments.map(a => (

@@ -11,6 +11,12 @@ interface ContractRow {
   status: string; total_parcels: number; annual_rent: number
 }
 
+function effectiveStatus(status: string, endDate: string): string {
+  if (status === 'TERMINATED' || status === 'ARCHIVED') return status
+  if (new Date(endDate) < new Date()) return 'EXPIRED'
+  return status
+}
+
 export default function LessorContracteTabClient() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -53,7 +59,7 @@ export default function LessorContracteTabClient() {
               <td className="px-3 py-2">{row.end_date}</td>
               <td className="px-3 py-2">{row.total_parcels}</td>
               <td className="px-3 py-2">{Number(row.annual_rent).toFixed(2)} RON</td>
-              <td className="px-3 py-2"><StatusBadge status={row.status} /></td>
+              <td className="px-3 py-2"><StatusBadge status={effectiveStatus(row.status, row.end_date)} /></td>
             </tr>
           ))}
         </tbody>

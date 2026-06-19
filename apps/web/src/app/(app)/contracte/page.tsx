@@ -16,6 +16,12 @@ interface Contract {
   lessor_name: string
 }
 
+function effectiveStatus(status: string, endDate: string): string {
+  if (status === 'TERMINATED' || status === 'ARCHIVED') return status
+  if (new Date(endDate) < new Date()) return 'EXPIRED'
+  return status
+}
+
 export default function ContractesListPage() {
   const router = useRouter()
   const [search, setSearch] = useState('')
@@ -89,7 +95,7 @@ export default function ContractesListPage() {
           },
           {
             key: 'status', header: 'Status',
-            cell: r => <StatusBadge status={r.status} />,
+            cell: r => <StatusBadge status={effectiveStatus(r.status, r.end_date)} />,
           },
           {
             key: 'actions', header: '', mobileLabel: false, hideOnMobile: true,
