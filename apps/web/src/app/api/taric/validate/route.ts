@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'edge'
 
-// EU TARIC public API — no API key required
-const EU_TARIC_BASE = 'https://api.trade.ec.europa.eu/en/v1'
+// UK Trade Tariff API — same CN/HS codes as EU, reliable from edge
+// TARIC 10-digit codes are looked up using the first 8 digits (CN level)
+const UK_TARIFF_BASE = 'https://www.trade-tariff.service.gov.uk/api/v2'
 
 function detectLevel(code: string): 'HS' | 'CN' | 'TARIC' | null {
   const clean = code.replace(/\s/g, '')
@@ -17,13 +18,31 @@ function normalizeCode(code: string): string {
   return code.replace(/[\s.]/g, '').trim()
 }
 
+// For UK API: 10-digit TARIC → use as-is; 6/8-digit → pad to 10 with zeros
+function toUkLookupCode(code: string, level: 'HS' | 'CN' | 'TARIC'): string {
+  if (level === 'HS')    return code + '0000'
+  if (level === 'CN')    return code + '00'
+  return code
+}
+
+interface UkCommodityResponse {
+  data?: {
+    attributes?: {
+      description?: string
+      formatted_description?: string
+      validity_start_date?: string
+      validity_end_date?: string | null
+    }
+  }
+  errors?: Array<{ detail: string }>
+}
+
 export async function POST(req: NextRequest) {
   let body: { code?: string; reference_date?: string; language?: string } = {}
   try { body = await req.json() } catch { /* empty body */ }
 
   const raw = body.code ?? ''
   const code = normalizeCode(raw)
-  const language = body.language ?? 'EN'
   const referenceDate = body.reference_date ?? new Date().toISOString().split('T')[0]
 
   if (!code) {
@@ -40,15 +59,16 @@ export async function POST(req: NextRequest) {
       exists_in_taric: false,
       valid_for_reference_date: false,
       description: null,
-      message: 'Invalid code format. Expected 6, 8, or 10 digits.',
+      message: 'Format invalid. Se acceptă 6 (HS), 8 (CN) sau 10 cifre (TARIC).',
     })
   }
 
+  const lookupCode = toUkLookupCode(code, level)
+
   try {
-    // Goods nomenclature lookup
-    const url = `${EU_TARIC_BASE}/goods/nomenclatures/${code}?language=${language}&as_of=${referenceDate}`
+    const url = `${UK_TARIFF_BASE}/commodities/${lookupCode}?as_of=${referenceDate}`
     const res = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
+      headers: { 'Accept': 'application/json', 'User-Agent': 'ArendaPro/1.0' },
       signal: AbortSignal.timeout(8000),
     })
 
@@ -61,26 +81,19 @@ export async function POST(req: NextRequest) {
         exists_in_taric: false,
         valid_for_reference_date: false,
         description: null,
-        message: 'Code not found in TARIC for the specified date.',
+        message: 'Cod negăsit în nomenclatorul vamal pentru data specificată.',
       })
     }
 
     if (!res.ok) {
-      throw new Error(`TARIC API returned ${res.status}`)
+      throw new Error(`Tariff API returned ${res.status}`)
     }
 
-    const data = await res.json() as {
-      goodsNomenclature?: { description?: string; validityStartDate?: string; validityEndDate?: string }
-      description?: string
-      validityStartDate?: string
-      validityEndDate?: string
-    }
-
-    // Handle both flat and nested response shapes
-    const entry = data.goodsNomenclature ?? data
-    const description = entry.description ?? null
-    const validFrom = entry.validityStartDate ?? null
-    const validTo = entry.validityEndDate ?? null
+    const data = await res.json() as UkCommodityResponse
+    const attrs = data.data?.attributes
+    const description = attrs?.formatted_description ?? attrs?.description ?? null
+    const validFrom = attrs?.validity_start_date ?? null
+    const validTo   = attrs?.validity_end_date ?? null
 
     const isValidForDate = (() => {
       const ref = new Date(referenceDate)
@@ -100,12 +113,11 @@ export async function POST(req: NextRequest) {
       valid_from: validFrom,
       valid_to: validTo,
       message: isValidForDate
-        ? 'Code is valid in TARIC for the reference date.'
-        : 'Code exists but is not valid for the reference date.',
+        ? 'Cod valid în nomenclatorul vamal pentru data specificată.'
+        : 'Codul există dar nu este valid pentru data specificată.',
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'TARIC lookup failed'
-    // Return a graceful degraded response — still useful for UI
+    const message = err instanceof Error ? err.message : 'Verificare indisponibilă'
     return NextResponse.json({
       code,
       normalized_code: code,
@@ -114,8 +126,9 @@ export async function POST(req: NextRequest) {
       exists_in_taric: null,
       valid_for_reference_date: null,
       description: null,
-      message: `TARIC verification unavailable: ${message}`,
+      message: `Verificare live indisponibilă (${message}). Codul a fost salvat fără confirmare externă.`,
       error: true,
     })
   }
 }
+
