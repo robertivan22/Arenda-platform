@@ -360,7 +360,7 @@ function ParcelMapPopup({ parcel, onClose, onRegisterActivity }: { parcel: Regis
 
 // ─── Parcel list item ─────────────────────────────────────────────────────────
 function ParcelItem({
-  parcel, isSelected, onView, onDelete, onEdit, onEditGeometry, onSelect, legendLabel, legendColor,
+  parcel, isSelected, onView, onDelete, onEdit, onEditGeometry, onSelect, onActivity, legendLabel, legendColor,
 }: {
   parcel: ParceleFitosanitar
   isSelected: boolean
@@ -369,6 +369,7 @@ function ParcelItem({
   onEdit: () => void
   onEditGeometry: () => void
   onSelect?: () => void
+  onActivity?: () => void
   legendLabel?: string
   legendColor?: string
 }) {
@@ -418,12 +419,18 @@ function ParcelItem({
       <div className="border-t border-gray-100 px-2 py-1.5 flex items-center gap-0.5">
         <button onClick={onView} title="Vizualizează pe hartă"
           className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium">
-          <Eye className="w-3.5 h-3.5" /> Vizualizează
+          <Eye className="w-3.5 h-3.5" /> Viz.
         </button>
         <button onClick={onEdit} title="Editează parcela"
           className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-          <Pencil className="w-3.5 h-3.5" /> Editează
+          <Pencil className="w-3.5 h-3.5" /> Edit
         </button>
+        {onActivity && (
+          <button onClick={onActivity} title="Înregistrează activitate"
+            className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-green-700 hover:bg-green-50 rounded-lg transition-colors font-medium">
+            <Tractor className="w-3.5 h-3.5" /> Activ.
+          </button>
+        )}
         <button onClick={onEditGeometry} title="Editează geometria"
           className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 transition-colors">
           <Move className="w-3.5 h-3.5" />
@@ -771,10 +778,13 @@ export default function MapParcelSelector({
   const [editJudet, setEditJudet] = useState('')
   const [editNote, setEditNote] = useState('')
   const [editLegendId, setEditLegendId] = useState('')
+  const [editNrCvi, setEditNrCvi] = useState('')
+  const [editAdresa, setEditAdresa] = useState('')
   const [editSaving, setEditSaving] = useState(false)
 
   // Geometry editing of existing parcel
   const [geoEditId, setGeoEditId] = useState<string | null>(null)
+  const [cardActivity, setCardActivity] = useState<{ parcelId: string | null; name: string; surface: number | null } | null>(null)
   const geoEditLayerRef = useRef<L.Polygon | null>(null)
 
   // Address search
@@ -1425,6 +1435,8 @@ export default function MapParcelSelector({
     setEditLocalitate(parcel.localitate ?? '')
     setEditJudet(parcel.judet ?? '')
     setEditNote(parcel.note ?? '')
+    setEditNrCvi(parcel.nr_cvi ?? '')
+    setEditAdresa(parcel.adresa ?? '')
     // Resolve legend from DB cultura_label or from localStorage map
     const dbCultura = (parcel as any).cultura_label
     if (dbCultura) {
@@ -1448,6 +1460,8 @@ export default function MapParcelSelector({
         localitate: editLocalitate || null,
         judet: editJudet || null,
         note: editNote || null,
+        nr_cvi: editNrCvi || null,
+        adresa: editAdresa || null,
         cultura_label: legendItem?.label ?? null,
         cultura_color: legendItem?.color ?? null,
       })
@@ -1555,6 +1569,11 @@ export default function MapParcelSelector({
       })
       .eq('id', geoEditId)
     if (error) { toast.error('Eroare la salvare geometrie: ' + error.message); return }
+    // Sync area to linked registry parcel
+    const editedParcel = parcels.find(p => p.id === geoEditId)
+    if (editedParcel?.parcela_id) {
+      await db.from('parcels').update({ surface: area }).eq('id', editedParcel.parcela_id)
+    }
     toast.success(`Geometrie actualizată — ${area.toFixed(2)} ha`)
     cancelGeometryEdit()
     await loadParcels()
@@ -1813,14 +1832,6 @@ export default function MapParcelSelector({
             )}
           </div>
 
-          {/* Projection badge */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-            <Info className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
-            <div className="text-xs text-blue-700">
-              <span className="font-semibold">Stereo 70</span> (EPSG:3844) — stocare APIA/ANCPI
-            </div>
-          </div>
-
           {/* Parcel list header */}
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
@@ -1918,6 +1929,7 @@ export default function MapParcelSelector({
                     onEdit={() => openEditModal(parcel)}
                     onEditGeometry={() => startGeometryEdit(parcel)}
                     onSelect={onParcelSelected ? () => focusParcel(parcel) : undefined}
+                    onActivity={() => setCardActivity({ parcelId: parcel.parcela_id ?? null, name: parcel.nume_parcela, surface: parcel.suprafata_ha ?? null })}
                     legendLabel={legend?.label}
                     legendColor={legend?.color}
                   />
@@ -1949,7 +1961,7 @@ export default function MapParcelSelector({
         {/* GPS – My location button */}
         <button
           onClick={handleMyLocation}
-          className="absolute top-[52px] right-2 z-[1000] bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-green-50 active:bg-green-100 transition-colors"
+          className="absolute bottom-12 right-2 z-[1000] bg-white border border-gray-300 rounded-lg p-2 shadow-md hover:bg-green-50 active:bg-green-100 transition-colors"
           title="Locația mea"
           aria-label="Locația mea"
         >
@@ -2188,7 +2200,7 @@ export default function MapParcelSelector({
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="px-6 py-4 space-y-4">
+              <div className="px-6 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nume parcelă <span className="text-red-500">*</span></label>
                 <input type="text" value={editName} onChange={e => setEditName(e.target.value)} maxLength={100}
@@ -2206,15 +2218,27 @@ export default function MapParcelSelector({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nr. CVI</label>
+                  <input type="text" value={editNrCvi} onChange={e => setEditNrCvi(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cultură</label>
+                  <select value={editLegendId} onChange={e => setEditLegendId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+                    <option value="">— Fără cultură —</option>
+                    {legendItems.map(item => (
+                      <option key={item.id} value={item.id}>{item.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cultură</label>
-                <select value={editLegendId} onChange={e => setEditLegendId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
-                  <option value="">— Fără cultură —</option>
-                  {legendItems.map(item => (
-                    <option key={item.id} value={item.id}>{item.label}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Adresă</label>
+                <input type="text" value={editAdresa} onChange={e => setEditAdresa(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Note</label>
@@ -2233,6 +2257,16 @@ export default function MapParcelSelector({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Card activity modal ── */}
+      {cardActivity && (
+        <QuickActivityModal
+          parcelId={cardActivity.parcelId}
+          parcelName={cardActivity.name}
+          parcelSurface={cardActivity.surface}
+          onClose={() => setCardActivity(null)}
+        />
       )}
 
       {/* ── Quick activity modal ── */}

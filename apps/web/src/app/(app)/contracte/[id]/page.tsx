@@ -195,9 +195,9 @@ export default function ContractDashboardPage() {
     <div className="space-y-5 max-w-6xl">
       {/* Header */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
-            <div className="flex items-center gap-3 mb-1">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
               <h1 className="text-xl font-bold text-gray-900">{contract.lessor_name}</h1>
               <StatusBadge status={effectiveStatus(contract.status, contract.end_date)} size="md" />
             </div>
@@ -206,8 +206,8 @@ export default function ContractDashboardPage() {
               <div>Plata impozit: <span className="font-medium">{TAX_LABELS[contract.tax_method] ?? contract.tax_method}</span></div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="text-right mr-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-right">
               <div className="text-xs text-gray-400">Suprafata totala</div>
               <div className="text-xl font-bold text-brand-700">{Number(totalHa.toFixed(4))} ha</div>
             </div>
@@ -260,7 +260,7 @@ export default function ContractDashboardPage() {
             ))}
           </tbody>
         </table>
-        <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
+        <div className="px-4 py-3 border-t border-gray-100 flex flex-wrap gap-2">
           <button onClick={() => router.push('/contracte/nou')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded font-medium"><Plus className="w-3.5 h-3.5" /> Contract nou</button>
           <button onClick={() => setShowNewAmendment(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded font-medium"><Plus className="w-3.5 h-3.5" /> Adauga act aditional</button>
           <button onClick={async () => { if (!confirm('Inchizi contractul?')) return; await createClient().from('contracts').update({ status: 'TERMINATED' }).eq('id', id); load() }} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-500 hover:bg-red-600 text-white rounded font-medium"><X className="w-3.5 h-3.5" /> Inchide Contract</button>
@@ -282,9 +282,9 @@ export default function ContractDashboardPage() {
 
       {/* Tranzactii */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
           <span className="font-semibold text-sm">Tranzactii</span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {selectedTxns.size > 0 && (
               <>
                 <button onClick={generateInvoice} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded font-medium"><Printer className="w-3.5 h-3.5" /> Factura ({selectedTxns.size})</button>
