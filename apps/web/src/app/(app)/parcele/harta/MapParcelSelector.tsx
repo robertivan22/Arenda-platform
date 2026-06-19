@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
-  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers, Pencil, Navigation, Tractor, Upload,
+  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers, Pencil, Navigation, Tractor, Upload, Download, Move,
 } from 'lucide-react'
 import { area as turfArea } from '@turf/area'
 import ImportWizardModal from './ImportWizardModal'
@@ -360,13 +360,14 @@ function ParcelMapPopup({ parcel, onClose, onRegisterActivity }: { parcel: Regis
 
 // ─── Parcel list item ─────────────────────────────────────────────────────────
 function ParcelItem({
-  parcel, isSelected, onView, onDelete, onEdit, onSelect, legendLabel, legendColor,
+  parcel, isSelected, onView, onDelete, onEdit, onEditGeometry, onSelect, legendLabel, legendColor,
 }: {
   parcel: ParceleFitosanitar
   isSelected: boolean
   onView: () => void
   onDelete: () => void
   onEdit: () => void
+  onEditGeometry: () => void
   onSelect?: () => void
   legendLabel?: string
   legendColor?: string
@@ -415,6 +416,10 @@ function ParcelItem({
           <button onClick={onEdit} title="Editează parcela"
             className="p-1.5 text-gray-400 hover:text-green-600 rounded hover:bg-green-50 transition-colors">
             <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={onEditGeometry} title="Editează geometria (mută vârfurile)"
+            className="p-1.5 text-gray-400 hover:text-amber-600 rounded hover:bg-amber-50 transition-colors">
+            <Move className="w-3.5 h-3.5" />
           </button>
           {onSelect && (
             <button onClick={onSelect} title="Selecteaza"
@@ -761,6 +766,10 @@ export default function MapParcelSelector({
   const [editNote, setEditNote] = useState('')
   const [editLegendId, setEditLegendId] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+
+  // Geometry editing of existing parcel
+  const [geoEditId, setGeoEditId] = useState<string | null>(null)
+  const geoEditLayerRef = useRef<L.Polygon | null>(null)
 
   // Address search
   const [searchQuery, setSearchQuery] = useState('')
@@ -1468,6 +1477,116 @@ export default function MapParcelSelector({
   const isModal = mode === 'modal'
   const activeLayerCount = Object.values(wmsLayerState).filter(s => s.visible).length
 
+  // ── Edit geometry of existing parcel ────────────────────────────────────
+  function startGeometryEdit(parcel: ParceleFitosanitar) {
+    const map = mapRef.current
+    if (!map || !parcel.geometry_geojson?.coordinates?.[0]) return
+    // Cancel any existing geo edit
+    cancelGeometryEdit()
+    const ring = parcel.geometry_geojson.coordinates[0]
+    const ringWgs84 = isLikelyStereo70(ring[0]) ? ringStereo70ToWgs84(ring) : ring
+    const latLngs = ringWgs84.map(([lng, lat]: number[]) => L.latLng(lat, lng))
+    const poly = L.polygon(latLngs, { color: '#ef4444', fillColor: '#fca5a5', fillOpacity: 0.3, weight: 3, dashArray: '6 4' })
+    poly.addTo(map)
+    // Enable vertex editing
+    ;(poly as any).editing?.enable()
+    geoEditLayerRef.current = poly
+    setGeoEditId(parcel.id)
+    // Hide the original layer
+    const origLayer = parcelLayersRef.current.get(parcel.id)
+    if (origLayer) map.removeLayer(origLayer)
+    map.fitBounds(poly.getBounds(), { padding: [40, 40] })
+  }
+
+  function cancelGeometryEdit() {
+    const map = mapRef.current
+    if (geoEditLayerRef.current && map) {
+      ;(geoEditLayerRef.current as any).editing?.disable()
+      map.removeLayer(geoEditLayerRef.current)
+    }
+    geoEditLayerRef.current = null
+    setGeoEditId(null)
+  }
+
+  async function saveGeometryEdit() {
+    const poly = geoEditLayerRef.current
+    if (!poly || !geoEditId) return
+    ;(poly as any).editing?.disable()
+    const latLngs = poly.getLatLngs()[0] as L.LatLng[]
+    const ringWgs84 = latLngs.map(ll => [ll.lng, ll.lat])
+    // Close the ring
+    if (ringWgs84.length > 0 && (ringWgs84[0][0] !== ringWgs84[ringWgs84.length - 1][0] || ringWgs84[0][1] !== ringWgs84[ringWgs84.length - 1][1])) {
+      ringWgs84.push([...ringWgs84[0]])
+    }
+    const ringStereo = ringWgs84ToStereo70(ringWgs84)
+    const area = calcAreaHaStereo70(ringStereo)
+    const [cx, cy] = centroidStereo70(ringStereo)
+    const [centruLat, centruLng] = stereo70ToLeaflet(cx, cy)
+    const geometryStereo70 = { type: 'Polygon' as const, coordinates: [ringStereo] }
+
+    const db = createClient()
+    const { error } = await db
+      .from('parcele_fitosanitar')
+      .update({
+        geometry_geojson: geometryStereo70,
+        suprafata_ha: area,
+        centru_lat: centruLat,
+        centru_lng: centruLng,
+      })
+      .eq('id', geoEditId)
+    if (error) { toast.error('Eroare la salvare geometrie: ' + error.message); return }
+    toast.success(`Geometrie actualizată — ${area.toFixed(2)} ha`)
+    cancelGeometryEdit()
+    await loadParcels()
+  }
+
+  // ── Export parcels as Shapefile ZIP ──────────────────────────────────────
+  async function handleExport() {
+    if (parcels.length === 0) { toast.error('Nu ai parcele de exportat.'); return }
+    try {
+      const { zip } = await import('shp-write')
+      const features = parcels
+        .filter(p => p.geometry_geojson?.coordinates?.[0]?.length >= 3)
+        .map(p => {
+          const ring = p.geometry_geojson.coordinates[0]
+          const ringWgs84 = isLikelyStereo70(ring[0]) ? ringStereo70ToWgs84(ring) : ring
+          return {
+            type: 'Feature' as const,
+            geometry: { type: 'Polygon' as const, coordinates: [ringWgs84] },
+            properties: {
+              NUME: p.nume_parcela,
+              JUDET: p.judet ?? '',
+              LOCALITATE: p.localitate ?? '',
+              SUPRAFATA: p.suprafata_ha ?? 0,
+              CULTURA: p.cultura_label ?? '',
+              NR_CVI: p.nr_cvi ?? '',
+              ADRESA: p.adresa ?? '',
+              NOTE: p.note ?? '',
+              CREAT: p.created_at?.slice(0, 10) ?? '',
+            },
+          }
+        })
+      const fc = { type: 'FeatureCollection' as const, features }
+      const blob = await zip(fc as any, {
+        folder: 'parcele_export',
+        types: { polygon: 'parcele' },
+        outputType: 'blob',
+      })
+      // Download
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `parcele_export_${new Date().toISOString().slice(0, 10)}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success(`${features.length} parcele exportate ca Shapefile.`)
+    } catch (err) {
+      toast.error('Eroare la export: ' + (err instanceof Error ? err.message : 'necunoscută'))
+    }
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className={isModal ? 'flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-160px)] lg:min-h-[500px]' : 'flex flex-col gap-3'}>
@@ -1683,6 +1802,13 @@ export default function MapParcelSelector({
               >
                 <Upload className="w-3 h-3" /> Import
               </button>
+              <button
+                onClick={() => void handleExport()}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors font-medium"
+                title="Exportă parcele ca Shapefile (.zip)"
+              >
+                <Download className="w-3 h-3" /> Export
+              </button>
               <button onClick={() => void loadParcels()} title="Reincarcare"
                 className="p-1 text-gray-400 hover:text-gray-600 rounded">
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -1753,6 +1879,7 @@ export default function MapParcelSelector({
                     onView={() => focusParcel(parcel)}
                     onDelete={() => setDeleteId(parcel.id)}
                     onEdit={() => openEditModal(parcel)}
+                    onEditGeometry={() => startGeometryEdit(parcel)}
                     onSelect={onParcelSelected ? () => focusParcel(parcel) : undefined}
                     legendLabel={legend?.label}
                     legendColor={legend?.color}
@@ -1791,6 +1918,26 @@ export default function MapParcelSelector({
         >
           <Navigation className="w-4 h-4 text-green-700" />
         </button>
+
+        {/* Geometry edit toolbar */}
+        {geoEditId && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1100] flex items-center gap-2 px-4 py-2 bg-white border border-red-300 rounded-lg shadow-lg">
+            <Move className="w-4 h-4 text-red-600" />
+            <span className="text-sm font-medium text-gray-700">Editare geometrie</span>
+            <button
+              onClick={() => void saveGeometryEdit()}
+              className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              Salvează
+            </button>
+            <button
+              onClick={() => { cancelGeometryEdit(); void loadParcels() }}
+              className="px-3 py-1 text-xs font-medium bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+            >
+              Anulează
+            </button>
+          </div>
+        )}
 
         {/* Parcel detail popup – click centre marker or registry marker */}
         {popupParcel && (
