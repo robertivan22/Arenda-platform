@@ -571,7 +571,7 @@ function QuickActivityModal({ parcelId, parcelName, parcelSurface, onClose }: Qu
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Tip operație *</label>
               <select className={inputCls} required value={form.operation_type}
@@ -588,7 +588,7 @@ function QuickActivityModal({ parcelId, parcelName, parcelSurface, onClose }: Qu
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Dată</label>
               <input className={inputCls} type="date" value={form.planned_date}
