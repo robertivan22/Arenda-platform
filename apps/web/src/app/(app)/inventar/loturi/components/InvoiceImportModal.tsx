@@ -140,8 +140,6 @@ export function InvoiceImportModal({ suppliers, onCreated, onClose }: Props) {
       setStage('upload')
       return
     }
-    dbg(`Fișier: ${f.name} | ${(f.size/1024).toFixed(0)} KB | ${f.type}`)
-    dbg(`User Agent: ${navigator.userAgent.slice(0, 80)}`)
 
     try {
       setProgress('Se pregătește fișierul...')
