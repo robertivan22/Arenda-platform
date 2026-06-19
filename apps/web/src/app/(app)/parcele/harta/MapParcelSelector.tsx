@@ -1608,13 +1608,13 @@ export default function MapParcelSelector({
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className={isModal ? 'flex flex-col-reverse lg:flex-row gap-4 lg:h-[calc(100vh-160px)] lg:min-h-[500px]' : 'flex flex-col-reverse gap-3'}>
+    <div className={isModal ? 'flex flex-col-reverse gap-4' : 'flex flex-col-reverse gap-3'}>
 
       {/* ── Sidebar ── */}
       {showList && (
         <aside className={isModal
-          ? 'lg:w-72 xl:w-80 lg:flex-shrink-0 flex flex-col gap-3 order-2 lg:order-1'
-          : 'space-y-3 order-2'
+          ? 'flex flex-col gap-3'
+          : 'space-y-3'
         }>
 
           {/* Address search */}
@@ -1919,7 +1919,7 @@ export default function MapParcelSelector({
 
       {/* ── Map + status bar ── */}
       <div
-        className={`relative flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm${isModal ? ' order-1 lg:order-2 h-[55vh] lg:h-auto lg:flex-1' : ' order-1'}`}
+        className={`relative flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm${isModal ? ' h-[65vh] min-h-[400px]' : ' order-1'}`}
         style={!isModal ? { height } : undefined}
       >
         <div
