@@ -119,7 +119,8 @@ export default function MiscariPage() {
           <p className="text-sm mt-1">Miscarile de stoc apar aici dupa ce inregistrezi iesiri sau intrari din pagina Loturi.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <>
+        <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
@@ -164,6 +165,40 @@ export default function MiscariPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile cards */}
+        <div className="sm:hidden bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+          {displayed.map(r => {
+            const Icon = MVT_ICONS[r.mvt_type]
+            return (
+              <div key={r.id} className="p-3">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0">
+                    <div className="font-medium text-gray-900 text-sm truncate">{r.product_name}</div>
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium mt-0.5 ${INPUT_CATEGORY_COLORS[r.category]}`}>
+                      {INPUT_CATEGORY_LABELS[r.category]}
+                    </span>
+                  </div>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${MVT_COLORS[r.mvt_type]}`}>
+                    <Icon className="w-3 h-3" />
+                    {MVT_TYPE_LABELS[r.mvt_type]}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                  <div>
+                    <span className="text-gray-400">Cantitate </span>
+                    <span className={`font-semibold ${r.mvt_type === 'OUT' ? 'text-red-600' : r.mvt_type === 'IN' ? 'text-green-600' : 'text-gray-700'}`}>
+                      {r.mvt_type === 'OUT' ? '−' : r.mvt_type === 'IN' ? '+' : ''}{fmtQty(Number(r.quantity))} {r.unit}
+                    </span>
+                  </div>
+                  <div><span className="text-gray-400">Data </span>{r.mvt_date}</div>
+                  {r.notes && <div className="col-span-2 text-gray-400 truncate">{r.notes}</div>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        </>
       )}
     </div>
   )

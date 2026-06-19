@@ -188,7 +188,8 @@ export default function LoturiPage() {
           <p className="text-sm mt-1">Inregistreaza primul lot de inputuri agricole.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <>
+        <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
@@ -279,6 +280,67 @@ export default function LoturiPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile cards */}
+        <div className="sm:hidden bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+          {displayed.map(l => {
+            const pct = l.quantity > 0 ? (l.quantity_available / l.quantity) * 100 : 0
+            const isLow = pct < 10 && l.quantity_available > 0
+            const isExpired = l.expiry_date ? new Date(l.expiry_date) < new Date() : false
+            return (
+              <div key={l.id} className="p-3">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {isLow && <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
+                    <span className="font-medium text-gray-900 text-sm truncate">{l.product_name}</span>
+                  </div>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${INPUT_CATEGORY_COLORS[l.category]}`}>
+                    {INPUT_CATEGORY_LABELS[l.category]}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 mb-2">
+                  <div>
+                    <span className="text-gray-400">Disponibil </span>
+                    <span className={`font-semibold ${isLow ? 'text-amber-600' : l.quantity_available === 0 ? 'text-red-500' : 'text-gray-900'}`}>
+                      {Number(l.quantity_available).toFixed(2)}
+                    </span>
+                    <span className="text-gray-400"> / {Number(l.quantity).toFixed(2)} {l.unit}</span>
+                    <div className="mt-1 h-1 rounded-full bg-gray-200 w-16">
+                      <div className={`h-1 rounded-full ${isLow ? 'bg-amber-400' : 'bg-brand-500'}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                    </div>
+                  </div>
+                  <div><span className="text-gray-400">Recepție </span>{l.received_date}</div>
+                  {l.supplier_name && <div><span className="text-gray-400">Furnizor </span>{l.supplier_name}</div>}
+                  {l.unit_price != null && <div><span className="text-gray-400">Preț </span>{Number(l.unit_price).toFixed(2)} RON/{l.unit}</div>}
+                  {l.batch_number && <div><span className="text-gray-400">Lot </span>{l.batch_number}</div>}
+                  {l.expiry_date && (
+                    <div className={isExpired ? 'text-red-500 font-medium' : 'text-gray-600'}>
+                      <span className="text-gray-400">Exp. </span>{l.expiry_date}{isExpired ? ' (exp.)' : ''}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => { setShowMvt(l); setMvtForm({ ...EMPTY_MVT(), lot_id: l.id, mvt_type: 'OUT' }) }}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs text-red-600 border border-red-100 hover:bg-red-50 rounded-lg">
+                    <ArrowUpCircle className="w-3 h-3" /> Ieșire
+                  </button>
+                  <button
+                    onClick={() => { setShowMvt(l); setMvtForm({ ...EMPTY_MVT(), lot_id: l.id, mvt_type: 'IN' }) }}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs text-green-600 border border-green-100 hover:bg-green-50 rounded-lg">
+                    <ArrowDownCircle className="w-3 h-3" /> Intrare
+                  </button>
+                  <button
+                    onClick={() => deleteLot(l)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-400 hover:text-red-600 border border-gray-100 hover:border-red-100 hover:bg-red-50 rounded-lg">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        </>
       )}
 
       {/* Add lot modal */}

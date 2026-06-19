@@ -123,7 +123,8 @@ export default function FurnizoriPage() {
           <p className="text-sm mt-1">Adauga primul furnizor de inputuri agricole.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <>
+        <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
@@ -175,6 +176,37 @@ export default function FurnizoriPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile cards */}
+        <div className="sm:hidden bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+          {displayed.map(s => (
+            <div key={s.id} className="p-3">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="min-w-0">
+                  <div className="font-medium text-gray-900 text-sm truncate">{s.name}</div>
+                  {s.address && <div className="text-xs text-gray-400 mt-0.5 truncate">{s.address}</div>}
+                </div>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${s.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {s.is_active ? 'Activ' : 'Inactiv'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 mb-2">
+                {s.cui && <div><span className="text-gray-400">CUI </span>{s.cui}</div>}
+                {s.phone && <div className="flex items-center gap-1"><Phone className="w-3 h-3 text-gray-400" />{s.phone}</div>}
+                {s.email && <div className="flex items-center gap-1 col-span-2 truncate"><Mail className="w-3 h-3 text-gray-400 flex-shrink-0" />{s.email}</div>}
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => openEdit(s)} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-200 text-brand-600 hover:bg-brand-50 rounded-lg">
+                  <Pencil className="w-3 h-3" /> Editează
+                </button>
+                <button onClick={() => toggleActive(s)} className={`flex items-center gap-1 px-3 py-1.5 text-xs border rounded-lg ${s.is_active ? 'border-amber-100 text-amber-600 hover:bg-amber-50' : 'border-green-100 text-green-600 hover:bg-green-50'}`}>
+                  <Power className="w-3 h-3" /> {s.is_active ? 'Dezactivează' : 'Activează'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        </>
       )}
 
       {/* Modal */}

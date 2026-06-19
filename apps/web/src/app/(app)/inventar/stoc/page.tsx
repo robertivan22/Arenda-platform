@@ -118,7 +118,8 @@ export default function StocPage() {
           <p className="text-sm mt-1">Inregistreaza un lot nou in sectiunea Loturi Inputuri.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <>
+        <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
@@ -181,6 +182,51 @@ export default function StocPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile cards */}
+        <div className="sm:hidden bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+          {all.map(r => {
+            const pct = r.quantity > 0 ? (r.quantity_available / r.quantity) * 100 : 100
+            const isLow = pct < 10
+            const isExpired = r.expiry_date ? new Date(r.expiry_date) < new Date() : false
+            const value = r.quantity_available * (r.unit_price ?? 0)
+            return (
+              <div key={r.id} className="p-3">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {(isLow || isExpired) && <AlertTriangle className={`w-3.5 h-3.5 flex-shrink-0 ${isExpired ? 'text-red-500' : 'text-amber-500'}`} />}
+                    <span className="font-medium text-gray-900 text-sm truncate">{r.product_name}</span>
+                  </div>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${INPUT_CATEGORY_COLORS[r.category]}`}>
+                    {INPUT_CATEGORY_LABELS[r.category]}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 mb-2">
+                  <div>
+                    <span className="text-gray-400">Disponibil </span>
+                    <span className={`font-semibold ${isLow ? 'text-amber-600' : 'text-gray-900'}`}>
+                      {Number(r.quantity_available).toFixed(2)} {r.unit}
+                    </span>
+                    <div className="mt-1 h-1 rounded-full bg-gray-200 w-16">
+                      <div className={`h-1 rounded-full ${isLow ? 'bg-amber-400' : 'bg-brand-500'}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                    </div>
+                  </div>
+                  <div><span className="text-gray-400">Furnizor </span>{r.supplier_name ?? '—'}</div>
+                  {r.unit_price != null && <div><span className="text-gray-400">Preț/unit </span>{Number(r.unit_price).toFixed(2)} RON</div>}
+                  {value > 0 && <div><span className="text-gray-400">Valoare </span><span className="font-medium">{value.toFixed(2)} RON</span></div>}
+                  {r.expiry_date && (
+                    <div className="col-span-2">
+                      <span className="text-gray-400">Expirare </span>
+                      <span className={isExpired ? 'text-red-600 font-semibold' : 'text-gray-700'}>{r.expiry_date}{isExpired ? ' !' : ''}</span>
+                    </div>
+                  )}
+                  {r.batch_number && <div className="col-span-2"><span className="text-gray-400">Lot </span>{r.batch_number}</div>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        </>
       )}
     </div>
   )
