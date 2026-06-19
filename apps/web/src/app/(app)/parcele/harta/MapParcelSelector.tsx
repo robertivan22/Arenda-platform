@@ -1608,7 +1608,7 @@ export default function MapParcelSelector({
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className={isModal ? 'flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-160px)] lg:min-h-[500px]' : 'flex flex-col gap-3'}>
+    <div className={isModal ? 'flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-160px)] lg:min-h-[500px]' : 'flex flex-col-reverse gap-3'}>
 
       {/* ── Sidebar ── */}
       {showList && (
