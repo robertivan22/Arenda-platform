@@ -7,8 +7,9 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   Plus, Search, SlidersHorizontal, Columns, Download, MapIcon,
-  X, ChevronUp, ChevronDown, MapPin, Users, Activity, Layers, Pencil,
+  X, ChevronUp, ChevronDown, MapPin, Users, Activity, Layers, Pencil, Trash2, Eye, AlertTriangle,
 } from 'lucide-react'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { toast } from 'sonner'
 
 interface Parcel {
@@ -83,6 +84,8 @@ export default function ParceleListPage() {
   const [filters, setFilters] = useState({ judet: '', status: '', cultura: '', arendator: '', apiaEligibil: '' })
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [sortCol, setSortCol] = useState('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(ALL_COLS.map(c => c.key)))
@@ -154,6 +157,8 @@ export default function ParceleListPage() {
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
   const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const selectedParcel = rows.find(r => r.id === selectedId) ?? null
+  const deleteParcel = rows.find(r => r.id === deleteId) ?? null
+  const isMobile = useIsMobile()
 
   // KPIs
   const totalHa      = rows.reduce((s, r) => s + Number(r.surface ?? 0), 0)
@@ -200,6 +205,19 @@ export default function ParceleListPage() {
     } else {
       router.push('/parcele/harta')
     }
+  }
+
+  async function handleDelete() {
+    if (!deleteId) return
+    setDeleting(true)
+    const db = createClient()
+    const { error } = await db.from('parcels').delete().eq('id', deleteId)
+    setDeleting(false)
+    if (error) { toast.error('Eroare la ștergere: ' + error.message); return }
+    toast.success('Parcela ștearsă.')
+    setRows(prev => prev.filter(r => r.id !== deleteId))
+    if (selectedId === deleteId) setSelectedId(null)
+    setDeleteId(null)
   }
 
   const visibleList = ALL_COLS.filter(c => visibleCols.has(c.key))
@@ -320,8 +338,68 @@ export default function ParceleListPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* Mobile cards */}
+      {isMobile && (
+        <div className="space-y-3">
+          {sorted.length === 0 && (
+            <div className="py-10 text-center text-sm text-gray-400">Nicio parcelă găsită</div>
+          )}
+          {sorted.map(row => {
+            const cultureClass = row.culture ? (CULTURE_COLORS[row.culture] ?? 'bg-gray-100 text-gray-600') : ''
+            return (
+              <div key={row.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">{row.bloc_fizic ?? '—'}</p>
+                    {(row.locality || row.county) && (
+                      <p className="text-xs text-gray-500 mt-0.5">{[row.locality, row.county].filter(Boolean).join(', ')}</p>
+                    )}
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${STATUS_STYLES[row.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                    {STATUS_LABELS[row.status] ?? row.status}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs mb-3">
+                  {row.surface != null && (
+                    <span className="font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded">
+                      {Number(row.surface).toFixed(2)} HA
+                    </span>
+                  )}
+                  {row.culture && (
+                    <span className={`px-2 py-0.5 rounded-full font-medium ${cultureClass}`}>🌾 {row.culture}</span>
+                  )}
+                  {row.lessor_name && row.lessor_name !== '—' && (
+                    <span className="text-brand-700 font-medium">{row.lessor_name}</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => viewOnMap(row)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium bg-brand-50 text-brand-700 rounded-lg"
+                  >
+                    <MapIcon className="w-4 h-4" /> Hartă
+                  </button>
+                  <button
+                    onClick={() => router.push(`/parcele/${row.id}`)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium bg-gray-50 text-gray-600 rounded-lg"
+                  >
+                    <Eye className="w-4 h-4" /> Editează
+                  </button>
+                  <button
+                    onClick={() => setDeleteId(row.id)}
+                    className="px-4 flex items-center justify-center py-2.5 text-sm font-medium bg-red-50 text-red-600 rounded-lg"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Table — desktop only */}
+      <div className={`bg-white rounded-lg border border-gray-200 overflow-hidden${isMobile ? ' hidden' : ''}`}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -345,6 +423,7 @@ export default function ParceleListPage() {
                     </span>
                   </th>
                 ))}
+                <th className="w-8 px-2 py-2" />
               </tr>
             </thead>
             <tbody>
@@ -437,6 +516,15 @@ export default function ParceleListPage() {
                       </span>
                     </td>
                   )}
+                  <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => setDeleteId(row.id)}
+                      className="p-1.5 text-gray-300 hover:text-red-600 rounded hover:bg-red-50 transition-colors"
+                      title="Șterge parcela"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -567,13 +655,58 @@ export default function ParceleListPage() {
                 onClick={() => viewOnMap(selectedParcel)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded transition-colors"
               >
-                <MapIcon className="w-4 h-4" /> Vezi pe Hartă
+                <MapIcon className="w-4 h-4" /> Hartă
               </button>
               <button
-                onClick={() => setSelectedId(null)}
-                className="flex-1 py-2.5 border border-gray-300 text-sm text-gray-700 font-medium rounded hover:bg-gray-50 transition-colors"
+                onClick={() => { setSelectedId(null); router.push(`/parcele/${selectedParcel.id}`) }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded transition-colors"
               >
-                Închide
+                <Pencil className="w-4 h-4" /> Editează
+              </button>
+              <button
+                onClick={() => { setDeleteId(selectedParcel.id) }}
+                className="px-4 flex items-center justify-center py-2.5 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded transition-colors border border-red-200"
+                title="Șterge parcela"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteId && deleteParcel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40" onClick={() => setDeleteId(null)} />
+          <div className="relative bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-red-100 rounded-full">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="font-bold text-gray-800">Șterge parcela</p>
+                <p className="text-sm text-gray-500">Această acțiune nu poate fi anulată.</p>
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700">
+              <span className="font-semibold">{deleteParcel.bloc_fizic ?? '—'}</span>
+              {deleteParcel.locality && <span className="text-gray-500"> · {deleteParcel.locality}</span>}
+              {deleteParcel.surface != null && <span className="text-gray-500"> · {Number(deleteParcel.surface).toFixed(2)} HA</span>}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => void handleDelete()}
+                disabled={deleting}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50"
+              >
+                {deleting ? 'Se șterge...' : 'Șterge definitiv'}
+              </button>
+              <button
+                onClick={() => setDeleteId(null)}
+                className="flex-1 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+              >
+                Anulează
               </button>
             </div>
           </div>
