@@ -811,10 +811,23 @@ export default function MapParcelSelector({
     } catch {
       // ignore localStorage parsing errors
     }
+    // Also load from Supabase user metadata (persisted across devices)
+    createClient().auth.getUser().then(({ data }) => {
+      const meta = data?.user?.user_metadata
+      if (meta?.map_legend_items && Array.isArray(meta.map_legend_items) && meta.map_legend_items.length > 0) {
+        setLegendItems(meta.map_legend_items as LegendItem[])
+        localStorage.setItem('map_legend_items', JSON.stringify(meta.map_legend_items))
+      }
+    }).catch(() => { /* ignore */ })
   }, [])
 
   useEffect(() => {
     localStorage.setItem('map_legend_items', JSON.stringify(legendItems))
+    // Persist to Supabase user metadata (debounced — only after first user change)
+    const t = setTimeout(() => {
+      createClient().auth.updateUser({ data: { map_legend_items: legendItems } }).catch(() => { /* ignore */ })
+    }, 1500)
+    return () => clearTimeout(t)
   }, [legendItems])
 
   useEffect(() => {
@@ -1544,7 +1557,9 @@ export default function MapParcelSelector({
   async function handleExport() {
     if (parcels.length === 0) { toast.error('Nu ai parcele de exportat.'); return }
     try {
-      const { zip } = await import('shp-write')
+      // shp-write is CJS and synchronous; dynamic import wraps it — access via .default
+      const shpWriteMod = await import('shp-write')
+      const shpWrite = (shpWriteMod as any).default ?? shpWriteMod
       const features = parcels
         .filter(p => p.geometry_geojson?.coordinates?.[0]?.length >= 3)
         .map(p => {
@@ -1567,12 +1582,16 @@ export default function MapParcelSelector({
           }
         })
       const fc = { type: 'FeatureCollection' as const, features }
-      const blob = await zip(fc as any, {
+      // shp-write v0.3 zip() is synchronous and returns base64 string in browser
+      const base64 = shpWrite.zip(fc, {
         folder: 'parcele_export',
         types: { polygon: 'parcele' },
-        outputType: 'blob',
       })
-      // Download
+      // Convert base64 → Uint8Array → Blob
+      const binary = atob(base64)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+      const blob = new Blob([bytes], { type: 'application/zip' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -1595,7 +1614,7 @@ export default function MapParcelSelector({
       {showList && (
         <aside className={isModal
           ? 'lg:w-72 xl:w-80 lg:flex-shrink-0 flex flex-col gap-3 order-2 lg:order-1'
-          : 'space-y-3'
+          : 'space-y-3 order-2'
         }>
 
           {/* Address search */}
@@ -1900,7 +1919,7 @@ export default function MapParcelSelector({
 
       {/* ── Map + status bar ── */}
       <div
-        className={`relative flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm order-1 lg:order-2${isModal ? ' h-[55vh] lg:h-auto lg:flex-1' : ''}`}
+        className={`relative flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm${isModal ? ' order-1 lg:order-2 h-[55vh] lg:h-auto lg:flex-1' : ' order-1'}`}
         style={!isModal ? { height } : undefined}
       >
         <div
