@@ -11,8 +11,10 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
-  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers, Pencil, Navigation, Tractor,
+  Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers, Pencil, Navigation, Tractor, Upload,
 } from 'lucide-react'
+import ImportWizardModal from './ImportWizardModal'
+import type { ParsedFeature } from './ImportWizardModal'
 import type { ParceleFitosanitar, GeoJSONPolygon, MapSearchResult, RegistryParcel } from '@/lib/parcele-types'
 import {
   wgs84ToStereo70,
@@ -717,6 +719,8 @@ export default function MapParcelSelector({
   // Centre-pin markers and registry markers (not inside drawnItems)
   const centreMarkersGroupRef = useRef<L.LayerGroup | null>(null)
   const registryMarkersGroupRef = useRef<L.LayerGroup | null>(null)
+  // Import wizard preview layer
+  const importPreviewLayerRef = useRef<L.GeoJSON | null>(null)
 
   const [parcels, setParcels] = useState<ParceleFitosanitar[]>([])
   const [loading, setLoading] = useState(true)
@@ -725,6 +729,10 @@ export default function MapParcelSelector({
   const [popupParcel, setPopupParcel] = useState<RegistryParcel | null>(null)
   const [popupRegistryParcelId, setPopupRegistryParcelId] = useState<string | null>(null)
   const [showActivityModal, setShowActivityModal] = useState(false)
+
+  // Import wizard
+  const [showImportWizard, setShowImportWizard] = useState(false)
+  const [importPreviewFC, setImportPreviewFC] = useState<{ fc: GeoJSON.FeatureCollection; features: ParsedFeature[] } | null>(null)
 
   // Drawing — ring stored in Stereo 70
   const [drawnRingStereo, setDrawnRingStereo] = useState<number[][] | null>(null)
@@ -1100,8 +1108,50 @@ export default function MapParcelSelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registryParcels, parcels])
 
+  // ── Import preview layer ────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    // Remove existing preview layer
+    if (importPreviewLayerRef.current) {
+      map.removeLayer(importPreviewLayerRef.current)
+      importPreviewLayerRef.current = null
+    }
+    if (!importPreviewFC) return
+
+    const { fc, features } = importPreviewFC
+    const layer = L.geoJSON(fc, {
+      style: () => ({
+        color: '#f97316',
+        fillColor: '#f97316',
+        fillOpacity: 0.15,
+        weight: 2.5,
+        dashArray: '6 4',
+      }),
+      onEachFeature: (feature, lyr) => {
+        const attrs = (feature.properties ?? {}) as Record<string, unknown>
+        const idx = fc.features.indexOf(feature)
+        const parsed = features[idx]
+        const areaHa = parsed ? parsed.areaHa.toFixed(2) + ' ha' : '—'
+        const name = String(attrs['BLOC_FIZIC'] ?? attrs['NR_PARCEL'] ?? attrs['COD_UNIC'] ?? `Parcelă ${idx + 1}`)
+        lyr.bindTooltip(
+          `<strong>${name}</strong><br/>Suprafață: ${areaHa}` +
+          (parsed?.isValid === false ? `<br/><span style="color:#ef4444">⚠ ${parsed.validationMsg}</span>` : ''),
+          { sticky: true },
+        )
+      },
+    })
+    layer.addTo(map)
+    importPreviewLayerRef.current = layer
+    try {
+      const bounds = layer.getBounds()
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 })
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importPreviewFC])
+
   function focusParcel(parcel: ParceleFitosanitar) {
-    setSelectedId(parcel.id)
     onParcelSelected?.(parcel)
     const layer = parcelLayersRef.current.get(parcel.id)
     if (layer && mapRef.current) {
@@ -1568,11 +1618,38 @@ export default function MapParcelSelector({
                 <span className="text-xs font-normal text-gray-400 ml-1">({parcels.length})</span>
               )}
             </h3>
-            <button onClick={() => void loadParcels()} title="Reincarcare"
-              className="p-1 text-gray-400 hover:text-gray-600 rounded">
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {/* Import button */}
+              <button
+                onClick={() => setShowImportWizard(true)}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded hover:bg-orange-100 transition-colors font-medium"
+                title="Importă parcele din Shapefile / GeoJSON"
+              >
+                <Upload className="w-3 h-3" /> Import
+              </button>
+              <button onClick={() => void loadParcels()} title="Reincarcare"
+                className="p-1 text-gray-400 hover:text-gray-600 rounded">
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
+
+          {/* Import preview banner */}
+          {importPreviewFC && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-700">
+              <div className="flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5" />
+                <span><strong>{importPreviewFC.features.length}</strong> parcele previzualizate (portocaliu)</span>
+              </div>
+              <button
+                onClick={() => setImportPreviewFC(null)}
+                className="p-0.5 hover:text-orange-900 rounded"
+                title="Șterge previzualizare"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Parcel list */}
           <div className={isModal ? 'max-h-44 lg:flex-1 overflow-y-auto pr-1 space-y-2' : 'space-y-2 max-h-64 overflow-y-auto'}>
@@ -1905,6 +1982,16 @@ export default function MapParcelSelector({
           onClose={() => setShowActivityModal(false)}
         />
       )}
+
+      {/* ── Import wizard modal ── */}
+      <ImportWizardModal
+        open={showImportWizard}
+        onClose={() => setShowImportWizard(false)}
+        onPreview={(fc, features) => {
+          setImportPreviewFC({ fc, features })
+          setShowImportWizard(false)
+        }}
+      />
     </div>
   )
 }
