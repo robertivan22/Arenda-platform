@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import {
   Search, MapPin, Trash2, Eye, Check, X, RefreshCw, Plus, Info, Layers, Pencil, Navigation, Tractor, Upload,
 } from 'lucide-react'
+import { area as turfArea } from '@turf/area'
 import ImportWizardModal from './ImportWizardModal'
 import type { ParsedFeature } from './ImportWizardModal'
 import type { ParceleFitosanitar, GeoJSONPolygon, MapSearchResult, RegistryParcel } from '@/lib/parcele-types'
@@ -719,8 +720,8 @@ export default function MapParcelSelector({
   // Centre-pin markers and registry markers (not inside drawnItems)
   const centreMarkersGroupRef = useRef<L.LayerGroup | null>(null)
   const registryMarkersGroupRef = useRef<L.LayerGroup | null>(null)
-  // Import wizard preview layer
-  const importPreviewLayerRef = useRef<L.GeoJSON | null>(null)
+  // Import wizard preview layer — stored as FeatureGroup so we can enable vertex editing
+  const importPreviewLayerRef = useRef<L.FeatureGroup | null>(null)
 
   const [parcels, setParcels] = useState<ParceleFitosanitar[]>([])
   const [loading, setLoading] = useState(true)
@@ -733,6 +734,7 @@ export default function MapParcelSelector({
   // Import wizard
   const [showImportWizard, setShowImportWizard] = useState(false)
   const [importPreviewFC, setImportPreviewFC] = useState<{ fc: GeoJSON.FeatureCollection; features: ParsedFeature[] } | null>(null)
+  const [importEditMode, setImportEditMode] = useState(false)
 
   // Drawing — ring stored in Stereo 70
   const [drawnRingStereo, setDrawnRingStereo] = useState<number[][] | null>(null)
@@ -1119,37 +1121,91 @@ export default function MapParcelSelector({
       importPreviewLayerRef.current = null
     }
     if (!importPreviewFC) return
+    setImportEditMode(false)
 
     const { fc, features } = importPreviewFC
-    const layer = L.geoJSON(fc, {
-      style: () => ({
-        color: '#f97316',
-        fillColor: '#f97316',
-        fillOpacity: 0.15,
-        weight: 2.5,
-        dashArray: '6 4',
-      }),
-      onEachFeature: (feature, lyr) => {
-        const attrs = (feature.properties ?? {}) as Record<string, unknown>
-        const idx = fc.features.indexOf(feature)
-        const parsed = features[idx]
-        const areaHa = parsed ? parsed.areaHa.toFixed(2) + ' ha' : '—'
-        const name = String(attrs['BLOC_FIZIC'] ?? attrs['NR_PARCEL'] ?? attrs['COD_UNIC'] ?? `Parcelă ${idx + 1}`)
-        lyr.bindTooltip(
-          `<strong>${name}</strong><br/>Suprafață: ${areaHa}` +
-          (parsed?.isValid === false ? `<br/><span style="color:#ef4444">⚠ ${parsed.validationMsg}</span>` : ''),
-          { sticky: true },
+    const fg = new L.FeatureGroup()
+
+    fc.features.forEach((feature, idx) => {
+      const geom = feature.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon
+      if (!geom) return
+      const attrs = (feature.properties ?? {}) as Record<string, unknown>
+      const parsed = features[idx]
+      const name = String(attrs['BLOC_FIZIC'] ?? attrs['NR_PARCEL'] ?? attrs['COD_UNIC'] ?? `Parcelă ${idx + 1}`)
+      const areaHa = parsed ? parsed.areaHa.toFixed(2) + ' ha' : '—'
+      const tooltipHtml = `<strong>${name}</strong><br/>Suprafață: ${areaHa}` +
+        (parsed?.isValid === false ? `<br/><span style="color:#ef4444">⚠ ${parsed.validationMsg}</span>` : '')
+      const style = { color: '#f97316', fillColor: '#f97316', fillOpacity: 0.15, weight: 2.5, dashArray: '6 4' }
+
+      let poly: L.Polygon | null = null
+      if (geom.type === 'Polygon') {
+        const latlngs = (geom.coordinates[0] as [number, number][]).map(([lng, lat]) => L.latLng(lat, lng))
+        poly = L.polygon(latlngs, style)
+      } else if (geom.type === 'MultiPolygon') {
+        const rings = geom.coordinates.map(ring =>
+          (ring[0] as [number, number][]).map(([lng, lat]) => L.latLng(lat, lng))
         )
-      },
+        poly = L.polygon(rings as L.LatLngTuple[][], style)
+      }
+      if (poly) {
+        poly.bindTooltip(tooltipHtml, { sticky: true })
+        fg.addLayer(poly)
+      }
     })
-    layer.addTo(map)
-    importPreviewLayerRef.current = layer
+
+    fg.addTo(map)
+    importPreviewLayerRef.current = fg
     try {
-      const bounds = layer.getBounds()
+      const bounds = fg.getBounds()
       if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 })
     } catch { /* ignore */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [importPreviewFC])
+
+  // ── Vertex editing for import preview ──────────────────────────────────
+  function toggleImportEdit() {
+    const fg = importPreviewLayerRef.current
+    if (!fg || !mapRef.current) return
+
+    if (!importEditMode) {
+      // Enable leaflet-draw editing on each polygon
+      fg.eachLayer(layer => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const poly = layer as any
+        if (poly.editing) poly.editing.enable()
+      })
+      setImportEditMode(true)
+      toast('Mod editare activat — trage vârfurile pentru a modifica geometria.', { duration: 3000 })
+    } else {
+      // Disable editing and collect updated geometries
+      const updatedGeoms: GeoJSON.Feature[] = []
+      fg.eachLayer(layer => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const poly = layer as any
+        if (poly.editing) poly.editing.disable()
+        updatedGeoms.push((layer as L.Polygon).toGeoJSON() as GeoJSON.Feature)
+      })
+
+      // Update importPreviewFC with edited geometries + recalculate areas
+      if (importPreviewFC) {
+        const updatedFC: GeoJSON.FeatureCollection = {
+          type: 'FeatureCollection',
+          features: importPreviewFC.fc.features.map((f, i) => ({
+            ...f,
+            geometry: updatedGeoms[i]?.geometry ?? f.geometry,
+          })),
+        }
+        const updatedFeatures: ParsedFeature[] = importPreviewFC.features.map((pf, i) => ({
+          ...pf,
+          geometry: (updatedGeoms[i]?.geometry ?? pf.geometry) as GeoJSON.Polygon | GeoJSON.MultiPolygon,
+          areaHa: updatedGeoms[i] ? turfArea(updatedGeoms[i]) / 10000 : pf.areaHa,
+        }))
+        setImportPreviewFC({ fc: updatedFC, features: updatedFeatures })
+        toast.success('Geometrii actualizate. Continuă la mapare câmpuri pentru salvare.')
+      }
+      setImportEditMode(false)
+    }
+  }
 
   function focusParcel(parcel: ParceleFitosanitar) {
     onParcelSelected?.(parcel)
@@ -1636,18 +1692,40 @@ export default function MapParcelSelector({
 
           {/* Import preview banner */}
           {importPreviewFC && (
-            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-700">
-              <div className="flex items-center gap-1.5">
-                <Eye className="w-3.5 h-3.5" />
-                <span><strong>{importPreviewFC.features.length}</strong> parcele previzualizate (portocaliu)</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-700">
+                <div className="flex items-center gap-1.5">
+                  <Eye className="w-3.5 h-3.5" />
+                  <span><strong>{importPreviewFC.features.length}</strong> parcele previzualizate</span>
+                </div>
+                <button
+                  onClick={() => { setImportPreviewFC(null); setImportEditMode(false) }}
+                  className="p-0.5 hover:text-orange-900 rounded" title="Șterge previzualizare"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <button
-                onClick={() => setImportPreviewFC(null)}
-                className="p-0.5 hover:text-orange-900 rounded"
-                title="Șterge previzualizare"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={toggleImportEdit}
+                  className={`flex items-center gap-1 px-2 py-1.5 text-xs rounded border font-medium transition-colors flex-1 justify-center ${
+                    importEditMode
+                      ? 'bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200'
+                      : 'bg-white border-gray-300 text-gray-600 hover:border-amber-300 hover:bg-amber-50'
+                  }`}
+                  title={importEditMode ? 'Finalizează editarea geometriei' : 'Editează vârfurile poligoanelor importate'}
+                >
+                  <Pencil className="w-3 h-3" />
+                  {importEditMode ? 'Finalizează' : 'Editează geometrie'}
+                </button>
+                <button
+                  onClick={() => setShowImportWizard(true)}
+                  disabled={importEditMode}
+                  className="flex items-center gap-1 px-2 py-1.5 text-xs rounded border bg-green-600 border-green-600 text-white hover:bg-green-700 font-medium transition-colors flex-1 justify-center disabled:opacity-40"
+                >
+                  Continuă import →
+                </button>
+              </div>
             </div>
           )}
 
@@ -1991,6 +2069,8 @@ export default function MapParcelSelector({
           setImportPreviewFC({ fc, features })
           setShowImportWizard(false)
         }}
+        currentFC={importPreviewFC?.fc}
+        onSaveComplete={() => { void loadParcels(); void loadRegistryParcels() }}
       />
     </div>
   )

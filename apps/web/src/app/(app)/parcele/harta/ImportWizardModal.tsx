@@ -4,12 +4,14 @@
 import { useState, useCallback, useRef } from 'react'
 import {
   Upload, X, AlertTriangle, CheckCircle2, FileArchive, FileJson,
-  ChevronRight, Loader2, Eye, RotateCcw, Info,
+  ChevronRight, Loader2, Eye, RotateCcw, Info, Save, CheckCheck, Database,
 } from 'lucide-react'
 import { area as turfArea } from '@turf/area'
-import { bbox as turfBbox } from '@turf/bbox'
 import { kinks as turfKinks } from '@turf/kinks'
-import type { FeatureCollection, Feature, Polygon, MultiPolygon, GeoJsonProperties } from 'geojson'
+import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
+import { ringWgs84ToStereo70, stereo70ToLeaflet, centroidStereo70 } from '@/lib/stereo70'
+import type { FeatureCollection, Feature, Polygon, MultiPolygon } from 'geojson'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,11 +26,49 @@ export interface ParsedFeature {
   validationMsg?: string
 }
 
+export interface FieldMapping {
+  bloc_fizic: string    // DBF column → bloc_fizic
+  suprafata_ha: string  // DBF column → suprafata_ha ('' = use calculated)
+  cultura: string
+  judet: string
+  localitate: string
+  cod_parcela: string
+}
+
+interface SaveResult {
+  idx: number
+  name: string
+  status: 'pending' | 'saving' | 'ok' | 'error'
+  error?: string
+}
+
+const MAPPING_KEY = 'arenda_import_field_mapping_v1'
+const DEFAULT_MAPPING: FieldMapping = {
+  bloc_fizic: 'BLOC_FIZIC', suprafata_ha: 'SUPRAFATA',
+  cultura: 'CULTURA', judet: 'JUDET', localitate: 'LOCALITATE', cod_parcela: 'NR_PARCEL',
+}
+
+function loadMapping(): FieldMapping {
+  try {
+    const raw = localStorage.getItem(MAPPING_KEY)
+    if (raw) return { ...DEFAULT_MAPPING, ...JSON.parse(raw) as FieldMapping }
+  } catch { /* ignore */ }
+  return DEFAULT_MAPPING
+}
+
+function saveMapping(m: FieldMapping) {
+  try { localStorage.setItem(MAPPING_KEY, JSON.stringify(m)) } catch { /* ignore */ }
+}
+
 interface ImportWizardModalProps {
   open: boolean
   onClose: () => void
-  /** Called with the full GeoJSON FeatureCollection when user clicks Preview */
+  /** Called with GeoJSON when user clicks Preview (closes wizard, shows on map) */
   onPreview: (fc: FeatureCollection, features: ParsedFeature[]) => void
+  /** Potentially vertex-edited FC from the map — used instead of rawFC for saving */
+  currentFC?: FeatureCollection
+  /** Called after all features saved successfully */
+  onSaveComplete?: () => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -59,8 +99,8 @@ function fmtPct(n: number) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ImportWizardModal({ open, onClose, onPreview }: ImportWizardModalProps) {
-  const [step, setStep] = useState<'upload' | 'preview'>('upload')
+export default function ImportWizardModal({ open, onClose, onPreview, currentFC, onSaveComplete }: ImportWizardModalProps) {
+  const [step, setStep] = useState<'upload' | 'preview' | 'mapping' | 'saving' | 'done'>('upload')
   const [dragging, setDragging] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
@@ -68,8 +108,9 @@ export default function ImportWizardModal({ open, onClose, onPreview }: ImportWi
   const [rawFC, setRawFC] = useState<FeatureCollection | null>(null)
   const [fileName, setFileName] = useState('')
   const [columnNames, setColumnNames] = useState<string[]>([])
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [fieldMapping, setFieldMapping] = useState<FieldMapping>(loadMapping)
+  const [saveResults, setSaveResults] = useState<SaveResult[]>([])
+  const [isSaving, setIsSaving] = useState(false)
 
   // ── Parse uploaded file ───────────────────────────────────────────────────
 
@@ -221,31 +262,164 @@ export default function ImportWizardModal({ open, onClose, onPreview }: ImportWi
     setParseError(null)
     setFileName('')
     setColumnNames([])
+    setSaveResults([])
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // ── Save to database ──────────────────────────────────────────────────────
+
+  async function handleSave() {
+    const fcToSave = currentFC ?? rawFC
+    if (!fcToSave) return
+    setIsSaving(true)
+
+    const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) { toast.error('Neautentificat — reîncarcă pagina.'); setIsSaving(false); return }
+
+    const initial: SaveResult[] = fcToSave.features.map((_, i) => ({
+      idx: i, name: `Parcelă ${i + 1}`, status: 'pending',
+    }))
+    setSaveResults(initial)
+    setStep('saving')
+
+    const results = [...initial]
+
+    for (let i = 0; i < fcToSave.features.length; i++) {
+      results[i] = { ...results[i], status: 'saving' }
+      setSaveResults([...results])
+
+      try {
+        const f = fcToSave.features[i]
+        const attrs = (f.properties ?? {}) as Record<string, unknown>
+
+        const get = (col: string) => col && attrs[col] != null ? String(attrs[col]) : ''
+        const bloc_fizic = get(fieldMapping.bloc_fizic) || `Parcelă import ${i + 1}`
+        const cultura    = get(fieldMapping.cultura) || null
+        const judet      = get(fieldMapping.judet) || null
+        const localitate = get(fieldMapping.localitate) || null
+        const suprafataDeclared = fieldMapping.suprafata_ha && attrs[fieldMapping.suprafata_ha]
+          ? Number(attrs[fieldMapping.suprafata_ha]) : null
+        const calcArea = turfArea(f as Feature<Polygon | MultiPolygon>) / 10000
+        const suprafata = suprafataDeclared && suprafataDeclared > 0 ? suprafataDeclared : calcArea
+
+        results[i].name = bloc_fizic
+
+        // Convert WGS84 polygon → Stereo 70 for storage
+        const geom = f.geometry as Polygon | MultiPolygon
+        let ringStereo: number[][]
+        if (geom.type === 'Polygon') {
+          ringStereo = ringWgs84ToStereo70(geom.coordinates[0] as [number, number][])
+        } else {
+          // MultiPolygon — use largest exterior ring
+          let biggest = geom.coordinates[0][0] as [number, number][]
+          for (const poly of geom.coordinates) {
+            if (poly[0].length > biggest.length) biggest = poly[0] as [number, number][]
+          }
+          ringStereo = ringWgs84ToStereo70(biggest)
+        }
+
+        const geometryStereo70 = { type: 'Polygon' as const, coordinates: [ringStereo] }
+        const [cx, cy] = centroidStereo70(ringStereo)
+        const [centruLat, centruLng] = stereo70ToLeaflet(cx, cy)
+
+        // 1. Insert parcele_fitosanitar (map polygon)
+        const { data: mapParcel, error: mapErr } = await db
+          .from('parcele_fitosanitar')
+          .insert({
+            user_id: user.id,
+            nume_parcela: bloc_fizic,
+            geometry_geojson: geometryStereo70,
+            centru_lat: centruLat,
+            centru_lng: centruLng,
+            suprafata_ha: suprafata,
+            judet: judet || null,
+            localitate: localitate || null,
+            cultura_label: cultura || null,
+          })
+          .select('id').single()
+
+        if (mapErr) throw new Error(`Hartă: ${mapErr.message}`)
+
+        // 2. Insert parcels (registry entry so parcel appears in dropdowns)
+        const { data: regParcel, error: regErr } = await db
+          .from('parcels')
+          .insert({
+            user_id: user.id,
+            bloc_fizic,
+            surface: suprafata,
+            culture: cultura || null,
+            county: judet || null,
+            locality: localitate || null,
+            lat: centruLat,
+            lng: centruLng,
+            status: 'ACTIVE',
+          })
+          .select('id').single()
+
+        // 3. Link map polygon → registry parcel
+        if (!regErr && regParcel && mapParcel) {
+          await db.from('parcele_fitosanitar')
+            .update({ parcela_id: regParcel.id })
+            .eq('id', mapParcel.id)
+        }
+
+        results[i] = { ...results[i], status: 'ok' }
+      } catch (err) {
+        results[i] = {
+          ...results[i], status: 'error',
+          error: err instanceof Error ? err.message : 'Eroare',
+        }
+      }
+      setSaveResults([...results])
+    }
+
+    setIsSaving(false)
+    const ok = results.filter(r => r.status === 'ok').length
+    const err = results.filter(r => r.status === 'error').length
+    if (ok > 0) { toast.success(`${ok} parcel${ok !== 1 ? 'e' : 'ă'} importate!`); onSaveComplete?.() }
+    if (err > 0) toast.error(`${err} parcel${err !== 1 ? 'e' : 'ă'} cu erori.`)
+    // Stay on 'saving' step so user sees the result log
   }
 
   // ── Derived stats ─────────────────────────────────────────────────────────
 
+  const fcToUse = currentFC ?? rawFC
   const totalHa = features.reduce((s, f) => s + f.areaHa, 0)
   const validCount = features.filter(f => f.isValid).length
   const warnCount = features.filter(f => !f.isValid).length
 
-  // Pick up to 3 "interesting" attribute columns to show in the preview table
+  // Pick up to 3 "interesting" attribute columns for the preview table
   const PRIORITY_COLS = ['BLOC_FIZIC', 'NR_PARCEL', 'CULTURA', 'COD_UNIC', 'TARLA', 'JUDET', 'LOCALITATE']
   const displayCols = [
     ...PRIORITY_COLS.filter(c => columnNames.includes(c)),
     ...columnNames.filter(c => !PRIORITY_COLS.includes(c)),
   ].slice(0, 3)
 
+  // DB fields available for mapping
+  const DB_FIELDS: { key: keyof FieldMapping; label: string; required?: boolean }[] = [
+    { key: 'bloc_fizic',   label: 'Bloc fizic / Nume parcelă', required: true },
+    { key: 'suprafata_ha', label: 'Suprafață (ha)' },
+    { key: 'cultura',      label: 'Cultură' },
+    { key: 'judet',        label: 'Județ' },
+    { key: 'localitate',   label: 'Localitate' },
+    { key: 'cod_parcela',  label: 'Cod parcelă / NR_PARCEL' },
+  ]
+
   if (!open) return null
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const isUpload  = step === 'upload'
+  const isPreview = step === 'preview'
+  const isMapping = step === 'mapping'
+  const isSavingStep = step === 'saving'
+
   const STEPS = [
-    { n: 1, label: 'Încărcare', done: step === 'preview' },
-    { n: 2, label: 'Preview', done: false, active: step === 'preview' },
-    { n: 3, label: 'Mapare câmpuri', disabled: true },
-    { n: 4, label: 'Salvare', disabled: true },
+    { n: 1, label: 'Încărcare', done: !isUpload },
+    { n: 2, label: 'Preview',   done: isMapping || isSavingStep, active: isPreview },
+    { n: 3, label: 'Mapare câmpuri', done: isSavingStep, active: isMapping },
+    { n: 4, label: 'Salvare',   done: false, active: isSavingStep },
   ]
 
   return (
@@ -268,17 +442,15 @@ export default function ImportWizardModal({ open, onClose, onPreview }: ImportWi
           {STEPS.map((s, i) => (
             <div key={s.n} className="flex items-center gap-1 flex-shrink-0">
               <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                s.disabled
-                  ? 'text-gray-300 bg-gray-100'
-                  : s.done
-                    ? 'text-green-700 bg-green-100'
-                    : s.active || (!s.done && !s.disabled && step === 'upload' && s.n === 1)
-                      ? 'text-brand-700 bg-brand-100'
-                      : 'text-gray-500 bg-gray-100'
+                s.done
+                  ? 'text-green-700 bg-green-100'
+                  : s.active || (isUpload && s.n === 1)
+                    ? 'text-brand-700 bg-brand-100'
+                    : 'text-gray-400 bg-gray-100'
               }`}>
                 <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                  s.disabled ? 'bg-gray-200 text-gray-400' : s.done ? 'bg-green-500 text-white' : 'bg-current text-white'
-                }`} style={s.done || s.disabled ? {} : { background: s.active || s.n === 1 ? '#16a34a' : '#9ca3af' }}>
+                  s.done ? 'bg-green-500 text-white' : 'text-white'
+                }`} style={s.done ? {} : { background: (s.active || (isUpload && s.n === 1)) ? '#16a34a' : '#d1d5db' }}>
                   {s.done ? '✓' : s.n}
                 </span>
                 {s.label}
@@ -480,24 +652,159 @@ export default function ImportWizardModal({ open, onClose, onPreview }: ImportWi
               <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
                 <Info className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>
-                  <strong>Pasul următor (în curând):</strong> mapare câmpuri DBF → câmpuri bază de date și salvare.
-                  Deocamdată poți previzualiza poligoanele pe hartă.
+                  Poți previzualiza poligoanele pe hartă (editare vertex cu butonul ✏️ din bara laterală), 
+                  sau mergi direct la <strong>Mapare câmpuri</strong> pentru salvare.
                 </span>
               </div>
+            </div>
+          )}
+
+          {/* ── STEP 3: Field mapping ── */}
+          {isMapping && (
+            <div className="p-5 space-y-5">
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <span>
+                  Asociază câmpurile din fișierul importat (<strong>coloane DBF</strong>) cu câmpurile din baza de date.
+                  Maparea se salvează automat pentru importurile viitoare.
+                  {currentFC && <span className="ml-1 font-semibold text-green-700">✓ Se vor salva geometriile editate de pe hartă.</span>}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {DB_FIELDS.map(dbf => (
+                  <div key={dbf.key} className="grid grid-cols-5 gap-3 items-center">
+                    <div className="col-span-2 text-xs font-medium text-gray-700">
+                      {dbf.label}
+                      {dbf.required && <span className="text-red-500 ml-0.5">*</span>}
+                    </div>
+                    <div className="col-span-3">
+                      <select
+                        value={fieldMapping[dbf.key]}
+                        onChange={e => {
+                          const m = { ...fieldMapping, [dbf.key]: e.target.value }
+                          setFieldMapping(m)
+                          saveMapping(m)
+                        }}
+                        className="w-full text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white"
+                      >
+                        <option value="">— Ignoră câmpul —</option>
+                        {columnNames.map(col => (
+                          <option key={col} value={col}>{col}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Preview mapped values for first 3 parcels */}
+              {features.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-2">Preview mapare (primele 3 parcele):</p>
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-400 text-[10px] uppercase tracking-wide">
+                          <th className="px-3 py-2 text-left">Bloc fizic</th>
+                          <th className="px-3 py-2 text-right">Suprafață</th>
+                          <th className="px-3 py-2 text-left">Cultură</th>
+                          <th className="px-3 py-2 text-left">Județ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {features.slice(0, 3).map(f => {
+                          const get = (col: string) => col && f.attributes[col] != null ? String(f.attributes[col]) : '—'
+                          return (
+                            <tr key={f.idx}>
+                              <td className="px-3 py-2 text-gray-800 font-medium">{get(fieldMapping.bloc_fizic)}</td>
+                              <td className="px-3 py-2 text-right text-gray-600 font-mono">
+                                {fieldMapping.suprafata_ha && f.attributes[fieldMapping.suprafata_ha]
+                                  ? Number(f.attributes[fieldMapping.suprafata_ha]).toFixed(2) + ' ha'
+                                  : f.areaHa.toFixed(2) + ' ha (calc.)'}
+                              </td>
+                              <td className="px-3 py-2 text-gray-600">{get(fieldMapping.cultura)}</td>
+                              <td className="px-3 py-2 text-gray-500">{get(fieldMapping.judet)}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── STEP 4: Saving ── */}
+          {isSavingStep && (
+            <div className="p-5 space-y-4">
+              <div className="flex items-center gap-3">
+                {isSaving
+                  ? <Loader2 className="w-5 h-5 text-green-600 animate-spin flex-shrink-0" />
+                  : <Database className="w-5 h-5 text-green-600 flex-shrink-0" />
+                }
+                <div>
+                  <div className="text-sm font-semibold text-gray-800">
+                    {isSaving ? 'Import în curs…' : 'Import finalizat'}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {saveResults.filter(r => r.status === 'ok').length} / {saveResults.length} parcele salvate
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-green-500 rounded-full transition-all duration-300"
+                  style={{ width: `${saveResults.length > 0 ? (saveResults.filter(r => r.status === 'ok' || r.status === 'error').length / saveResults.length) * 100 : 0}%` }}
+                />
+              </div>
+
+              {/* Per-feature log */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                {saveResults.map(r => (
+                  <div key={r.idx} className={`flex items-center justify-between px-3 py-2 text-xs border-b border-gray-100 last:border-0 ${
+                    r.status === 'error' ? 'bg-red-50' : r.status === 'ok' ? '' : 'bg-gray-50'
+                  }`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {r.status === 'pending' && <span className="w-3.5 h-3.5 rounded-full bg-gray-200 flex-shrink-0" />}
+                      {r.status === 'saving' && <Loader2 className="w-3.5 h-3.5 text-green-500 animate-spin flex-shrink-0" />}
+                      {r.status === 'ok' && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />}
+                      {r.status === 'error' && <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
+                      <span className="truncate text-gray-700 font-medium">{r.name}</span>
+                    </div>
+                    {r.error && <span className="text-red-600 ml-2 flex-shrink-0 max-w-[180px] truncate" title={r.error}>{r.error}</span>}
+                    {r.status === 'ok' && <span className="text-green-600 ml-2 flex-shrink-0">Salvat ✓</span>}
+                  </div>
+                ))}
+              </div>
+
+              {!isSaving && saveResults.some(r => r.status === 'ok') && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
+                  <CheckCheck className="w-4 h-4 flex-shrink-0" />
+                  <span>
+                    <strong>{saveResults.filter(r => r.status === 'ok').length} parcele</strong> au fost adăugate în harta parcele și registru.
+                    Reîncarcă harta pentru a le vedea.
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-100 bg-gray-50 flex-shrink-0 gap-3">
-          {step === 'upload' ? (
+          {isUpload && (
             <>
               <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
                 Anulează
               </button>
               <div className="text-xs text-gray-400">Selectează un fișier pentru a continua</div>
             </>
-          ) : (
+          )}
+          {isPreview && (
             <>
               <button onClick={reset} className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
                 <RotateCcw className="w-3.5 h-3.5" /> Alt fișier
@@ -505,19 +812,54 @@ export default function ImportWizardModal({ open, onClose, onPreview }: ImportWi
               <div className="flex items-center gap-2">
                 <button
                   onClick={handlePreviewOnMap}
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors font-medium"
                 >
-                  <Eye className="w-4 h-4" />
+                  <Eye className="w-3.5 h-3.5" />
                   Previzualizare pe hartă
                 </button>
                 <button
-                  disabled
-                  title="Disponibil în curând — pasul 3: mapare câmpuri"
-                  className="px-4 py-2 text-sm bg-gray-200 text-gray-400 rounded-lg cursor-not-allowed font-medium"
+                  onClick={() => setStep('mapping')}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm"
                 >
-                  Continuă →
+                  Continuă la mapare <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
+            </>
+          )}
+          {isMapping && (
+            <>
+              <button onClick={() => setStep('preview')} className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                ← Înapoi
+              </button>
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-gray-400">{(fcToUse?.features.length ?? 0)} parcele de salvat</div>
+                <button
+                  onClick={() => void handleSave()}
+                  disabled={!fieldMapping.bloc_fizic}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium shadow-sm"
+                >
+                  <Save className="w-4 h-4" />
+                  Salvează în baza de date
+                </button>
+              </div>
+            </>
+          )}
+          {isSavingStep && (
+            <>
+              <button
+                onClick={reset}
+                disabled={isSaving}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Import nou
+              </button>
+              <button
+                onClick={onClose}
+                disabled={isSaving}
+                className="px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40 transition-colors"
+              >
+                {isSaving ? 'Se salvează…' : 'Închide'}
+              </button>
             </>
           )}
         </div>
