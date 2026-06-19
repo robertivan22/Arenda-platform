@@ -780,7 +780,21 @@ export default function MapParcelSelector({
   const [editLegendId, setEditLegendId] = useState('')
   const [editNrCvi, setEditNrCvi] = useState('')
   const [editAdresa, setEditAdresa] = useState('')
+  const [editBlocFizic, setEditBlocFizic] = useState('')
+  const [editTarlaNr, setEditTarlaNr] = useState('')
+  const [editParcelNr, setEditParcelNr] = useState('')
+  const [editNrCadastral, setEditNrCadastral] = useState('')
+  const [editLandCategory, setEditLandCategory] = useState('Arabil')
+  const [editApiaEligibil, setEditApiaEligibil] = useState('')
+  const [editSurface, setEditSurface] = useState('')
+  const [editLat, setEditLat] = useState('')
+  const [editLng, setEditLng] = useState('')
+  const [editLessorId, setEditLessorId] = useState('')
+  const [editContractId, setEditContractId] = useState('')
+  const [editLessors, setEditLessors] = useState<{ id: string; display_name: string }[]>([])
+  const [editContracts, setEditContracts] = useState<{ id: string; contract_number: string; lessor_id: string }[]>([])
   const [editSaving, setEditSaving] = useState(false)
+  const [showMobilePanel, setShowMobilePanel] = useState(false)
 
   // Geometry editing of existing parcel
   const [geoEditId, setGeoEditId] = useState<string | null>(null)
@@ -1429,7 +1443,7 @@ export default function MapParcelSelector({
   }
 
   // ── Edit ────────────────────────────────────────────────────────────────
-  function openEditModal(parcel: ParceleFitosanitar) {
+  async function openEditModal(parcel: ParceleFitosanitar) {
     setEditId(parcel.id)
     setEditName(parcel.nume_parcela)
     setEditLocalitate(parcel.localitate ?? '')
@@ -1437,6 +1451,17 @@ export default function MapParcelSelector({
     setEditNote(parcel.note ?? '')
     setEditNrCvi(parcel.nr_cvi ?? '')
     setEditAdresa(parcel.adresa ?? '')
+    setEditBlocFizic('')
+    setEditTarlaNr('')
+    setEditParcelNr('')
+    setEditNrCadastral('')
+    setEditLandCategory('Arabil')
+    setEditApiaEligibil('')
+    setEditSurface('')
+    setEditLat(parcel.centru_lat != null ? String(parcel.centru_lat) : '')
+    setEditLng(parcel.centru_lng != null ? String(parcel.centru_lng) : '')
+    setEditLessorId('')
+    setEditContractId('')
     // Resolve legend from DB cultura_label or from localStorage map
     const dbCultura = (parcel as any).cultura_label
     if (dbCultura) {
@@ -1444,6 +1469,34 @@ export default function MapParcelSelector({
       setEditLegendId(found?.id ?? legendItems[0]?.id ?? '')
     } else {
       setEditLegendId(parcelLegendMap[parcel.id] ?? legendItems[0]?.id ?? '')
+    }
+    // Load lessors + contracts for dropdowns
+    const db = createClient()
+    const [{ data: ls }, { data: cs }] = await Promise.all([
+      db.from('lessors').select('id, first_name, last_name, company_name, type').order('last_name'),
+      db.from('contracts').select('id, lessor_id, contract_number').order('contract_number'),
+    ])
+    if (ls) setEditLessors((ls as any[]).map(l => ({
+      id: l.id,
+      display_name: l.type === 'LEGAL' ? l.company_name : `${l.last_name} ${l.first_name}`.trim(),
+    })))
+    if (cs) setEditContracts(cs as any[])
+    // Load linked registry parcel if exists
+    if (parcel.parcela_id) {
+      const { data: rp } = await db.from('parcels').select('*').eq('id', parcel.parcela_id).single()
+      if (rp) {
+        setEditBlocFizic(rp.bloc_fizic ?? '')
+        setEditTarlaNr(rp.tarla_nr ?? '')
+        setEditParcelNr(rp.parcel_nr ?? '')
+        setEditNrCadastral(rp.nr_cadastral ?? '')
+        setEditLandCategory(rp.land_use_category ?? 'Arabil')
+        setEditApiaEligibil(rp.apia_eligible === true ? 'true' : rp.apia_eligible === false ? 'false' : '')
+        setEditSurface(rp.surface != null ? String(rp.surface) : '')
+        setEditLat(rp.lat != null ? String(rp.lat) : (parcel.centru_lat != null ? String(parcel.centru_lat) : ''))
+        setEditLng(rp.lng != null ? String(rp.lng) : (parcel.centru_lng != null ? String(parcel.centru_lng) : ''))
+        setEditLessorId(rp.lessor_id ?? '')
+        setEditContractId(rp.contract_id ?? '')
+      }
     }
   }
 
@@ -1468,13 +1521,23 @@ export default function MapParcelSelector({
       .eq('id', editId)
     setEditSaving(false)
     if (error) { toast.error('Eroare la editare: ' + error.message); return }
-    // Sync changes back to the linked registry parcel
+    // Sync changes back to the linked registry parcel (full update)
     if (parcel?.parcela_id) {
       await db.from('parcels').update({
-        bloc_fizic: editName.trim(),
+        bloc_fizic: editBlocFizic || editName.trim(),
+        tarla_nr: editTarlaNr || null,
+        parcel_nr: editParcelNr || null,
+        nr_cadastral: editNrCadastral || null,
         locality: editLocalitate || null,
         county: editJudet || null,
         culture: legendItem?.label ?? null,
+        land_use_category: editLandCategory || null,
+        apia_eligible: editApiaEligibil !== '' ? editApiaEligibil === 'true' : null,
+        surface: editSurface ? parseFloat(editSurface) : null,
+        lat: editLat ? parseFloat(editLat) : null,
+        lng: editLng ? parseFloat(editLng) : null,
+        lessor_id: editLessorId || null,
+        contract_id: editContractId || null,
       }).eq('id', parcel.parcela_id)
     }
     setParcelLegendMap(prev => ({ ...prev, [editId]: editLegendId }))
@@ -1636,10 +1699,29 @@ export default function MapParcelSelector({
   return (
     <div className={isModal ? 'flex flex-col-reverse gap-4' : 'flex flex-col-reverse gap-3'}>
 
+      {/* ── Mobile panel toggle button (shown below map on mobile) ── */}
+      {showList && (
+        <button
+          className="md:hidden flex items-center justify-center gap-2 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-medium text-gray-700"
+          onClick={() => setShowMobilePanel(v => !v)}
+        >
+          <MapPin className="w-4 h-4 text-green-600" />
+          {showMobilePanel ? 'Ascunde panoul' : `Parcele mele (${parcels.length})`}
+        </button>
+      )}
+
       {/* ── Sidebar ── */}
       {showList && (
+        <>
+        {/* Mobile overlay backdrop */}
+        {showMobilePanel && (
+          <div
+            className="md:hidden fixed inset-0 z-[1500] bg-black/40"
+            onClick={() => setShowMobilePanel(false)}
+          />
+        )}
         <aside className={isModal
-          ? 'flex flex-col gap-3'
+          ? `flex flex-col gap-3 md:block ${showMobilePanel ? 'fixed inset-x-0 bottom-0 z-[1600] bg-white rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto p-4 flex flex-col gap-3' : 'hidden md:flex md:flex-col'}`
           : 'space-y-3'
         }>
 
@@ -1945,6 +2027,7 @@ export default function MapParcelSelector({
             </div>
           )}
         </aside>
+        </>
       )}
 
       {/* ── Map + status bar ── */}
@@ -2192,66 +2275,152 @@ export default function MapParcelSelector({
 
       {/* ── Edit parcel modal ── */}
       {editId && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
               <h2 className="text-base font-semibold text-gray-800">Editează parcela</h2>
-              <button onClick={() => setEditId(null)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                <X className="w-4 h-4" />
-              </button>
+              <button onClick={() => setEditId(null)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"><X className="w-4 h-4" /></button>
             </div>
-              <div className="px-6 py-4 space-y-4">
+            <div className="px-5 py-4 space-y-5">
+              {/* Identificare */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nume parcelă <span className="text-red-500">*</span></label>
-                <input type="text" value={editName} onChange={e => setEditName(e.target.value)} maxLength={100}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Identificare cadastrală</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Nume parcelă <span className="text-red-500">*</span></label>
+                    <input value={editName} onChange={e => setEditName(e.target.value)} maxLength={100}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Bloc Fizic (APIA/LPIS)</label>
+                    <input value={editBlocFizic} onChange={e => setEditBlocFizic(e.target.value)} placeholder="ex: AB001-0001"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Tarla nr.</label>
+                    <input value={editTarlaNr} onChange={e => setEditTarlaNr(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Parcelă nr.</label>
+                    <input value={editParcelNr} onChange={e => setEditParcelNr(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Nr. Cadastral</label>
+                    <input value={editNrCadastral} onChange={e => setEditNrCadastral(e.target.value)} placeholder="ex: CAD-001234"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Nr. CVI</label>
+                    <input value={editNrCvi} onChange={e => setEditNrCvi(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Localitate</label>
-                  <input type="text" value={editLocalitate} onChange={e => setEditLocalitate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Județ</label>
-                  <input type="text" value={editJudet} onChange={e => setEditJudet(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nr. CVI</label>
-                  <input type="text" value={editNrCvi} onChange={e => setEditNrCvi(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cultură</label>
-                  <select value={editLegendId} onChange={e => setEditLegendId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
-                    <option value="">— Fără cultură —</option>
-                    {legendItems.map(item => (
-                      <option key={item.id} value={item.id}>{item.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              {/* Localizare */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Adresă</label>
-                <input type="text" value={editAdresa} onChange={e => setEditAdresa(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Localizare</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Județ</label>
+                    <input value={editJudet} onChange={e => setEditJudet(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Localitate</label>
+                    <input value={editLocalitate} onChange={e => setEditLocalitate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Adresă</label>
+                    <input value={editAdresa} onChange={e => setEditAdresa(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Categorie folosință</label>
+                    <select value={editLandCategory} onChange={e => setEditLandCategory(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+                      {['Arabil','Pasune','Fanete','Vie','Livada','Padure','Curti-constructii','Ape','Drumuri','Neproductiv'].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Latitudine (GPS)</label>
+                    <input type="number" step="0.0000001" value={editLat} onChange={e => setEditLat(e.target.value)} placeholder="ex: 45.9432"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Longitudine (GPS)</label>
+                    <input type="number" step="0.0000001" value={editLng} onChange={e => setEditLng(e.target.value)} placeholder="ex: 24.9668"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                </div>
               </div>
+              {/* Suprafata & Cultura */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Note</label>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Suprafată &amp; Cultură</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Suprafață totală (ha)</label>
+                    <input type="number" min="0" step="0.0001" value={editSurface} onChange={e => setEditSurface(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Cultură</label>
+                    <select value={editLegendId} onChange={e => setEditLegendId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+                      <option value="">— Fără cultură —</option>
+                      {legendItems.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">APIA Eligibil</label>
+                    <select value={editApiaEligibil} onChange={e => setEditApiaEligibil(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+                      <option value="">—</option>
+                      <option value="true">Da</option>
+                      <option value="false">Nu</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              {/* Asociere */}
+              {editLessors.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Asociere</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Arendator</label>
+                      <select value={editLessorId} onChange={e => { setEditLessorId(e.target.value); setEditContractId('') }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+                        <option value="">Selectați</option>
+                        {editLessors.map(l => <option key={l.id} value={l.id}>{l.display_name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Contract</label>
+                      <select value={editContractId} onChange={e => setEditContractId(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+                        <option value="">Selectați</option>
+                        {editContracts.filter(c => !editLessorId || c.lessor_id === editLessorId).map(c => <option key={c.id} value={c.id}>{c.contract_number}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Note */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Note</label>
                 <textarea value={editNote} onChange={e => setEditNote(e.target.value)} rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
               </div>
             </div>
-            <div className="flex gap-3 px-6 pb-5">
+            <div className="flex gap-3 px-5 pb-5 sticky bottom-0 bg-white pt-3 border-t border-gray-100">
               <button onClick={() => void handleSaveEdit()} disabled={editSaving}
-                className="flex-1 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+                className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
                 {editSaving ? 'Se salvează...' : 'Salvează modificările'}
               </button>
-              <button onClick={() => setEditId(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              <button onClick={() => setEditId(null)} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
                 Anulează
               </button>
             </div>

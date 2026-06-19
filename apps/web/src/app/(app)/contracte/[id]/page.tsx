@@ -233,33 +233,63 @@ export default function ContractDashboardPage() {
       {/* Contract initial + Acte aditionale */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 font-semibold text-sm">Contract initial si acte aditionale</div>
-        <table className="w-full text-sm">
-          <thead><tr>{['Nr.','Data','Arendator','Perioada','Nivel arenda','Tarla','Parcela','Ha','Status'].map(h => <th key={h} className={thCls}>{h}</th>)}</tr></thead>
-          <tbody>
-            {lessorContracts.map(lc => (
-              <tr key={lc.id} className={`border-b border-gray-100 ${lc.id === id ? 'bg-green-50' : 'hover:bg-gray-50 cursor-pointer'}`} onClick={() => { if (lc.id !== id) router.push(`/contracte/${lc.id}`) }}>
-                <td className={tdCls + ' font-mono font-bold'}>{lc.contract_number}</td>
-                <td className={tdCls}>{lc.sign_date ?? '—'}</td>
-                <td className={tdCls}><span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">{contract.lessor_name}</span></td>
-                <td className={tdCls}>{new Date(lc.start_date).getFullYear()} — {new Date(lc.end_date).getFullYear()}</td>
-                <td className={tdCls}>{lc.id === id ? rentLevels.map((r, i) => <div key={i} className="text-xs">{r.level_per_ha} {r.product_name}/ha {r.level_type}</div>) : null}</td>
-                <td className={tdCls}>{lc.id === id ? (parcels.map(p => p.tarla_nr).filter(Boolean).join(', ') || '—') : '—'}</td>
-                <td className={tdCls}>{lc.id === id ? (parcels.map(p => p.parcel_nr).filter(Boolean).join(', ') || '—') : '—'}</td>
-                <td className={tdCls + ' font-semibold'}>{lc.id === id ? Number(totalHa.toFixed(4)) : ''}</td>
-                <td className={tdCls}><StatusBadge status={effectiveStatus(lc.status, lc.end_date)} /></td>
-              </tr>
-            ))}
-            {amendments.map(a => (
-              <tr key={a.id} className="border-b border-gray-100 bg-blue-50">
-                <td className={tdCls + ' font-mono text-blue-700'}>Act {a.number}</td>
-                <td className={tdCls}>{a.sign_date ?? '—'}</td>
-                <td className={tdCls + ' text-blue-700 font-medium'}>{contract.lessor_name}</td>
-                <td className={tdCls} colSpan={5}>{a.description ?? '—'}</td>
-                <td className={tdCls}><button onClick={async () => { await createClient().from('contract_amendments').delete().eq('id', a.id); setAmendments(p => p.filter(x => x.id !== a.id)) }} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr>{['Nr.','Data','Arendator','Perioada','Nivel arenda','Tarla','Parcela','Ha','Status'].map(h => <th key={h} className={thCls}>{h}</th>)}</tr></thead>
+            <tbody>
+              {lessorContracts.map(lc => (
+                <tr key={lc.id} className={`border-b border-gray-100 ${lc.id === id ? 'bg-green-50' : 'hover:bg-gray-50 cursor-pointer'}`} onClick={() => { if (lc.id !== id) router.push(`/contracte/${lc.id}`) }}>
+                  <td className={tdCls + ' font-mono font-bold'}>{lc.contract_number}</td>
+                  <td className={tdCls}>{lc.sign_date ?? '—'}</td>
+                  <td className={tdCls}><span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">{contract.lessor_name}</span></td>
+                  <td className={tdCls}>{new Date(lc.start_date).getFullYear()} — {new Date(lc.end_date).getFullYear()}</td>
+                  <td className={tdCls}>{lc.id === id ? rentLevels.map((r, i) => <div key={i} className="text-xs">{r.level_per_ha} {r.product_name}/ha {r.level_type}</div>) : null}</td>
+                  <td className={tdCls}>{lc.id === id ? (parcels.map(p => p.tarla_nr).filter(Boolean).join(', ') || '—') : '—'}</td>
+                  <td className={tdCls}>{lc.id === id ? (parcels.map(p => p.parcel_nr).filter(Boolean).join(', ') || '—') : '—'}</td>
+                  <td className={tdCls + ' font-semibold'}>{lc.id === id ? Number(totalHa.toFixed(4)) : ''}</td>
+                  <td className={tdCls}><StatusBadge status={effectiveStatus(lc.status, lc.end_date)} /></td>
+                </tr>
+              ))}
+              {amendments.map(a => (
+                <tr key={a.id} className="border-b border-gray-100 bg-blue-50">
+                  <td className={tdCls + ' font-mono text-blue-700'}>Act {a.number}</td>
+                  <td className={tdCls}>{a.sign_date ?? '—'}</td>
+                  <td className={tdCls + ' text-blue-700 font-medium'}>{contract.lessor_name}</td>
+                  <td className={tdCls} colSpan={5}>{a.description ?? '—'}</td>
+                  <td className={tdCls}><button onClick={async () => { await createClient().from('contract_amendments').delete().eq('id', a.id); setAmendments(p => p.filter(x => x.id !== a.id)) }} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* Mobile cards */}
+        <div className="sm:hidden divide-y divide-gray-100">
+          {lessorContracts.map(lc => (
+            <div key={lc.id} className={`p-3 ${lc.id === id ? 'bg-green-50' : 'hover:bg-gray-50'}`} onClick={() => { if (lc.id !== id) router.push(`/contracte/${lc.id}`) }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-mono font-bold text-sm text-gray-900">{lc.contract_number}</span>
+                <StatusBadge status={effectiveStatus(lc.status, lc.end_date)} />
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                <div><span className="text-gray-400">Arendator: </span>{contract.lessor_name}</div>
+                <div><span className="text-gray-400">Data: </span>{lc.sign_date ?? '—'}</div>
+                <div><span className="text-gray-400">Perioadă: </span>{new Date(lc.start_date).getFullYear()} — {new Date(lc.end_date).getFullYear()}</div>
+                {lc.id === id && <div><span className="text-gray-400">Ha: </span><strong>{Number(totalHa.toFixed(4))}</strong></div>}
+                {lc.id === id && rentLevels.length > 0 && <div className="col-span-2"><span className="text-gray-400">Arendă: </span>{rentLevels.map(r => `${r.level_per_ha} ${r.product_name}/ha`).join(', ')}</div>}
+              </div>
+            </div>
+          ))}
+          {amendments.map(a => (
+            <div key={a.id} className="p-3 bg-blue-50">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-blue-700 font-semibold text-sm">Act {a.number}</span>
+                <button onClick={async () => { await createClient().from('contract_amendments').delete().eq('id', a.id); setAmendments(p => p.filter(x => x.id !== a.id)) }} className="text-red-400 hover:text-red-600 p-1"><Trash2 className="w-4 h-4" /></button>
+              </div>
+              <div className="text-xs text-blue-700 mt-1">{a.sign_date ?? '—'} · {a.description ?? '—'}</div>
+            </div>
+          ))}
+        </div>
         <div className="px-4 py-3 border-t border-gray-100 flex flex-wrap gap-2">
           <button onClick={() => router.push('/contracte/nou')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded font-medium"><Plus className="w-3.5 h-3.5" /> Contract nou</button>
           <button onClick={() => setShowNewAmendment(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded font-medium"><Plus className="w-3.5 h-3.5" /> Adauga act aditional</button>
@@ -267,7 +297,7 @@ export default function ContractDashboardPage() {
         </div>
         {showNewAmendment && (
           <form onSubmit={saveAmendment} className="px-4 pb-4 border-t border-gray-100 pt-3">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div><label className={labelCls}>Nr. act</label><input className={inputCls} value={amendForm.number} onChange={e => setAmendForm(p => ({...p, number: e.target.value}))} required /></div>
               <div><label className={labelCls}>Data semnare</label><input className={inputCls} type="date" value={amendForm.sign_date} onChange={e => setAmendForm(p => ({...p, sign_date: e.target.value}))} /></div>
               <div><label className={labelCls}>Descriere</label><input className={inputCls} value={amendForm.description} onChange={e => setAmendForm(p => ({...p, description: e.target.value}))} /></div>
@@ -317,7 +347,8 @@ export default function ContractDashboardPage() {
             </table>
           </div>
         )}
-        <div className="overflow-x-auto">
+        {/* Desktop transactions table */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm min-w-[900px]">
             <thead><tr>
               <th className={thCls + ' w-8'}><input type="checkbox" onChange={e => setSelectedTxns(e.target.checked ? new Set(transactions.map(t => t.id)) : new Set())} /></th>
@@ -340,15 +371,7 @@ export default function ContractDashboardPage() {
                   <td className={tdCls + ' text-right font-semibold text-green-700'}>{Number(t.ron_net).toFixed(2)}</td>
                   <td className={tdCls + ' text-right text-orange-600'}>{Number(t.tax_amount).toFixed(2)}</td>
                   <td className={tdCls}>
-                    <button
-                      onClick={() => togglePaid(t.id, t.is_paid)}
-                      title={t.is_paid ? 'Marcat ca plătit — click pentru a anula' : 'Marchează ca plătit'}
-                      className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
-                        t.is_paid
-                          ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200'
-                          : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
-                      }`}
-                    >
+                    <button onClick={() => togglePaid(t.id, t.is_paid)} className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${t.is_paid ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'}`}>
                       {t.is_paid ? 'Plătit' : 'Neplătit'}
                     </button>
                   </td>
@@ -357,6 +380,35 @@ export default function ContractDashboardPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        {/* Mobile transaction cards */}
+        <div className="sm:hidden divide-y divide-gray-100">
+          {transactions.length === 0 && <div className="px-4 py-8 text-center text-gray-400 text-sm">Nicio tranzactie inregistrata</div>}
+          {transactions.map(t => (
+            <div key={t.id} className={`p-3 ${t.is_previzionata ? 'opacity-60 italic' : ''}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={selectedTxns.has(t.id)} onChange={e => setSelectedTxns(prev => { const s = new Set(prev); e.target.checked ? s.add(t.id) : s.delete(t.id); return s })} />
+                  <span className="px-1.5 py-0.5 bg-brand-100 text-brand-700 rounded text-xs font-medium">{t.product_name}</span>
+                  <span className="text-xs text-gray-500">{t.campaign_year}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => togglePaid(t.id, t.is_paid)} className={`px-2 py-0.5 rounded text-xs font-medium border ${t.is_paid ? 'bg-green-100 text-green-700 border-green-300' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                    {t.is_paid ? 'Plătit' : 'Neplătit'}
+                  </button>
+                  <button onClick={() => deleteTxn(t.id)} className="p-1 text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-gray-600">
+                <div><span className="text-gray-400">Data: </span>{t.transaction_date}</div>
+                <div><span className="text-gray-400">Tip plată: </span>{t.payment_type}{t.pv_number ? ` #${t.pv_number}` : ''}</div>
+                <div><span className="text-gray-400">Kg net: </span><strong>{Number(t.kg_net).toFixed(0)}</strong></div>
+                <div><span className="text-gray-400">Preț: </span>{Number(t.price_per_unit).toFixed(2)} lei</div>
+                <div><span className="text-gray-400">RON net: </span><strong className="text-green-700">{Number(t.ron_net).toFixed(2)}</strong></div>
+                <div><span className="text-gray-400">Impozit: </span><span className="text-orange-600">{Number(t.tax_amount).toFixed(2)}</span></div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
