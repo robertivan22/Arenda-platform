@@ -99,16 +99,16 @@ export default function UtilajePage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <PageHeader title="Parc Utilaje" subtitle="Tractoare, combine, semănători și alte echipamente agricole" />
         <button onClick={() => setShowAdd(v => !v)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg hover:bg-brand-700">
+          className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 text-white text-sm rounded-lg hover:bg-brand-700 self-start sm:self-auto">
           <Plus className="w-4 h-4" /> Utilaj nou
         </button>
       </div>
 
       {/* Sub-nav */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
+      <div className="flex flex-wrap gap-1 bg-gray-100 rounded-lg p-1 mb-6">
         {[
           { label: 'Parc utilaje',  href: '/utilaje' },
           { label: 'Implementuri', href: '/utilaje/implementuri' },
@@ -143,9 +143,9 @@ export default function UtilajePage() {
       {showAdd && (
         <form onSubmit={addMachine} className="bg-white border border-brand-200 rounded-lg p-4 mb-4">
           <div className="text-sm font-semibold text-gray-700 mb-3">Adaugă utilaj nou</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-3">
             <input required
-              className="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="sm:col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm"
               placeholder="Denumire *" value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
@@ -171,12 +171,12 @@ export default function UtilajePage() {
             <input className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
               placeholder="Putere (CP)" type="number" min="0" value={form.engine_hp}
               onChange={e => setForm(f => ({ ...f, engine_hp: e.target.value }))} />
-            <input className="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            <input className="sm:col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm"
               placeholder="Observații" value={form.notes}
               onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
           </div>
           {/* RCA */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-3">
             <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
               <input type="checkbox" className="rounded" checked={form.rca_active}
                 onChange={e => setForm(f => ({ ...f, rca_active: e.target.checked }))} />
@@ -230,7 +230,8 @@ export default function UtilajePage() {
           {machines.length === 0 ? 'Niciun utilaj înregistrat.' : 'Niciun utilaj pentru filtrul ales.'}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <>
+        <div className="hidden sm:block bg-white rounded-lg border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-medium uppercase tracking-wide">
@@ -297,6 +298,57 @@ export default function UtilajePage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile cards */}
+        <div className="sm:hidden bg-white rounded-lg border border-gray-200 overflow-hidden divide-y divide-gray-100">
+          {filtered.map(m => {
+            const cls   = TYPE_COLORS[m.type] ?? 'bg-gray-100 text-gray-600'
+            const label = MACHINE_TYPES.find(t => t.value === m.type)?.label ?? m.type
+            return (
+              <div key={m.id} className="p-3">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0 ${cls}`}>{label}</span>
+                    <span className="font-medium text-gray-900 text-sm truncate">{m.name}</span>
+                  </div>
+                  <span className={`px-2 py-0.5 text-xs rounded-full font-medium flex-shrink-0 ${m.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {m.is_active ? 'Activ' : 'Inactiv'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 mb-2">
+                  <div><span className="text-gray-400">Marcă/Model </span>{[m.brand, m.model].filter(Boolean).join(' ') || '—'}</div>
+                  <div><span className="text-gray-400">An </span>{m.year ?? '—'}</div>
+                  <div><span className="text-gray-400">Nr. înm. </span><span className="font-mono">{m.plate ?? '—'}</span></div>
+                  <div><span className="text-gray-400">Combustibil </span><span className="capitalize">{m.fuel_type}</span></div>
+                  {m.rca_active && (
+                    <div className="col-span-2">
+                      <span className="text-gray-400">RCA </span>
+                      <span className={`font-medium ${m.rca_expiry_date && new Date(m.rca_expiry_date) < new Date() ? 'text-red-600' : 'text-green-600'}`}>
+                        {m.rca_expiry_date && new Date(m.rca_expiry_date) < new Date() ? 'Expirat' : 'Activ'}
+                      </span>
+                      {m.rca_expiry_date && <span className="text-gray-400 ml-1">{m.rca_expiry_date}</span>}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <a href={`/utilaje/${m.id}`}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
+                    <ChevronRight className="w-3 h-3" /> Detalii
+                  </a>
+                  <button onClick={() => void toggleActive(m)}
+                    className={`flex items-center gap-1 px-3 py-1.5 text-xs border rounded-lg ${m.is_active ? 'border-green-200 text-green-600 hover:bg-green-50' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                    <Power className="w-3 h-3" /> {m.is_active ? 'Dezactivează' : 'Activează'}
+                  </button>
+                  <button onClick={() => void deleteMachine(m.id)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs border border-red-100 text-red-500 rounded-lg hover:bg-red-50">
+                    <Trash2 className="w-3 h-3" /> Șterge
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        </>
       )}
 
       {/* Links to sub-pages */}

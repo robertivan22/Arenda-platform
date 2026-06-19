@@ -354,7 +354,7 @@ export default function MachineDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
+      <div className="flex flex-wrap gap-1 bg-gray-100 rounded-lg p-1 mb-6">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
             className={`flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-md transition-colors ${
@@ -394,7 +394,7 @@ export default function MachineDetailPage() {
               </div>
             )}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {([
               { label: 'Denumire *', key: 'name', required: true },
               { label: 'Marcă', key: 'brand' },
@@ -442,7 +442,7 @@ export default function MachineDetailPage() {
                 </select>
               ) : <div className="text-sm text-gray-800 capitalize py-0.5">{machine.fuel_type}</div>}
             </div>
-            <div className="col-span-2 md:col-span-3">
+            <div className="col-span-1 sm:col-span-2 md:col-span-3">
               <label className="block text-xs text-gray-500 mb-1">Observații</label>
               {editing ? (
                 <textarea className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={3}
@@ -481,7 +481,7 @@ export default function MachineDetailPage() {
 
           {showAddLog && (
             <form onSubmit={saveWorkLog} className="bg-white border border-brand-200 rounded-lg p-4 mb-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Dată *</label>
                   <input required type="date" className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
@@ -534,7 +534,7 @@ export default function MachineDetailPage() {
                       placeholder="end" value={logForm.end_hours} onChange={e => setLogForm(f => ({ ...f, end_hours: e.target.value }))} />
                   </div>
                 </div>
-                <div className="col-span-2 md:col-span-4">
+                <div className="col-span-1 sm:col-span-2 md:col-span-4">
                   <label className="block text-xs text-gray-500 mb-1">Observații</label>
                   <input className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
                     value={logForm.notes} onChange={e => setLogForm(f => ({ ...f, notes: e.target.value }))} />
@@ -557,7 +557,8 @@ export default function MachineDetailPage() {
               Nicio sesiune de lucru înregistrată.
             </div>
           ) : (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <>
+            <div className="hidden sm:block bg-white rounded-lg border border-gray-200 overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-medium">
@@ -600,6 +601,37 @@ export default function MachineDetailPage() {
                 Total ore înregistrate: <strong className="text-gray-600">{totalWorkHours.toFixed(1)} h</strong>
               </div>
             </div>
+
+            {/* Mobile work log cards */}
+            <div className="sm:hidden bg-white rounded-lg border border-gray-200 overflow-hidden divide-y divide-gray-100">
+              {workLogs.map(log => (
+                <div key={log.id} className="p-3">
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div>
+                      <span className="text-xs font-medium text-gray-700">
+                        {OP_TYPES.find(o => o.value === log.operation_type)?.label ?? log.operation_type}
+                      </span>
+                      <span className="text-xs text-gray-400 ml-2">{fmtDate(log.log_date)}</span>
+                    </div>
+                    <button onClick={() => void deleteWorkLog(log.id)} className="p-1 text-gray-300 hover:text-red-500 flex-shrink-0">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                    <div><span className="text-gray-400">Operator </span>{log.operators?.name ?? '—'}</div>
+                    <div><span className="text-gray-400">Implement </span>{log.implements?.name ?? '—'}</div>
+                    <div><span className="text-gray-400">Ore </span>{log.hours_worked != null ? `${log.hours_worked} h` : '—'}</div>
+                    <div><span className="text-gray-400">Suprafață </span>{log.area_worked_ha != null ? `${log.area_worked_ha} ha` : '—'}</div>
+                    <div><span className="text-gray-400">Combustibil </span>{log.fuel_consumed_l != null ? `${log.fuel_consumed_l} L` : '—'}</div>
+                    {log.notes && <div className="col-span-2 text-gray-400 truncate">{log.notes}</div>}
+                  </div>
+                </div>
+              ))}
+              <div className="px-3 py-2 text-xs text-gray-400 text-right">
+                Total ore: <strong className="text-gray-600">{totalWorkHours.toFixed(1)} h</strong>
+              </div>
+            </div>
+            </>
           )}
         </div>
       )}
@@ -634,7 +666,7 @@ export default function MachineDetailPage() {
 
           {showAddFuel && (
             <form onSubmit={saveFuelLog} className="bg-white border border-brand-200 rounded-lg p-4 mb-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Dată *</label>
                   <input required type="date" className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
@@ -665,7 +697,7 @@ export default function MachineDetailPage() {
                   <input className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
                     placeholder="ex: Depou fermă" value={fuelForm.location} onChange={e => setFuelForm(f => ({ ...f, location: e.target.value }))} />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs text-gray-500 mb-1">Observații</label>
                   <input className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
                     value={fuelForm.notes} onChange={e => setFuelForm(f => ({ ...f, notes: e.target.value }))} />
@@ -688,7 +720,8 @@ export default function MachineDetailPage() {
               Nicio alimentare înregistrată.
             </div>
           ) : (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <>
+              <div className="hidden sm:block bg-white rounded-lg border border-gray-200 overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-medium">
@@ -724,6 +757,32 @@ export default function MachineDetailPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile fuel log cards */}
+            <div className="sm:hidden bg-white rounded-lg border border-gray-200 overflow-hidden divide-y divide-gray-100">
+              {fuelLogs.map(log => (
+                <div key={log.id} className="p-3">
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div>
+                      <span className="font-medium text-gray-800 text-sm">{log.liters} L</span>
+                      <span className="text-xs text-gray-400 ml-2">{fmtDate(log.log_date)}</span>
+                    </div>
+                    <button onClick={() => void deleteFuelLog(log.id)} className="p-1 text-gray-300 hover:text-red-500 flex-shrink-0">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                    <div><span className="text-gray-400">Total </span><span className="font-semibold">{log.total_cost != null ? `${log.total_cost} RON` : '—'}</span></div>
+                    <div><span className="text-gray-400">Preț/L </span>{log.cost_per_liter != null ? `${log.cost_per_liter} RON` : '—'}</div>
+                    <div><span className="text-gray-400">Ore contor </span>{log.hours_meter != null ? `${log.hours_meter} h` : '—'}</div>
+                    <div><span className="text-gray-400">Km </span>{log.odometer_km != null ? `${log.odometer_km} km` : '—'}</div>
+                    {log.location && <div className="col-span-2"><span className="text-gray-400">Locație </span>{log.location}</div>}
+                    {log.notes && <div className="col-span-2 text-gray-400 truncate">{log.notes}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </div>
       )}
@@ -741,8 +800,8 @@ export default function MachineDetailPage() {
 
           {showAddMaint && (
             <form onSubmit={saveMaintTask} className="bg-white border border-brand-200 rounded-lg p-4 mb-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs text-gray-500 mb-1">Titlu *</label>
                   <input required className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
                     placeholder="ex: Schimb ulei motor + filtru"
@@ -780,7 +839,7 @@ export default function MachineDetailPage() {
                   <input className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
                     value={maintForm.service_provider} onChange={e => setMaintForm(f => ({ ...f, service_provider: e.target.value }))} />
                 </div>
-                <div className="col-span-2 md:col-span-4">
+                <div className="col-span-1 sm:col-span-2 md:col-span-4">
                   <label className="block text-xs text-gray-500 mb-1">Observații</label>
                   <input className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
                     value={maintForm.notes} onChange={e => setMaintForm(f => ({ ...f, notes: e.target.value }))} />
