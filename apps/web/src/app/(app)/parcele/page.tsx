@@ -82,6 +82,7 @@ export default function ParceleListPage() {
   const [rows, setRows] = useState<Parcel[]>([])
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({ judet: '', status: '', cultura: '', arendator: '', apiaEligibil: '' })
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -251,9 +252,22 @@ export default function ParceleListPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-500 font-medium flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => setFiltersOpen(v => !v)}
+            className="md:hidden flex items-center gap-1.5 text-xs text-gray-600 font-medium px-2.5 py-1.5 border border-gray-300 rounded hover:bg-gray-50"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            Filtre
+            {Object.values(filters).some(Boolean) && (
+              <span className="w-1.5 h-1.5 bg-brand-500 rounded-full" />
+            )}
+            <ChevronDown className={`w-3 h-3 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+          </button>
+          <span className="hidden md:flex text-xs text-gray-500 font-medium items-center gap-1 flex-shrink-0">
             <SlidersHorizontal className="w-3.5 h-3.5" />
           </span>
+
+          <div className={`${filtersOpen ? 'flex' : 'hidden'} md:flex items-center gap-2 flex-wrap w-full md:w-auto`}>
 
           <FilterSelect label="Județ"         value={filters.judet}         onChange={v => setFilter('judet', v)}>
             <option value="">Toate</option>
@@ -291,6 +305,8 @@ export default function ParceleListPage() {
               Resetează
             </button>
           )}
+
+          </div>{/* end collapsible filters */}
 
           <div className="ml-auto flex items-center gap-2 flex-shrink-0">
             <div className="relative" ref={colRef}>

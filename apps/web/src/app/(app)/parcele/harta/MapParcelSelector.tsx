@@ -1600,7 +1600,9 @@ export default function MapParcelSelector({
     const ringWgs84 = isLikelyStereo70(ring[0]) ? ringStereo70ToWgs84(ring) : ring
     const latLngs = ringWgs84.map(([lng, lat]: number[]) => L.latLng(lat, lng))
     const poly = L.polygon(latLngs, { color: '#ef4444', fillColor: '#fca5a5', fillOpacity: 0.3, weight: 3, dashArray: '6 4' })
-    poly.addTo(map)
+    // Add to featureGroup so leaflet-draw editing initializes fully
+    const fg = drawnItemsRef.current
+    if (fg) { fg.addLayer(poly) } else { poly.addTo(map) }
     // Enable vertex editing
     ;(poly as any).editing?.enable()
     geoEditLayerRef.current = poly
@@ -1613,9 +1615,11 @@ export default function MapParcelSelector({
 
   function cancelGeometryEdit() {
     const map = mapRef.current
-    if (geoEditLayerRef.current && map) {
+    if (geoEditLayerRef.current) {
       ;(geoEditLayerRef.current as any).editing?.disable()
-      map.removeLayer(geoEditLayerRef.current)
+      const fg = drawnItemsRef.current
+      if (fg) { fg.removeLayer(geoEditLayerRef.current) }
+      else if (map) { map.removeLayer(geoEditLayerRef.current) }
     }
     geoEditLayerRef.current = null
     setGeoEditId(null)

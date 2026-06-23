@@ -99,7 +99,7 @@ export function AppTopbar() {
           </button>
 
           {bellOpen && (
-            <div className="absolute right-0 top-10 w-80 max-h-[70vh] flex flex-col bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+            <div className="fixed top-12 right-2 left-2 sm:left-auto sm:w-80 max-h-[75vh] flex flex-col bg-white border border-gray-200 rounded-xl shadow-xl z-[9999] overflow-hidden">
               <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 flex-shrink-0">
                 <span className="text-sm font-semibold text-gray-800">Alerte operative</span>
                 <div className="flex items-center gap-2">
