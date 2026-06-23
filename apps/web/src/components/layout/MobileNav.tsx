@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { label: 'Rapoarte',    href: '/rapoarte',           icon: BarChart3 },
   { label: 'Declarații',  href: '/declaratii',         icon: FileSpreadsheet },
   { label: 'Fitosanitar', href: '/fitosanitar',        icon: Leaf },
-] as const
+] as { label: string; href: string; icon: React.ElementType }[]
 
 export function MobileNav() {
   const pathname = usePathname()
@@ -76,7 +76,7 @@ export function MobileNav() {
       >
         <div className="flex h-14">
           {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-            const active = pathname === href || (href !== '/' && pathname.startsWith(href + '/'))
+            const active = pathname === href || pathname.startsWith(href + '/')
             return (
               <Link
                 key={href}
