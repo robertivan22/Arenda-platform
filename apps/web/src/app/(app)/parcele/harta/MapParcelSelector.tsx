@@ -731,6 +731,7 @@ export default function MapParcelSelector({
 }: MapParcelSelectorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
+  const mapWrapperRef = useRef<HTMLDivElement>(null)
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null)
   const parcelLayersRef = useRef<Map<string, L.GeoJSON>>(new Map())
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1273,6 +1274,10 @@ export default function MapParcelSelector({
 
   function focusParcel(parcel: ParceleFitosanitar) {
     onParcelSelected?.(parcel)
+    // On mobile: scroll the map into view first
+    if (mapWrapperRef.current && window.innerWidth < 768) {
+      mapWrapperRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
     const layer = parcelLayersRef.current.get(parcel.id)
     if (layer && mapRef.current) {
       mapRef.current.fitBounds(layer.getBounds(), { padding: [30, 30], maxZoom: 16 })
@@ -2027,6 +2032,7 @@ export default function MapParcelSelector({
 
       {/* ── Map + status bar ── */}
       <div
+        ref={mapWrapperRef}
         className={`relative flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm${isModal ? ' h-[65vh] min-h-[400px]' : ' order-1'}`}
         style={!isModal ? { height, isolation: 'isolate' } : { isolation: 'isolate' }}
       >
@@ -2065,6 +2071,21 @@ export default function MapParcelSelector({
             </button>
           </div>
         )}
+
+        {/* Edit selected parcel geometry — shown when a parcel is selected and not already editing */}
+        {!geoEditId && selectedId && allowDraw && (() => {
+          const sel = parcels.find(p => p.id === selectedId)
+          if (!sel?.geometry_geojson) return null
+          return (
+            <button
+              onClick={() => startGeometryEdit(sel)}
+              className="absolute top-2 left-1/2 -translate-x-1/2 z-[1100] flex items-center gap-1.5 px-3 py-1.5 bg-white border border-amber-300 text-amber-700 rounded-lg shadow text-xs font-medium hover:bg-amber-50 transition-colors"
+              title="Editează vârfurile poligonului selectat"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Editează poligon: {sel.nume_parcela}
+            </button>
+          )
+        })()}
 
         {/* Parcel detail popup – click centre marker or registry marker */}
         {popupParcel && (
