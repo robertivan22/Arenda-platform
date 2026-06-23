@@ -270,7 +270,7 @@ function makeRegistryIcon(color: string): L.DivIcon {
 }
 
 // ─── Parcel details popup ─────────────────────────────────────────────────────
-function ParcelMapPopup({ parcel, onClose, onRegisterActivity }: { parcel: RegistryParcel; onClose: () => void; onRegisterActivity?: () => void }) {
+function ParcelMapPopup({ parcel, onClose, onRegisterActivity, onEditGeometry }: { parcel: RegistryParcel; onClose: () => void; onRegisterActivity?: () => void; onEditGeometry?: () => void }) {
   const statusColors: Record<string, string> = {
     ACTIVE: 'bg-green-100 text-green-700 border-green-200',
     INACTIVE: 'bg-gray-100 text-gray-600 border-gray-200',
@@ -344,15 +344,26 @@ function ParcelMapPopup({ parcel, onClose, onRegisterActivity }: { parcel: Regis
           )}
         </div>
       )}
-      {onRegisterActivity && (
-        <div className="px-4 py-3 border-t border-gray-100">
-          <button
-            onClick={onRegisterActivity}
-            className="w-full py-2.5 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
-          >
-            <Tractor className="w-4 h-4" />
-            Înregistrare activitate
-          </button>
+      {(onRegisterActivity || onEditGeometry) && (
+        <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
+          {onEditGeometry && (
+            <button
+              onClick={onEditGeometry}
+              className="flex-1 py-2.5 text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+              Editare contur
+            </button>
+          )}
+          {onRegisterActivity && (
+            <button
+              onClick={onRegisterActivity}
+              className="flex-1 py-2.5 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+            >
+              <Tractor className="w-4 h-4" />
+              Activitate
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -749,6 +760,7 @@ export default function MapParcelSelector({
   const [registryParcels, setRegistryParcels] = useState<RegistryParcel[]>([])
   const [popupParcel, setPopupParcel] = useState<RegistryParcel | null>(null)
   const [popupRegistryParcelId, setPopupRegistryParcelId] = useState<string | null>(null)
+  const [popupFitoParcel, setPopupFitoParcel] = useState<ParceleFitosanitar | null>(null)
   const [showActivityModal, setShowActivityModal] = useState(false)
 
   // Import wizard
@@ -1125,6 +1137,7 @@ export default function MapParcelSelector({
         const [cLat, cLng] = stereo70ToLeaflet(cx, cy)
         const centreMarker = L.marker([cLat, cLng], { icon: makeCentreIcon(sanitizeColor(parcelColor)) })
         centreMarker.on('click', () => {
+          setPopupFitoParcel(parcel)
           const linked = registryParcels.find(rp => rp.id === parcel.parcela_id)
           if (linked) {
             setPopupParcel(linked)
@@ -2096,8 +2109,9 @@ export default function MapParcelSelector({
           <div className="absolute bottom-12 right-3 z-[2000]">
             <ParcelMapPopup
               parcel={popupParcel}
-              onClose={() => { setPopupParcel(null); setPopupRegistryParcelId(null) }}
+              onClose={() => { setPopupParcel(null); setPopupRegistryParcelId(null); setPopupFitoParcel(null) }}
               onRegisterActivity={() => setShowActivityModal(true)}
+              onEditGeometry={popupFitoParcel?.geometry_geojson ? () => { setPopupParcel(null); setPopupRegistryParcelId(null); setPopupFitoParcel(null); startGeometryEdit(popupFitoParcel) } : undefined}
             />
           </div>
         )}
