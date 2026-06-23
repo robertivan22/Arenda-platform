@@ -143,7 +143,7 @@ export function AppTopbar() {
                     <span className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${s.priority === 'inalta' ? 'bg-red-500' : 'bg-amber-400'}`} />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-gray-800 truncate">{s.product_name}</p>
-                      <p className="text-xs text-gray-500 truncate">Stoc {s.stoc_status === 'epuizat' ? 'epuizat' : `critic: ${s.quantity_available?.toFixed(1)} ${s.unit ?? ''}`}</p>
+                      <p className="text-xs text-gray-500 truncate">Stoc {s.stock_status === 'epuizat' ? 'epuizat' : `critic: ${s.quantity_available?.toFixed(1)} ${s.unit ?? ''}`}</p>
                     </div>
                     <ChevronRight className="w-3 h-3 text-gray-300 flex-shrink-0 mt-1" />
                   </button>
