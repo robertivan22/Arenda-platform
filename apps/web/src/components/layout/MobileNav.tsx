@@ -1,7 +1,6 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   Users, FileText, CreditCard, Wheat,
   MapPin, Package, Receipt, BarChart3, Tractor, Activity,
@@ -30,24 +29,29 @@ const NAV_ITEMS = [
 
 export function MobileNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const { toggle } = useSidebarStore()
   const scrollRef = useRef<HTMLDivElement>(null)
-  const activeRef = useRef<HTMLAnchorElement>(null)
+  const activeIndexRef = useRef<number>(-1)
 
-  // Auto-scroll active tab into view
+  // Auto-scroll active tab into view — instant, no smooth animation
   useEffect(() => {
-    if (activeRef.current && scrollRef.current) {
-      const container = scrollRef.current
-      const el = activeRef.current
-      const elLeft = el.offsetLeft
-      const elRight = elLeft + el.offsetWidth
-      const visLeft = container.scrollLeft
-      const visRight = visLeft + container.clientWidth
-      if (elLeft < visLeft + 8) {
-        container.scrollTo({ left: elLeft - 8, behavior: 'smooth' })
-      } else if (elRight > visRight - 8) {
-        container.scrollTo({ left: elRight - container.clientWidth + 8, behavior: 'smooth' })
-      }
+    const idx = NAV_ITEMS.findIndex(({ href }) => pathname === href || pathname.startsWith(href + '/'))
+    if (idx === -1) return
+    activeIndexRef.current = idx
+    const container = scrollRef.current
+    if (!container) return
+    // Each item is min-w-[56px]; find the button by index
+    const item = container.querySelectorAll('button')[idx] as HTMLElement | undefined
+    if (!item) return
+    const elLeft = item.offsetLeft
+    const elRight = elLeft + item.offsetWidth
+    const visLeft = container.scrollLeft
+    const visRight = visLeft + container.clientWidth
+    if (elLeft < visLeft + 8) {
+      container.scrollLeft = elLeft - 8
+    } else if (elRight > visRight - 8) {
+      container.scrollLeft = elRight - container.clientWidth + 8
     }
   }, [pathname])
 
@@ -70,18 +74,18 @@ export function MobileNav() {
       <div
         ref={scrollRef}
         className="flex-1 flex overflow-x-auto"
-        style={{ scrollbarWidth: 'none', touchAction: 'pan-x' } as React.CSSProperties}
+        style={{ scrollbarWidth: 'none' } as React.CSSProperties}
       >
         <div className="flex h-14">
           {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/')
             return (
-              <Link
+              <button
                 key={href}
-                href={href}
-                ref={active ? activeRef : undefined}
+                type="button"
+                onClick={() => router.push(href)}
                 className={clsx(
-                  'flex flex-col items-center justify-center gap-0.5 px-3 text-[10px] font-medium transition-colors whitespace-nowrap min-w-[56px] min-h-[44px]',
+                  'flex flex-col items-center justify-center gap-0.5 px-3 text-[10px] font-medium whitespace-nowrap min-w-[56px] min-h-[44px] flex-shrink-0 border-0 bg-transparent cursor-pointer',
                   active
                     ? 'text-green-700 border-t-2 border-green-600 -mt-px'
                     : 'text-gray-400 active:text-gray-600',
@@ -89,7 +93,7 @@ export function MobileNav() {
               >
                 <Icon className={clsx('w-5 h-5 flex-shrink-0', active && 'text-green-700')} />
                 <span>{label}</span>
-              </Link>
+              </button>
             )
           })}
         </div>
