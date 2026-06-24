@@ -3,31 +3,29 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Users, FileText, CreditCard, Wheat,
+  Users, FileText, CreditCard, Wheat,
   MapPin, Package, Receipt, BarChart3, Tractor, Activity,
-  FolderOpen, FileSpreadsheet, Leaf, Bot, Menu as MenuIcon,
+  FolderOpen, FileSpreadsheet, Leaf, Menu as MenuIcon,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useRef, useEffect } from 'react'
 import { useSidebarStore } from '@/store/sidebar.store'
 
 const NAV_ITEMS = [
-  { label: 'Dashboard',   href: '/dashboard',          icon: LayoutDashboard },
-  { label: 'Alerte',      href: '/alerte',             icon: Bot },
+  { label: 'Distribuire', href: '/distribuire-arenda', icon: Wheat },
   { label: 'Arendatori',  href: '/arendatori',         icon: Users },
   { label: 'Contracte',   href: '/contracte',          icon: FileText },
-  { label: 'Tranzacții',  href: '/plati',              icon: CreditCard },
-  { label: 'Distribuire', href: '/distribuire-arenda', icon: Wheat },
   { label: 'Parcele',     href: '/parcele',            icon: MapPin },
+  { label: 'Stocuri',     href: '/inventar/stoc',      icon: Package },
   { label: 'Campanie',    href: '/campanie',           icon: Wheat },
   { label: 'Utilaje',     href: '/utilaje',            icon: Tractor },
   { label: 'Fermă',       href: '/ferma',              icon: Activity },
-  { label: 'Stocuri',     href: '/inventar/stoc',      icon: Package },
+  { label: 'Tranzacții',  href: '/plati',              icon: CreditCard },
+  { label: 'Fitosanitar', href: '/fitosanitar',        icon: Leaf },
   { label: 'e-Factura',   href: '/efactura',           icon: Receipt },
   { label: 'APIA',        href: '/apia',               icon: FolderOpen },
   { label: 'Rapoarte',    href: '/rapoarte',           icon: BarChart3 },
   { label: 'Declarații',  href: '/declaratii',         icon: FileSpreadsheet },
-  { label: 'Fitosanitar', href: '/fitosanitar',        icon: Leaf },
 ] as { label: string; href: string; icon: React.ElementType }[]
 
 export function MobileNav() {
@@ -72,7 +70,7 @@ export function MobileNav() {
       <div
         ref={scrollRef}
         className="flex-1 flex overflow-x-auto"
-        style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+        style={{ scrollbarWidth: 'none', touchAction: 'pan-x' } as React.CSSProperties}
       >
         <div className="flex h-14">
           {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
