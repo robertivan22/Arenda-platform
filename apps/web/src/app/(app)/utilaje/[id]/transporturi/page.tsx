@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { ArrowLeft, Plus, Loader2, X, Truck, AlertTriangle, CheckCircle2, Clock, Ban } from 'lucide-react'
+import { ArrowLeft, Plus, Loader2, X, Truck, AlertTriangle, CheckCircle2, Clock, Ban, FileText } from 'lucide-react'
 import type { Machine, TransportUit } from '@/lib/fleet-types'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -125,6 +125,8 @@ export default function TransporturiUitPage() {
   const [saving,   setSaving]   = useState(false)
   const [form,     setForm]     = useState(emptyForm())
   const [cancelling, setCancelling] = useState<string | null>(null)
+  const [declaring,  setDeclaring]  = useState<string | null>(null)
+  const [tokenOk,    setTokenOk]    = useState(false)
 
   // ── Load ─────────────────────────────────────────────────────────────────
 
@@ -147,6 +149,14 @@ export default function TransporturiUitPage() {
   }, [id, router])
 
   useEffect(() => { void load() }, [load])
+
+  // Check ANAF token (quick HEAD-like call)
+  useEffect(() => {
+    fetch('/api/efactura/token')
+      .then(r => r.json())
+      .then((d: any) => setTokenOk(d.connected && !d.expired))
+      .catch(() => {})
+  }, [])
 
   // ── Auto-compute valabil_pana when tip or valabil_de changes ─────────────
 
@@ -219,6 +229,25 @@ export default function TransporturiUitPage() {
       toast.error('Eroare de rețea')
     } finally {
       setCancelling(null)
+    }
+  }
+
+  async function declareAtAnaf(uitId: string) {
+    setDeclaring(uitId)
+    try {
+      const res = await fetch('/api/etransport/declare', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ uit_id: uitId }),
+      })
+      const d = await res.json() as { cod_uit?: string; error?: string }
+      if (!res.ok) { toast.error(d.error ?? 'Eroare ANAF'); return }
+      toast.success(`Declarat la ANAF: ${d.cod_uit}`)
+      void load()
+    } catch {
+      toast.error('Eroare de rețea')
+    } finally {
+      setDeclaring(null)
     }
   }
 
@@ -322,13 +351,26 @@ export default function TransporturiUitPage() {
                     </td>
                     <td className="px-4 py-3">
                       {r.status === 'activ' && (
-                        <button
-                          onClick={() => void cancelUit(r.id)}
-                          disabled={cancelling === r.id}
-                          className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
-                        >
-                          {cancelling === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Anulează'}
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          {!r.cod_uit && tokenOk && (
+                            <button
+                              onClick={() => void declareAtAnaf(r.id)}
+                              disabled={declaring === r.id}
+                              className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                              title="Declară la ANAF și obține cod UIT automat"
+                            >
+                              {declaring === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+                              ANAF
+                            </button>
+                          )}
+                          <button
+                            onClick={() => void cancelUit(r.id)}
+                            disabled={cancelling === r.id}
+                            className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                          >
+                            {cancelling === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Anulează'}
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

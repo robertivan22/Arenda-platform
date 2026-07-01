@@ -81,7 +81,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/ferma') ||
     pathname.startsWith('/inventar') ||
     pathname.startsWith('/apia') ||
-    pathname.startsWith('/alerte')
+    pathname.startsWith('/alerte') ||
+    pathname.startsWith('/etransport')
 
   if (!user && isAppPage) {
     // Not logged in — redirect to login

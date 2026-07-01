@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Users, FileText, CreditCard, Wheat,
   MapPin, Package, Receipt, BarChart3, Tractor, Activity,
-  FolderOpen, FileSpreadsheet, Leaf, Menu as MenuIcon,
+  FolderOpen, FileSpreadsheet, Leaf, Menu as MenuIcon, Truck,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useRef, useEffect } from 'react'
@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { label: 'Tranzacții',  href: '/plati',              icon: CreditCard },
   { label: 'Fitosanitar', href: '/fitosanitar',        icon: Leaf },
   { label: 'e-Factura',   href: '/efactura',           icon: Receipt },
+  { label: 'e-Transport', href: '/etransport',          icon: Truck },
   { label: 'APIA',        href: '/apia',               icon: FolderOpen },
   { label: 'Rapoarte',    href: '/rapoarte',           icon: BarChart3 },
   { label: 'Declarații',  href: '/declaratii',         icon: FileSpreadsheet },
