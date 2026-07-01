@@ -23,6 +23,7 @@ interface Shipment {
 interface ShipmentDetail extends Shipment {
   loading_country: string; unloading_country: string; trailer1_no: string | null
   carrier_cui: string | null; source_document_ref: string | null; notes: string | null
+  validation_errors: string[] | null
   goods: Array<{ id: string; name: string; nc_code: string | null; quantity: number; uom: string; gross_weight_kg: number | null; value_ron: number | null }>
   logs: Array<{ id: string; request_type: string; http_status: number | null; anaf_status: string | null; cod_uit: string | null; error_message: string | null; created_at: string }>
 }
@@ -35,14 +36,16 @@ const TIP_OPTIONS = [
 ]
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
-  draft:             { label: 'Draft',         color: 'bg-gray-100 text-gray-600' },
-  validated:         { label: 'Validat',       color: 'bg-blue-50 text-blue-700' },
-  validation_failed: { label: 'Eroare valid.', color: 'bg-red-50 text-red-600' },
-  submitted:         { label: 'Trimis',        color: 'bg-purple-50 text-purple-700' },
-  processing:        { label: 'În procesare',  color: 'bg-yellow-50 text-yellow-700' },
-  accepted:          { label: 'Acceptat',      color: 'bg-green-50 text-green-700' },
-  rejected:          { label: 'Respins',       color: 'bg-red-50 text-red-600' },
-  deleted:           { label: 'Șters',         color: 'bg-gray-100 text-gray-500' },
+  draft:             { label: 'Draft',           color: 'bg-gray-100 text-gray-600' },
+  ready_to_submit:   { label: 'Gata de trimitere',color: 'bg-blue-50 text-blue-700' },
+  validated:         { label: 'Validat',         color: 'bg-blue-50 text-blue-700' },
+  validation_failed: { label: 'Eroare validare', color: 'bg-red-50 text-red-600' },
+  submitted:         { label: 'Trimis ANAF',     color: 'bg-purple-50 text-purple-700' },
+  processing:        { label: 'În procesare',    color: 'bg-yellow-50 text-yellow-700' },
+  accepted:          { label: 'Acceptat',        color: 'bg-green-50 text-green-700' },
+  rejected:          { label: 'Respins ANAF',    color: 'bg-red-50 text-red-600' },
+  uit_generated:     { label: 'UIT Generat ✓',   color: 'bg-green-100 text-green-800' },
+  deleted:           { label: 'Șters',           color: 'bg-gray-100 text-gray-500' },
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -78,6 +81,7 @@ export default function ETransportPage() {
   const [submitting,   setSubmitting]   = useState<string | null>(null)
   const [polling,      setPolling]      = useState<string | null>(null)
   const [cancelling,   setCancelling]   = useState<string | null>(null)
+  const [generating,   setGenerating]   = useState<string | null>(null)
   const [wForm, setWForm] = useState({
     operation_type: 'national', transport_start_date: new Date().toISOString().split('T')[0],
     loading_country: 'RO', loading_location: '', unloading_country: 'RO', unloading_location: '',
@@ -130,6 +134,37 @@ export default function ETransportPage() {
       void loadShipments()
       if (detail?.id === id) void openDetail(id)
     } finally { setter(null) }
+  }
+
+  async function generateUit(id: string) {
+    setGenerating(id)
+    try {
+      const r = await fetch(`/api/etransport/shipments/${id}/generate-uit`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const d = await r.json() as any
+      if (!r.ok || d.status === 'validation_failed') {
+        if (d.errors?.length) {
+          toast.error(`Validare eșuată: ${d.errors[0]}${d.errors.length > 1 ? ` (+${d.errors.length-1} erori)` : ''}`)
+        } else {
+          toast.error(d.error ?? 'Eroare generare UIT')
+        }
+        void loadShipments()
+        if (detail?.id === id) void openDetail(id)
+        return
+      }
+      if (d.status === 'already_generated') {
+        toast.info(`UIT deja generat: ${d.uitCode}`); return
+      }
+      toast.success(`✅ Cod UIT generat: ${d.uitCode}`)
+      void loadShipments()
+      if (detail?.id === id) void openDetail(id)
+    } catch {
+      toast.error('Eroare de rețea')
+    } finally {
+      setGenerating(null)
+    }
   }
 
   async function handleWizardSubmit() {
@@ -289,9 +324,11 @@ export default function ETransportPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filtered.map(s => {
-                      const canSubmit = ['draft','validated','rejected'].includes(s.status) && token?.connected && !token.expired
+                      const canGenerate = !s.uit_code
+                        && ['draft','ready_to_submit','validated','validation_failed','rejected'].includes(s.status)
+                        && token?.connected && !token.expired
                       const canPoll   = ['submitted','processing'].includes(s.status) && !!s.anaf_upload_index
-                      const canCancel = !['deleted','confirmed'].includes(s.status)
+                      const canCancel = !['deleted','confirmed','uit_generated'].includes(s.status)
                       return (
                         <tr key={s.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
@@ -319,10 +356,10 @@ export default function ETransportPage() {
                               <button onClick={() => void openDetail(s.id)} className="p-1.5 text-gray-400 hover:text-gray-700 rounded hover:bg-gray-100" title="Detalii">
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
-                              {canSubmit && (
-                                <button onClick={() => void doAction(s.id, 'submit', setSubmitting)} disabled={submitting===s.id}
-                                  className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                                  {submitting===s.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />} Declară
+                              {canGenerate && (
+                                <button onClick={() => void generateUit(s.id)} disabled={generating===s.id}
+                                  className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
+                                  {generating===s.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />} Generează UIT
                                 </button>
                               )}
                               {canPoll && (
@@ -368,14 +405,23 @@ export default function ETransportPage() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <StatusBadge status={detail.status} />
                   {detail.uit_code && (
-                    <div className="flex items-center gap-1 bg-green-50 border border-green-200 px-2 py-1 rounded-lg">
-                      <span className="text-xs font-mono text-green-800">{detail.uit_code}</span>
-                      <button onClick={() => { void navigator.clipboard?.writeText(detail.uit_code!); toast.success('Copiat!') }}>
-                        <Copy className="w-3 h-3 text-green-600" />
+                    <div className="flex items-center gap-1.5 bg-green-50 border border-green-300 px-3 py-1.5 rounded-lg">
+                      <span className="text-xs font-semibold text-green-800">Cod UIT:</span>
+                      <span className="font-mono text-xs font-bold text-green-900">{detail.uit_code}</span>
+                      <button onClick={() => { void navigator.clipboard?.writeText(detail.uit_code!); toast.success('Copiat!') }} title="Copiază">
+                        <Copy className="w-3.5 h-3.5 text-green-600" />
                       </button>
                     </div>
                   )}
                 </div>
+                {detail.validation_errors && detail.validation_errors.length > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="text-xs font-semibold text-red-700 mb-1">Erori validare ({detail.validation_errors.length})</div>
+                    <ul className="text-xs text-red-600 space-y-0.5 list-disc list-inside">
+                      {detail.validation_errors.map((e, i) => <li key={i}>{e}</li>)}
+                    </ul>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div><span className="text-gray-500">Tip:</span> <strong>{detail.operation_type}</strong></div>
                   <div><span className="text-gray-500">Data:</span> <strong>{fmtDate(detail.transport_start_date)}</strong></div>
@@ -411,10 +457,10 @@ export default function ETransportPage() {
                   </div>
                 )}
                 <div className="flex gap-2 pt-2">
-                  {['draft','validated','rejected'].includes(detail.status) && token?.connected && !token.expired && (
-                    <button onClick={() => void doAction(detail.id, 'submit', setSubmitting)} disabled={submitting===detail.id}
-                      className="flex-1 flex items-center justify-center gap-1 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                      {submitting===detail.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} Declară la ANAF
+                  {!detail.uit_code && ['draft','ready_to_submit','validated','validation_failed','rejected'].includes(detail.status) && token?.connected && !token.expired && (
+                    <button onClick={() => void generateUit(detail.id)} disabled={generating===detail.id}
+                      className="flex-1 flex items-center justify-center gap-1 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50">
+                      {generating===detail.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} Generează cod UIT
                     </button>
                   )}
                   {['submitted','processing'].includes(detail.status) && detail.anaf_upload_index && (
