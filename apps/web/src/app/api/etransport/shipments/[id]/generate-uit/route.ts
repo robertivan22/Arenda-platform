@@ -166,9 +166,9 @@ export async function POST(
 
   // ── 6. Upload to ANAF (with one 401-retry if refresh_token available) ────
   const anafClient = new AnafETransportClient((tokenRow as any).access_token, env)
-  let cod_uit: string
-  let upload_index: number | null
-  let rawResp: unknown
+  let cod_uit = ''
+  let upload_index: number | null = null
+  let rawResp: unknown = null
   let uploadErr: string | null = null
 
   const attemptUpload = async (client: AnafETransportClient) => {
