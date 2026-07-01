@@ -291,8 +291,17 @@ export default function FermaPage() {
         id: p.id, apia_code: p.bloc_fizic, crop_type: p.culture,
         bbch_stage: null, area_ha: p.surface, lat: p.lat!, lng: p.lng!,
       }))
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Sesiune expirată. Reautentificați-vă.')
+
       const res = await fetch('/api/farm-dashboard', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ parcels: inputs }),
       })
       if (!res.ok) throw new Error(`API error ${res.status}`)
