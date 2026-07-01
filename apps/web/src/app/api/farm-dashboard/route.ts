@@ -9,6 +9,11 @@ import type { ParcelInput } from '@/lib/farm-dashboard/types'
 //   SENTINEL_HUB_CLIENT_SECRET=<your-oauth2-client-secret>
 
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
+  }
+
   try {
     const body = (await req.json()) as { parcels?: ParcelInput[] }
     if (!Array.isArray(body.parcels) || body.parcels.length === 0) {

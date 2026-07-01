@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArendaPro QA Audit Report — 2026-07-01</title>
+<style>
+:root {
+  --red:#DC2626;--red-bg:#fef2f2;--red-bd:#fecaca;
+  --orange:#EA580C;--orange-bg:#fff7ed;--orange-bd:#fed7aa;
+  --yellow:#D97706;--yellow-bg:#fffbeb;--yellow-bd:#fde68a;
+  --blue:#2563EB;--blue-bg:#eff6ff;--blue-bd:#bfdbfe;
+  --green:#16A34A;--green-bg:#f0fdf4;--green-bd:#bbf7d0;
+  --ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc;
+  --card:#fff;--radius:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;font-size:14px}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+code{font-family:'JetBrains Mono','Fira Code','Cascadia Code',monospace;font-size:12.5px;background:#f1f5f9;padding:1px 5px;border-radius:4px;color:#334155}
+pre{background:#0f172a;color:#e2e8f0;padding:14px 18px;border-radius:10px;overflow-x:auto;font-size:12.5px;font-family:'JetBrains Mono',monospace;line-height:1.6;margin:10px 0}
+pre .k{color:#7dd3fc}pre .s{color:#86efac}pre .c{color:#94a3b8}pre .r{color:#f87171}pre .y{color:#fde68a}
+
+/* Layout */
+.wrap{max-width:1200px;margin:0 auto;padding:32px 24px}
+
+/* Header */
+.report-header{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:#fff;padding:48px 44px;border-radius:20px;margin-bottom:40px;position:relative;overflow:hidden}
+.report-header::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:44px 44px}
+.rh-inner{position:relative;z-index:2}
+.rh-logo{display:flex;align-items:center;gap:11px;margin-bottom:24px}
+.rh-logo .mk{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#2E7D32,#16A34A);display:grid;place-items:center}
+.rh-logo .mk svg{width:20px;height:20px}
+.rh-logo span{font-size:18px;font-weight:800;color:#fff}
+.rh-meta{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.rh-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 12px;border-radius:100px;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.85)}
+.report-header h1{font-size:clamp(22px,3vw,34px);font-weight:900;color:#fff;margin-bottom:10px;line-height:1.15}
+.report-header p{color:rgba(255,255,255,.72);font-size:15px;max-width:680px}
+
+/* Summary cards */
+.summary-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:40px}
+@media(max-width:900px){.summary-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:540px){.summary-grid{grid-template-columns:repeat(2,1fr)}}
+.scard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 16px;text-align:center}
+.scard .n{font-size:34px;font-weight:900;line-height:1}
+.scard .l{font-size:12px;font-weight:600;color:var(--muted);margin-top:5px;text-transform:uppercase;letter-spacing:.04em}
+.scard.critical{border-color:var(--red-bd);background:var(--red-bg)}.scard.critical .n{color:var(--red)}
+.scard.high{border-color:var(--orange-bd);background:var(--orange-bg)}.scard.high .n{color:var(--orange)}
+.scard.medium{border-color:var(--yellow-bd);background:var(--yellow-bg)}.scard.medium .n{color:var(--yellow)}
+.scard.low{border-color:var(--blue-bd);background:var(--blue-bg)}.scard.low .n{color:var(--blue)}
+.scard.total .n{color:var(--ink)}
+
+/* TOC */
+.toc{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px 28px;margin-bottom:40px}
+.toc h3{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:14px}
+.toc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+@media(max-width:700px){.toc-grid{grid-template-columns:1fr}}
+.toc a{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;font-size:13px;color:#334155;transition:.15s}
+.toc a:hover{background:#f1f5f9;text-decoration:none}
+
+/* Section */
+.section{margin-bottom:48px}
+.sec-hd{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid var(--line)}
+.sec-num{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:15px;font-weight:900;flex-shrink:0;color:#fff}
+.sec-num.s1{background:var(--red)}.sec-num.s2{background:var(--orange)}.sec-num.s3{background:var(--yellow)}.sec-num.s4{background:#8b5cf6}.sec-num.s5{background:var(--blue)}.sec-num.s6{background:#0891b2}
+.sec-hd h2{font-size:20px;font-weight:800}
+.sec-hd .scount{margin-left:auto;font-size:12px;font-weight:700;color:var(--muted)}
+
+/* Issue card */
+.issue{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;overflow:hidden}
+.issue-head{display:flex;align-items:flex-start;gap:12px;padding:16px 18px;cursor:pointer;user-select:none}
+.issue-head:hover{background:#fafbfc}
+.sev{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;white-space:nowrap;flex-shrink:0}
+.sev.critical{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd)}
+.sev.high{background:var(--orange-bg);color:var(--orange);border:1px solid var(--orange-bd)}
+.sev.medium{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-bd)}
+.sev.low{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-bd)}
+.issue-title{flex:1;font-size:14.5px;font-weight:700;color:var(--ink)}
+.issue-body{padding:0 18px 16px;border-top:1px solid var(--line);margin-top:0}
+.issue-body .desc{font-size:13.5px;color:#334155;line-height:1.6;margin:12px 0 10px}
+.file-ref{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--blue);background:var(--blue-bg);border:1px solid var(--blue-bd);padding:4px 10px;border-radius:6px;margin-bottom:10px;font-family:'JetBrains Mono',monospace}
+.fix-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+.fix-ok{font-size:13px;background:var(--green-bg);border:1px solid var(--green-bd);border-radius:8px;padding:10px 14px;color:#14532d}
+
+/* Priority table */
+.ptable{width:100%;border-collapse:separate;border-spacing:0;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line);margin-bottom:40px}
+.ptable th,.ptable td{padding:11px 16px;font-size:13px;border-bottom:1px solid var(--line);text-align:left}
+.ptable thead th{background:#0f172a;color:#fff;font-weight:700;font-size:12px;letter-spacing:.03em}
+.ptable tbody tr:last-child td{border-bottom:none}
+.ptable tbody tr:hover{background:#f8fafc}
+.ptable td.order{font-weight:800;color:var(--muted);font-size:15px;width:40px}
+.ptable td.area{font-size:11px;color:var(--muted);font-weight:600;white-space:nowrap}
+.ptable td.ref{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#334155}
+
+/* Checklist */
+.checklist{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:30px}
+@media(max-width:700px){.checklist{grid-template-columns:1fr}}
+.check-item{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card)}
+.check-icon{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;font-size:12px;margin-top:1px}
+.ok .check-icon{background:var(--green-bg);color:var(--green)}
+.ng .check-icon{background:var(--red-bg);color:var(--red)}
+.warn .check-icon{background:var(--yellow-bg);color:var(--yellow)}
+.na .check-icon{background:#f1f5f9;color:var(--muted)}
+.check-item .ct{font-size:13px;font-weight:600;color:var(--ink)}
+.check-item .cs{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+/* Expand/collapse toggle */
+details summary{list-style:none;cursor:pointer}
+details summary::-webkit-details-marker{display:none}
+details[open] .issue-body{display:block}
+.issue-body{display:none}
+details[open] summary .toggle-icon::before{content:'▲'}
+.toggle-icon::before{content:'▼';font-size:10px;color:var(--muted);margin-left:8px}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ═══ HEADER ═══ -->
+<div class="report-header">
+  <div class="rh-inner">
+    <div class="rh-logo">
+      <div class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v8M12 22c0-6 3-9 8-9-1 6-4 9-8 9zM12 22c0-5-3-7-7-7 1 5 3 7 7 7z"/></svg></div>
+      <span>ArendaPro</span>
+    </div>
+    <div class="rh-meta">
+      <span class="rh-badge">📋 QA Audit Report</span>
+      <span class="rh-badge">📅 2026-07-01</span>
+      <span class="rh-badge">🔬 Next.js 15 · Supabase · Cloudflare Pages</span>
+      <span class="rh-badge">🌿 branch: main · commit: df40b91</span>
+    </div>
+    <h1>Security, Functionality &amp; Performance Audit</h1>
+    <p>Systematic review across security, API auth coverage, RLS policies, mobile UX, dead code, performance, and accessibility. All issues include file + line numbers and concrete fixes.</p>
+  </div>
+</div>
+
+<!-- ═══ SUMMARY ═══ -->
+<div class="summary-grid">
+  <div class="scard critical"><div class="n">2</div><div class="l">Critical</div></div>
+  <div class="scard high"><div class="n">5</div><div class="l">High</div></div>
+  <div class="scard medium"><div class="n">8</div><div class="l">Medium</div></div>
+  <div class="scard low"><div class="n">5</div><div class="l">Low</div></div>
+  <div class="scard total"><div class="n">20</div><div class="l">Total Issues</div></div>
+</div>
+
+<!-- ═══ TOC ═══ -->
+<div class="toc">
+  <h3>Contents</h3>
+  <div class="toc-grid">
+    <a href="#s1">1. Functionality &amp; API Security</a>
+    <a href="#s2">2. Mobile View &amp; Interactions</a>
+    <a href="#s3">3. Dead Code &amp; Cleanup</a>
+    <a href="#s4">4. Performance</a>
+    <a href="#s5">5. Security &amp; RLS</a>
+    <a href="#s6">6. Accessibility</a>
+    <a href="#priority">▼ Prioritized Fix Order</a>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 1 — FUNCTIONALITY & API SECURITY
+═══════════════════════════════════════════════════ -->
+<div class="section" id="s1">
+  <div class="sec-hd">
+    <div class="sec-num s1">1</div>
+    <h2>Functionality &amp; API Security</h2>
+    <span class="scount">7 issues</span>
+  </div>
+
+  <!-- F-01 -->
+  <details class="issue" open>
+    <summary class="issue-head">
+      <span class="sev critical">● CRITICAL</span>
+      <span class="issue-title">F-01 · <code>/api/assistant</code> has no authentication guard — unauthenticated callers can trigger Groq LLM calls</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/app/api/assistant/route.ts · POST handler · no getUser() call</div>
+      <div class="desc">
+        The <code>POST /api/assistant</code> handler never calls <code>db.auth.getUser()</code> before processing. Any unauthenticated actor can POST <code>{"mode":"qa","question":"..."}</code> and drive Groq API consumption without a session. When <code>context</code> is supplied in the body, <code>fetchLiveData()</code> is skipped entirely, so RLS never runs — the call goes straight to Groq. This is a direct GROQ_API_KEY rate-limit / billing-abuse vector.
+      </div>
+      <div class="fix-label">Fix</div>
+      <pre><span class="k">export async function</span> <span class="s">POST</span>(req: NextRequest) {
+  <span class="c">// ── ADD these 5 lines at the very top ──────────────────────</span>
+  <span class="k">const</span> db = <span class="k">await</span> createSupabaseServerClient()
+  <span class="k">const</span> { data: { user } } = <span class="k">await</span> db.auth.getUser()
+  <span class="k">if</span> (!user) {
+    <span class="k">return</span> NextResponse.json({ ok: <span class="r">false</span>, error: <span class="s">'Neautentificat'</span> }, { status: <span class="y">401</span> })
+  }
+  <span class="c">// ──────────────────────────────────────────────────────────</span>
+  <span class="k">try</span> {
+    <span class="k">const</span> body = <span class="k">await</span> req.json()
+    <span class="c">// … rest unchanged</span></pre>
+    </div>
+  </details>
+
+  <!-- F-02 -->
+  <details class="issue" open>
+    <summary class="issue-head">
+      <span class="sev critical">● CRITICAL</span>
+      <span class="issue-title">F-02 · Middleware <code>isAppPage</code> guard missing 8 route prefixes — unprotected pages render for unauthenticated users</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/middleware.ts · ~line 57–70 · isAppPage definition</div>
+      <div class="desc">
+        The <code>isAppPage</code> condition that triggers the <code>/login</code> redirect only covers 11 routes. The following 8 app routes under <code>(app)/</code> are NOT listed and will render their full page shell to unauthenticated visitors: <code>/efactura</code>, <code>/distribuire-arenda</code>, <code>/campanie</code>, <code>/utilaje</code>, <code>/ferma</code>, <code>/inventar</code>, <code>/apia</code>, <code>/alerte</code>. The individual API calls inside those pages use RLS so data won't leak, but the pages themselves (sidebar, topbar, skeleton loaders) will render.
+      </div>
+      <div class="fix-label">Fix — add the missing prefixes to <code>isAppPage</code></div>
+      <pre><span class="k">const</span> isAppPage =
+  pathname.startsWith(<span class="s">'/dashboard'</span>) ||
+  pathname.startsWith(<span class="s">'/arendatori'</span>) ||
+  pathname.startsWith(<span class="s">'/contracte'</span>) ||
+  pathname.startsWith(<span class="s">'/parcele'</span>) ||
+  pathname.startsWith(<span class="s">'/plati'</span>) ||
+  pathname.startsWith(<span class="s">'/rapoarte'</span>) ||
+  pathname.startsWith(<span class="s">'/declaratii'</span>) ||
+  pathname.startsWith(<span class="s">'/profil'</span>) ||
+  pathname.startsWith(<span class="s">'/fitosanitar'</span>) ||
+  pathname.startsWith(<span class="s">'/setari'</span>) ||
+  pathname.startsWith(<span class="s">'/admin-cp'</span>) ||
+  pathname.startsWith(<span class="s">'/print'</span>) ||
+  <span class="c">// ── ADD these 8 ────────────────────────────────────────────</span>
+  pathname.startsWith(<span class="s">'/efactura'</span>) ||
+  pathname.startsWith(<span class="s">'/distribuire-arenda'</span>) ||
+  pathname.startsWith(<span class="s">'/campanie'</span>) ||
+  pathname.startsWith(<span class="s">'/utilaje'</span>) ||
+  pathname.startsWith(<span class="s">'/ferma'</span>) ||
+  pathname.startsWith(<span class="s">'/inventar'</span>) ||
+  pathname.startsWith(<span class="s">'/apia'</span>) ||
+  pathname.startsWith(<span class="s">'/alerte'</span>)</pre>
+    </div>
+  </details>
+
+  <!-- F-03 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev high">● HIGH</span>
+      <span class="issue-title">F-03 · <code>/api/farm-dashboard</code> has no auth — unauthenticated callers consume Sentinel Hub NDVI API credits</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/app/api/farm-dashboard/route.ts · POST handler · entire file</div>
+      <div class="desc">
+        The farm dashboard route accepts a <code>parcels[]</code> body and calls <code>computeFarmDashboard()</code> which invokes the Sentinel Hub Statistics API for NDVI. There is no <code>getUser()</code> check. Any unauthenticated caller can send 50 parcels per request and drive Sentinel Hub token usage without cost.
+      </div>
+      <div class="fix-label">Fix — same pattern as F-01</div>
+      <pre><span class="k">export async function</span> <span class="s">POST</span>(req: NextRequest) {
+  <span class="k">const</span> { createClient } = <span class="k">await import</span>(<span class="s">'@/lib/supabase/server'</span>)
+  <span class="k">const</span> db = <span class="k">await</span> createClient()
+  <span class="k">const</span> { data: { user } } = <span class="k">await</span> db.auth.getUser()
+  <span class="k">if</span> (!user) <span class="k">return</span> NextResponse.json({ error: <span class="s">'Neautentificat'</span> }, { status: <span class="y">401</span> })</pre>
+    </div>
+  </details>
+
+  <!-- F-04 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev high">● HIGH</span>
+      <span class="issue-title">F-04 · <code>/api/taric/validate</code> has no auth — open rate-limit abuse of UK Trade Tariff API</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/app/api/taric/validate/route.ts · POST handler · no auth check</div>
+      <div class="desc">
+        The TARIC validation endpoint proxies to <code>trade-tariff.service.gov.uk</code> for every POST. Without authentication, any external actor can bombard the UK Tariff API through this route. The upstream API has no key requirement, but rate-limits by originating IP — our Cloudflare edge IPs could get blocked.
+      </div>
+      <div class="fix-label">Fix — add auth guard at the top of POST handler (same pattern as F-01)</div>
+    </div>
+  </details>
+
+  <!-- F-05 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev high">● HIGH</span>
+      <span class="issue-title">F-05 · D112 route hardcodes <code>paymentType: 'CASH'</code> for all rows, ignoring actual transaction data</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/app/api/d112/route.ts · row-building block · <code>paymentType: 'CASH' as const</code></div>
+      <div class="desc">
+        Every row in the D112 dataset is emitted with <code>paymentType: 'CASH'</code> regardless of the actual <code>payment_type</code> value stored in the <code>transactions</code> table. A cereal/in-kind payment differs from a cash payment for tax reporting. This generates a structurally incorrect D112 draft that would need manual correction before filing.
+      </div>
+      <div class="fix-label">Fix</div>
+      <pre><span class="c">// In the query, add payment_type to the select:</span>
+.select(<span class="s">'id, lessor_id, contract_id, ron_brut, ron_net, tax_amount, payment_type, transaction_date'</span>)
+
+<span class="c">// In the row builder, use actual value:</span>
+paymentType: (<span class="k">t as any</span>).payment_type ?? <span class="s">'CASH'</span></pre>
+    </div>
+  </details>
+
+  <!-- F-06 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev medium">● MEDIUM</span>
+      <span class="issue-title">F-06 · <code>/api/wms-proxy</code> has no auth — open proxy for government WMS endpoints, abuse risk</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/app/api/wms-proxy/route.ts · GET handler · no auth check</div>
+      <div class="desc">
+        The WMS proxy has a solid hostname allowlist, but without an auth check the proxy is accessible to anyone on the internet. The government WMS services could blacklist our Cloudflare edge IP if flooded. Additionally, <code>'text/xml'</code> is listed in <code>ALLOWED_CONTENT_TYPES</code> with the comment "allow error responses to pass through for debugging" — this should be removed in production as it can leak SOAP error messages containing internal infrastructure details.
+      </div>
+      <div class="fix-label">Fix (1) — add auth guard. Fix (2) — remove text/xml in production</div>
+      <pre><span class="c">// Remove from ALLOWED_CONTENT_TYPES in production:</span>
+<span class="r">'text/xml',   // allow error responses to pass through for debugging</span>
+<span class="c">// Keep only image/* and application/vnd.ogc.*</span></pre>
+    </div>
+  </details>
+
+  <!-- F-07 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev medium">● MEDIUM</span>
+      <span class="issue-title">F-07 · Stripe subscription: no webhook handler found — subscription state never persists to DB</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/app/api/ · no stripe/ or webhook/ directory found</div>
+      <div class="desc">
+        A codebase-wide search found zero Stripe imports, webhook handlers, or <code>STRIPE_</code> environment variables. If Stripe subscriptions are part of the product spec (as mentioned in the QA requirements), the entire payment collection and subscription-gating layer is absent. Any "upgrade" CTA currently has no backend enforcement.
+      </div>
+      <div class="fix-label">Action Required</div>
+      <div class="fix-ok">Create <code>apps/web/src/app/api/stripe/webhook/route.ts</code> with signature verification (<code>stripe.webhooks.constructEvent</code>), idempotency check on <code>event.id</code>, and a <code>subscriptions</code> table to gate features. Until this exists, all users implicitly have full access.</div>
+    </div>
+  </details>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 2 — MOBILE
+═══════════════════════════════════════════════════ -->
+<div class="section" id="s2">
+  <div class="sec-hd">
+    <div class="sec-num s2">2</div>
+    <h2>Mobile View &amp; Interactions</h2>
+    <span class="scount">3 issues</span>
+  </div>
+
+  <!-- M-01 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev medium">● MEDIUM</span>
+      <span class="issue-title">M-01 · <code>AppTopbar</code> header is <code>h-12</code> (48px) — bell and profile buttons are exactly 48px tall with no explicit min-h on mobile, failing WCAG 2.5.8 (44×44px)</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/components/layout/AppTopbar.tsx · line ~201 · h-12 header; bell/profile buttons lack min-h</div>
+      <div class="desc">
+        The header is <code>h-12</code> (48px) which passes, but the individual bell and profile <code>&lt;div&gt;</code> wrappers that act as interactive targets are styled with <code>cursor-pointer</code> but no explicit <code>min-h-[44px] min-w-[44px]</code>. On narrow screens this can produce tap targets smaller than 44px wide. Additionally these are <code>&lt;div&gt;</code> elements, not <code>&lt;button&gt;</code>, so they are not keyboard-navigable without additional ARIA.
+      </div>
+      <div class="fix-label">Fix</div>
+      <pre><span class="c">// Replace div wrappers with button elements and add explicit tap target sizing:</span>
+&lt;<span class="k">button</span>
+  ref={bellRef}
+  onClick={() =&gt; setBellOpen(v =&gt; !v)}
+  className=<span class="s">"relative flex items-center justify-center w-10 h-10 min-w-[44px] min-h-[44px] rounded-lg hover:bg-gray-100"</span>
+  aria-label=<span class="s">"Alerte"</span>
+  aria-expanded={bellOpen}
+&gt;</pre>
+    </div>
+  </details>
+
+  <!-- M-02 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev low">● LOW</span>
+      <span class="issue-title">M-02 · Bottom nav safe-area only covers <code>paddingBottom</code> — side-inset not applied for iPhone Pro notch layout</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/components/layout/MobileNav.tsx · line 61 · style prop</div>
+      <div class="desc">
+        <code>paddingBottom: 'env(safe-area-inset-bottom)'</code> is correctly applied. However the fixed bottom nav has no <code>paddingLeft: 'env(safe-area-inset-left)'</code> and <code>paddingRight: 'env(safe-area-inset-right)'</code>. On iPhone 15 Pro Max in landscape mode the left/right safe-area insets are non-zero, causing the leftmost nav item (Meniu button) to be partially obscured by the notch/dynamic island overlay.
+      </div>
+      <div class="fix-label">Fix</div>
+      <pre>style={{
+  paddingBottom: <span class="s">'env(safe-area-inset-bottom)'</span>,
+  <span class="c">// Add these two:</span>
+  paddingLeft:   <span class="s">'env(safe-area-inset-left)'</span>,
+  paddingRight:  <span class="s">'env(safe-area-inset-right)'</span>,
+} <span class="k">as</span> React.CSSProperties}</pre>
+    </div>
+  </details>
+
+  <!-- M-03 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev low">● LOW</span>
+      <span class="issue-title">M-03 · Leaflet map touch events may conflict with main page vertical scroll on iOS Safari</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/components/MapParcelSelector.tsx · map container · no explicit touch-action config</div>
+      <div class="desc">
+        Leaflet handles pinch-zoom and drag by capturing <code>touchmove</code> events. iOS Safari's overscroll bounce can cause the outer page to scroll instead of the map panning when the gesture starts near the map edge. The <code>touch-action: 'pan-x'</code> was previously removed from MobileNav (correct fix), but the Leaflet map container itself should have <code>touch-action: none</code> set on the container div to prevent passive scroll interference during map interaction.
+      </div>
+      <div class="fix-label">Fix — set on the Leaflet container element</div>
+      <pre>&lt;<span class="k">div</span>
+  id=<span class="s">"map-container"</span>
+  className=<span class="s">"..."</span>
+  style={{ touchAction: <span class="s">'none'</span> }}  <span class="c">/* prevent iOS scroll capture during map pan */</span>
+/&gt;</pre>
+    </div>
+  </details>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 3 — DEAD CODE & CLEANUP
+═══════════════════════════════════════════════════ -->
+<div class="section" id="s3">
+  <div class="sec-hd">
+    <div class="sec-num s3">3</div>
+    <h2>Dead Code &amp; Cleanup</h2>
+    <span class="scount">3 issues</span>
+  </div>
+
+  <!-- DC-01 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev high">● HIGH</span>
+      <span class="issue-title">DC-01 · <code>console.log('[AI]', ...)</code> in production Edge Function leaks DB row counts to edge logs</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/app/api/assistant/route.ts · line 114 · console.log</div>
+      <div class="desc">
+        <code>console.log('[AI]', &#123; c: contractsRes.data?.length, ... &#125;)</code> runs on every AI assistant call in the Edge Function. Cloudflare logs these — they are visible in the Workers dashboard and retained for 3 days. This exposes row count telemetry per user (contracts, machines, transactions) to anyone with dashboard access. It also clutters production logs making error detection harder.
+      </div>
+      <div class="fix-label">Fix — remove the line entirely</div>
+      <pre><span class="r">- console.log('[AI]', { c: contractsRes.data?.length, o: ordersRes.data?.length, s: stockRes.data?.length, m: machinesRes.data?.length, tx: txBaseRes.data?.length, lessors: lessorRes.data?.length })</span></pre>
+    </div>
+  </details>
+
+  <!-- DC-02 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev medium">● MEDIUM</span>
+      <span class="issue-title">DC-02 · Migration SQL files scattered in project root — 25+ <code>supabase-migration-*.sql</code> files outside <code>supabase/</code> directory create confusion about applied state</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">Project root · supabase-migration-*.sql (25 files)</div>
+      <div class="desc">
+        There are 25 ad-hoc migration files in the project root alongside the official <code>supabase/</code> directory. These don't go through <code>supabase migration</code> lifecycle — there is no guarantee they've all been applied, in order, to production. This creates schema drift risk: a new developer or a fresh staging environment will not know which files to run, or in what order.
+      </div>
+      <div class="fix-label">Action</div>
+      <div class="fix-ok">Consolidate into <code>supabase/migrations/</code> with proper timestamp-prefixed filenames and commit a single canonical <code>schema.sql</code>. Delete or archive the root-level files once verified applied.</div>
+    </div>
+  </details>
+
+  <!-- DC-03 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev low">● LOW</span>
+      <span class="issue-title">DC-03 · Multiple residual <code>console.warn/error</code> debug statements in client components</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">Multiple files — see table below</div>
+      <div class="desc">
+        Several <code>console.warn</code> and <code>console.error</code> statements remain in client and server code. While <code>console.error</code> for genuine error paths is acceptable, debug-level logging like <code>console.warn('Could not auto-create registry parcel:', regErr.message)</code> in <code>MapParcelSelector.tsx:1420</code> should use structured error handling, not console output.
+      </div>
+      <div class="fix-label">Files with debug logs to review</div>
+      <pre><span class="c">MapParcelSelector.tsx:124   </span>console.error(`Nominatim API error: ...`)
+<span class="c">MapParcelSelector.tsx:1420  </span>console.warn(<span class="s">'Could not auto-create registry parcel:'</span>, ...)
+<span class="c">ContractDocuments.tsx:106   </span>console.warn(<span class="s">'PDF compression failed:'</span>, err)
+<span class="c">DirectStatusCards.tsx:278   </span>console.warn(<span class="s">'[DirectStatus] DB warnings:'</span>, ...)
+<span class="c">DistributionTracker.tsx:159 </span>console.warn(<span class="s">'Distribution sync error:'</span>, ...)
+<span class="c">assistant/route.ts:114      </span><span class="r">console.log('[AI]', { ... })</span>  <span class="r">← fix as DC-01</span></pre>
+    </div>
+  </details>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 4 — PERFORMANCE
+═══════════════════════════════════════════════════ -->
+<div class="section" id="s4">
+  <div class="sec-hd">
+    <div class="sec-num s4">4</div>
+    <h2>Performance</h2>
+    <span class="scount">3 issues</span>
+  </div>
+
+  <div class="checklist">
+    <div class="check-item ok"><div class="check-icon">✓</div><div><div class="ct">Leaflet lazy-loaded via <code>next/dynamic</code></div><div class="cs">MapParcelSelector and FarmDashboardMap both loaded with <code>dynamic(..., {ssr:false})</code></div></div></div>
+    <div class="check-item ok"><div class="check-icon">✓</div><div><div class="ct">Recharts charts lazy-loaded</div><div class="cs">All recharts components loaded via <code>dynamic()</code> in rapoarte page</div></div></div>
+    <div class="check-item ok"><div class="check-icon">✓</div><div><div class="ct">No service-role key in client bundle</div><div class="cs">Client and server Supabase clients both use ANON key only</div></div></div>
+    <div class="check-item warn"><div class="check-icon">!</div><div><div class="ct">Leaflet CSS applied globally after first mount</div><div class="cs">See P-01 below</div></div></div>
+    <div class="check-item warn"><div class="check-icon">!</div><div><div class="ct">LPIS zoom gate in layer config but not in query path</div><div class="cs">See P-02 below</div></div></div>
+    <div class="check-item na"><div class="check-icon">–</div><div><div class="ct">Cloudflare _headers cache rules</div><div class="cs">Not checked — wrangler.toml present but no _headers file found in <code>apps/web/public/</code></div></div></div>
+  </div>
+
+  <!-- P-01 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev medium">● MEDIUM</span>
+      <span class="issue-title">P-01 · <code>leaflet/dist/leaflet.css</code> imported at top-level of two components — becomes globally applied after first map visit, potentially affecting non-map page styles</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/components/MapParcelSelector.tsx · line 5 · import 'leaflet/dist/leaflet.css'</div>
+      <div class="file-ref" style="margin-top:6px">apps/web/src/components/FarmDashboardMap.tsx · line 4 · import 'leaflet/dist/leaflet.css'</div>
+      <div class="desc">
+        Both map components import Leaflet's CSS at module level. Because they are loaded via <code>dynamic({ ssr: false })</code>, the CSS is not injected at SSR time. However, once the map page is first visited in a session, Next.js injects the Leaflet CSS <em>globally</em> into <code>&lt;head&gt;</code>. Leaflet's CSS includes generic selectors like <code>.leaflet-container img</code>, <code>path</code>, and <code>.leaflet-popup-content-wrapper</code> that can unexpectedly override app styles on other pages visited after the map in the same session.
+      </div>
+      <div class="fix-label">Fix — scope via CSS Module wrapper</div>
+      <pre><span class="c">// MapParcelSelector.tsx — wrap the map container and scope with a CSS module:</span>
+<span class="c">// styles/map.module.css</span>
+.mapRoot :global(.leaflet-container) { ... }
+
+<span class="c">// Or import CSS conditionally inside useEffect:</span>
+useEffect(() =&gt; {
+  <span class="k">import</span>(<span class="s">'leaflet/dist/leaflet.css'</span>)
+}, [])</pre>
+    </div>
+  </details>
+
+  <!-- P-02 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev medium">● MEDIUM</span>
+      <span class="issue-title">P-02 · LPIS <code>minZoom: 12</code> is defined in layer catalogue config but does not gate the actual <code>lpis_by_bbox</code> Supabase query</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/components/MapParcelSelector.tsx · line 62 · <code>minZoom?: number</code> interface · line 75 · <code>minZoom: 12</code> in APIA layer config</div>
+      <div class="desc">
+        The <code>minZoom</code> property in <code>LayerDef</code> is declared but there is no evidence it gates the Supabase RPC call. If the map component triggers a bbox-based LPIS/parcel query when the zoom level is below 12, it will attempt to load potentially thousands of polygons covering a large geographic area, causing a slow query, large response payload, and Leaflet render freeze. The <code>minZoom</code> should also be checked before firing the RPC.
+      </div>
+      <div class="fix-label">Fix — add zoom guard before query</div>
+      <pre><span class="k">if</span> (map.getZoom() &lt; <span class="y">12</span>) {
+  <span class="c">// Clear existing LPIS features and show "zoom in" tooltip</span>
+  setLpisFeatures([])
+  <span class="k">return</span>
+}
+<span class="c">// Only then fire the bbox query:</span>
+<span class="k">const</span> { data } = <span class="k">await</span> supabase.rpc(<span class="s">'lpis_by_bbox'</span>, { ... })</pre>
+    </div>
+  </details>
+
+  <!-- P-03 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev low">● LOW</span>
+      <span class="issue-title">P-03 · <code>assistant/route.ts</code> Supabase queries use hardcoded <code>.limit(50/60/100)</code> — no per-user data volume management</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/app/api/assistant/route.ts · fetchLiveData() · lines 73–81</div>
+      <div class="desc">
+        The AI assistant context builder fetches up to 50 contracts, 60 stock items, 100 transactions etc. and serializes them all into a Groq prompt. As a farm grows, prompt tokens will approach and exceed Groq's context window limit (128k tokens for llama-3.3-70b), at which point the call silently truncates or errors. There is no token budget check before submission.
+      </div>
+      <div class="fix-label">Action</div>
+      <div class="fix-ok">Add a token estimate before calling Groq (e.g., <code>JSON.stringify(promptData).length / 4</code> as a rough token count). If it exceeds ~100k, trim lower-priority data arrays (stock &gt; transactions) and log a warning.</div>
+    </div>
+  </details>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 5 — SECURITY / RLS
+═══════════════════════════════════════════════════ -->
+<div class="section" id="s5">
+  <div class="sec-hd">
+    <div class="sec-num s5">5</div>
+    <h2>Security / RLS</h2>
+    <span class="scount">5 issues</span>
+  </div>
+
+  <div class="checklist">
+    <div class="check-item ok"><div class="check-icon">✓</div><div><div class="ct">No service-role key in client code</div><div class="cs">Both <code>client.ts</code> and <code>server.ts</code> use only ANON key</div></div></div>
+    <div class="check-item ok"><div class="check-icon">✓</div><div><div class="ct">Core table RLS policies use <code>auth.uid() = user_id</code></div><div class="cs">lessors, contracts, parcels, payments — all correct</div></div></div>
+    <div class="check-item ok"><div class="check-icon">✓</div><div><div class="ct">ANAF token endpoint never returns <code>access_token</code> in GET response</div><div class="cs"><code>/api/efactura/token</code> GET returns only metadata (expires_at, cif) — token value never exposed</div></div></div>
+    <div class="check-item ok"><div class="check-icon">✓</div><div><div class="ct">WMS proxy has hostname allowlist</div><div class="cs">Only 8 whitelisted government + Esri hostnames permitted</div></div></div>
+    <div class="check-item ng"><div class="check-icon">✗</div><div><div class="ct">Storage RLS is not user-scoped</div><div class="cs">See SEC-01 below — critical data isolation gap</div></div></div>
+    <div class="check-item ng"><div class="check-icon">✗</div><div><div class="ct">File upload type validated client-side only</div><div class="cs">See SEC-02 below</div></div></div>
+  </div>
+
+  <!-- SEC-01 -->
+  <details class="issue" open>
+    <summary class="issue-head">
+      <span class="sev high">● HIGH</span>
+      <span class="issue-title">SEC-01 · Storage RLS policy <code>documents_auth</code> checks only <code>auth.uid() IS NOT NULL</code> — any authenticated user can access any other user's contract documents</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">supabase-fix-rls-defaults.sql · lines ~48–52 · documents_auth policy</div>
+      <div class="desc">
+        The <code>documents</code> storage bucket policy is: <code>USING (bucket_id = 'documents' AND auth.uid() IS NOT NULL)</code>. This allows <strong>any authenticated user</strong> to read, update, or delete any file in the bucket as long as they are logged in — not just their own files. Contract PDFs, identity documents, and payment receipts from all tenants are cross-accessible. This is a multi-tenant data isolation failure.
+      </div>
+      <div class="fix-label">Fix — scope to user's own folder</div>
+      <pre><span class="c">-- Drop the overly-permissive policy:</span>
+DROP POLICY IF EXISTS <span class="s">"documents_auth"</span> ON storage.objects;
+
+<span class="c">-- Replace with path-scoped policy (files stored as {user_id}/...):</span>
+CREATE POLICY <span class="s">"documents_own"</span> ON storage.objects
+  FOR ALL
+  USING (
+    bucket_id = <span class="s">'documents'</span>
+    AND (storage.foldername(name))[<span class="y">1</span>] = auth.uid()::text
+  )
+  WITH CHECK (
+    bucket_id = <span class="s">'documents'</span>
+    AND (storage.foldername(name))[<span class="y">1</span>] = auth.uid()::text
+  );
+
+<span class="c">-- Ensure upload paths use user_id prefix:</span>
+<span class="c">-- e.g., storage_path = `${user.id}/contracts/${filename}`</span></pre>
+    </div>
+  </details>
+
+  <!-- SEC-02 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev high">● HIGH</span>
+      <span class="issue-title">SEC-02 · Shapefile and contract document file-type validation is client-side only — server accepts any MIME type</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/components/distribuire/ImportWizardModal.tsx · line 168 · client-side accept filter</div>
+      <div class="desc">
+        <code>ImportWizardModal</code> uses <code>accept=".zip,.geojson,.json"</code> and client-side MIME checks. The Supabase storage bucket <code>allowed_mime_types</code> for the <code>documents</code> bucket is set to PDF/images only, which partially protects contract attachments. However, the shapefile import appears to go through a direct client upload path where a crafted request bypassing the browser can upload arbitrary files. Any server-side API route that processes uploaded files should validate MIME type and file magic bytes server-side.
+      </div>
+      <div class="fix-label">Fix — validate server-side in the import handler</div>
+      <pre><span class="c">// In the import route/server action:</span>
+<span class="k">const</span> ALLOWED_TYPES = <span class="k">new</span> Set([<span class="s">'application/zip'</span>, <span class="s">'application/x-zip-compressed'</span>, <span class="s">'application/geo+json'</span>, <span class="s">'application/json'</span>])
+<span class="k">const</span> MAX_SIZE = <span class="y">10 * 1024 * 1024</span> <span class="c">// 10 MB</span>
+
+<span class="k">if</span> (!ALLOWED_TYPES.has(file.type) || file.size &gt; MAX_SIZE) {
+  <span class="k">return</span> NextResponse.json({ error: <span class="s">'Tip sau dimensiune fisier neacceptata'</span> }, { status: <span class="y">400</span> })
+}</pre>
+    </div>
+  </details>
+
+  <!-- SEC-03 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev medium">● MEDIUM</span>
+      <span class="issue-title">SEC-03 · <code>assistant/route.ts</code> returns <code>_debug</code> object with internal row counts in every successful AI response</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/app/api/assistant/route.ts · last return statement · <code>_debug: { machines: ..., transactions: ... }</code></div>
+      <div class="desc">
+        Every successful <code>full_analysis</code> response includes <code>_debug: { machines: rawData._machines_raw?.length, transactions: rawData._transactions_raw?.length }</code>. This leaks internal data counts to the browser. If the frontend renders or logs this, it reveals tenant data volume which is sensitive business information.
+      </div>
+      <div class="fix-label">Fix — remove <code>_debug</code> from production response</div>
+      <pre><span class="k">return</span> NextResponse.json({
+  ok: <span class="k">true</span>, mode, result, model, tokens_used: tokens,
+  data_errors: queryErrors.length &gt; <span class="y">0</span> ? queryErrors : <span class="k">undefined</span>,
+  <span class="r">// _debug: { machines: ..., transactions: ... }  ← REMOVE</span>
+})</pre>
+    </div>
+  </details>
+
+  <!-- SEC-04 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev medium">● MEDIUM</span>
+      <span class="issue-title">SEC-04 · <code>efactura/submit</code> stores raw XML (including full invoice data) in <code>efactura_submissions.xml_sent</code> with no RLS verified on that table</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/app/api/efactura/submit/route.ts · line ~130 · insert into efactura_submissions</div>
+      <div class="desc">
+        <code>efactura_submissions</code> stores the complete UBL 2.1 XML including CIF, IBAN, transaction amounts and personal data. This table is not referenced in <code>supabase-rls.sql</code> or any migration file, meaning it may have no RLS policy. If RLS is disabled on this table, any authenticated user can query all other users' submitted invoice XMLs. Verify and add the policy.
+      </div>
+      <div class="fix-label">Fix — add RLS policy</div>
+      <pre>ALTER TABLE efactura_submissions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY <span class="s">"efactura_own"</span> ON efactura_submissions
+  FOR ALL
+  USING     (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());</pre>
+    </div>
+  </details>
+
+  <!-- SEC-05 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev low">● LOW</span>
+      <span class="issue-title">SEC-05 · <code>/api/efactura/status</code> does not validate that <code>invoice_id</code> is a UUID — injectable into downstream URL construction</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/app/api/efactura/status/route.ts · ~line 22 · invoice_id from query param</div>
+      <div class="desc">
+        <code>invoice_id</code> is taken from the URL query string and passed to <code>db.from('invoices').eq('id', invoice_id)</code>. PostgREST parameterizes this correctly so SQL injection is not possible, but if <code>invoice_id</code> is also used in log strings or downstream ANAF API URL construction without sanitization, it's worth guarding. Add a UUID format check for defense-in-depth.
+      </div>
+      <div class="fix-label">Fix — one-line guard</div>
+      <pre><span class="k">const</span> UUID_RE = <span class="s">/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i</span>
+<span class="k">if</span> (!invoice_id || !UUID_RE.test(invoice_id)) {
+  <span class="k">return</span> NextResponse.json({ error: <span class="s">'invoice_id invalid'</span> }, { status: <span class="y">400</span> })
+}</pre>
+    </div>
+  </details>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 6 — ACCESSIBILITY
+═══════════════════════════════════════════════════ -->
+<div class="section" id="s6">
+  <div class="sec-hd">
+    <div class="sec-num s6">6</div>
+    <h2>Accessibility (Quick Pass)</h2>
+    <span class="scount">2 issues</span>
+  </div>
+
+  <!-- A-01 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev medium">● MEDIUM</span>
+      <span class="issue-title">A-01 · Bell and Profile interactive areas are <code>&lt;div&gt;</code> elements — not keyboard-reachable without explicit <code>tabIndex</code> and ARIA role</span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">apps/web/src/components/layout/AppTopbar.tsx · bell wrapper div · profile wrapper div</div>
+      <div class="desc">
+        Both the bell notification trigger and the profile button in the topbar are <code>&lt;div&gt;</code> elements with <code>onClick</code> and <code>cursor-pointer</code>. They are not reachable via <code>Tab</code> key and are not announced as interactive by screen readers. WCAG 2.1 Success Criterion 2.1.1 requires all functionality to be operable via keyboard.
+      </div>
+      <div class="fix-label">Fix — change to <code>&lt;button&gt;</code> elements (addresses M-01 and A-01 simultaneously)</div>
+      <pre>&lt;<span class="k">button</span>
+  type=<span class="s">"button"</span>
+  ref={bellRef}
+  onClick={() =&gt; setBellOpen(v =&gt; !v)}
+  aria-label=<span class="s">"Alerte"</span>
+  aria-haspopup=<span class="s">"dialog"</span>
+  aria-expanded={bellOpen}
+  className=<span class="s">"relative flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 min-w-[44px] min-h-[44px]"</span>
+&gt;</pre>
+    </div>
+  </details>
+
+  <!-- A-02 -->
+  <details class="issue">
+    <summary class="issue-head">
+      <span class="sev low">● LOW</span>
+      <span class="issue-title">A-02 · Several form <code>&lt;input&gt;</code> and <code>&lt;select&gt;</code> elements use only <code>placeholder</code> text without an associated <code>&lt;label&gt;</code></title></span>
+      <span class="toggle-icon"></span>
+    </summary>
+    <div class="issue-body">
+      <div class="file-ref">Multiple page.tsx files — parcele, contracte, fitosanitar, setari — unlabeled inputs</div>
+      <div class="desc">
+        Multiple inline inputs were found where the label text exists visually (via adjacent <code>&lt;label&gt;</code>) but the label lacks a matching <code>htmlFor</code> / <code>id</code> pairing, meaning screen readers cannot associate them. Some inputs rely solely on <code>placeholder</code> text which disappears once the user types and does not constitute an accessible label.
+      </div>
+      <div class="fix-label">Fix pattern</div>
+      <pre><span class="c">// Before (bad):</span>
+&lt;<span class="k">label</span>&gt;Suprafata (ha)&lt;/<span class="k">label</span>&gt;
+&lt;<span class="k">input</span> className={inputCls} type=<span class="s">"number"</span> /&gt;
+
+<span class="c">// After (correct):</span>
+&lt;<span class="k">label</span> htmlFor=<span class="s">"surface-input"</span>&gt;Suprafata (ha)&lt;/<span class="k">label</span>&gt;
+&lt;<span class="k">input</span> id=<span class="s">"surface-input"</span> className={inputCls} type=<span class="s">"number"</span> /&gt;</pre>
+    </div>
+  </details>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PRIORITY FIX ORDER
+═══════════════════════════════════════════════════ -->
+<div class="section" id="priority">
+  <div class="sec-hd">
+    <div class="sec-num" style="background:#0f172a">★</div>
+    <h2>Prioritized Fix Order</h2>
+  </div>
+
+  <table class="ptable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>ID</th>
+        <th>Severity</th>
+        <th>Issue</th>
+        <th>Area</th>
+        <th>File Reference</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="order">1</td>
+        <td><a href="#s1">F-01</a></td>
+        <td><span class="sev critical" style="font-size:10px">CRITICAL</span></td>
+        <td>Add <code>getUser()</code> auth guard to <code>/api/assistant</code></td>
+        <td class="area">Security / Auth</td>
+        <td class="ref">api/assistant/route.ts · top of POST</td>
+      </tr>
+      <tr>
+        <td class="order">2</td>
+        <td><a href="#s1">F-02</a></td>
+        <td><span class="sev critical" style="font-size:10px">CRITICAL</span></td>
+        <td>Add 8 missing routes to middleware <code>isAppPage</code></td>
+        <td class="area">Security / Auth</td>
+        <td class="ref">middleware.ts · isAppPage</td>
+      </tr>
+      <tr>
+        <td class="order">3</td>
+        <td><a href="#s5">SEC-01</a></td>
+        <td><span class="sev high" style="font-size:10px">HIGH</span></td>
+        <td>Fix storage RLS — scope <code>documents_auth</code> to <code>auth.uid()</code> path prefix</td>
+        <td class="area">Security / RLS</td>
+        <td class="ref">supabase-fix-rls-defaults.sql</td>
+      </tr>
+      <tr>
+        <td class="order">4</td>
+        <td><a href="#s3">DC-01</a></td>
+        <td><span class="sev high" style="font-size:10px">HIGH</span></td>
+        <td>Remove <code>console.log('[AI]', ...)</code> from production Edge route</td>
+        <td class="area">Dead Code</td>
+        <td class="ref">api/assistant/route.ts:114</td>
+      </tr>
+      <tr>
+        <td class="order">5</td>
+        <td><a href="#s5">SEC-02</a></td>
+        <td><span class="sev high" style="font-size:10px">HIGH</span></td>
+        <td>Add server-side file type + size validation to shapefile import</td>
+        <td class="area">Security</td>
+        <td class="ref">ImportWizardModal · import route</td>
+      </tr>
+      <tr>
+        <td class="order">6</td>
+        <td><a href="#s1">F-03</a></td>
+        <td><span class="sev high" style="font-size:10px">HIGH</span></td>
+        <td>Add auth guard to <code>/api/farm-dashboard</code></td>
+        <td class="area">Security / Auth</td>
+        <td class="ref">api/farm-dashboard/route.ts</td>
+      </tr>
+      <tr>
+        <td class="order">7</td>
+        <td><a href="#s1">F-04</a></td>
+        <td><span class="sev high" style="font-size:10px">HIGH</span></td>
+        <td>Add auth guard to <code>/api/taric/validate</code></td>
+        <td class="area">Security / Auth</td>
+        <td class="ref">api/taric/validate/route.ts</td>
+      </tr>
+      <tr>
+        <td class="order">8</td>
+        <td><a href="#s5">SEC-04</a></td>
+        <td><span class="sev medium" style="font-size:10px">MEDIUM</span></td>
+        <td>Add RLS policy to <code>efactura_submissions</code> table</td>
+        <td class="area">Security / RLS</td>
+        <td class="ref">supabase (SQL Editor)</td>
+      </tr>
+      <tr>
+        <td class="order">9</td>
+        <td><a href="#s1">F-05</a></td>
+        <td><span class="sev high" style="font-size:10px">HIGH</span></td>
+        <td>Fix D112 <code>paymentType</code> to use actual transaction value</td>
+        <td class="area">Functionality</td>
+        <td class="ref">api/d112/route.ts · row builder</td>
+      </tr>
+      <tr>
+        <td class="order">10</td>
+        <td><a href="#s5">SEC-03</a></td>
+        <td><span class="sev medium" style="font-size:10px">MEDIUM</span></td>
+        <td>Remove <code>_debug</code> payload from AI assistant response</td>
+        <td class="area">Security</td>
+        <td class="ref">api/assistant/route.ts · return</td>
+      </tr>
+      <tr>
+        <td class="order">11</td>
+        <td><a href="#s1">F-06</a></td>
+        <td><span class="sev medium" style="font-size:10px">MEDIUM</span></td>
+        <td>Add auth guard to WMS proxy + remove <code>text/xml</code> content type</td>
+        <td class="area">Security</td>
+        <td class="ref">api/wms-proxy/route.ts</td>
+      </tr>
+      <tr>
+        <td class="order">12</td>
+        <td><a href="#s4">P-02</a></td>
+        <td><span class="sev medium" style="font-size:10px">MEDIUM</span></td>
+        <td>Enforce LPIS zoom gate in query path (not just layer config)</td>
+        <td class="area">Performance</td>
+        <td class="ref">MapParcelSelector.tsx · bbox query</td>
+      </tr>
+      <tr>
+        <td class="order">13</td>
+        <td><a href="#s2">M-01</a></td>
+        <td><span class="sev medium" style="font-size:10px">MEDIUM</span></td>
+        <td>Replace bell/profile <code>&lt;div&gt;</code> with <code>&lt;button&gt;</code>, add <code>min-w/h-[44px]</code></td>
+        <td class="area">Mobile / A11y</td>
+        <td class="ref">AppTopbar.tsx · bell + profile triggers</td>
+      </tr>
+      <tr>
+        <td class="order">14</td>
+        <td><a href="#s4">P-01</a></td>
+        <td><span class="sev medium" style="font-size:10px">MEDIUM</span></td>
+        <td>Scope <code>leaflet.css</code> via CSS module to prevent global style pollution</td>
+        <td class="area">Performance / CSS</td>
+        <td class="ref">MapParcelSelector.tsx:5, FarmDashboardMap.tsx:4</td>
+      </tr>
+      <tr>
+        <td class="order">15</td>
+        <td><a href="#s3">DC-02</a></td>
+        <td><span class="sev medium" style="font-size:10px">MEDIUM</span></td>
+        <td>Consolidate 25 root-level SQL files into <code>supabase/migrations/</code></td>
+        <td class="area">Cleanup</td>
+        <td class="ref">Project root · supabase-migration-*.sql</td>
+      </tr>
+      <tr>
+        <td class="order">16</td>
+        <td><a href="#s1">F-07</a></td>
+        <td><span class="sev medium" style="font-size:10px">MEDIUM</span></td>
+        <td>Implement Stripe webhook handler (subscription gating absent)</td>
+        <td class="area">Functionality</td>
+        <td class="ref">apps/web/src/app/api/stripe/ (missing)</td>
+      </tr>
+      <tr>
+        <td class="order">17</td>
+        <td><a href="#s5">SEC-05</a></td>
+        <td><span class="sev low" style="font-size:10px">LOW</span></td>
+        <td>Validate <code>invoice_id</code> UUID format in status route</td>
+        <td class="area">Security</td>
+        <td class="ref">api/efactura/status/route.ts:22</td>
+      </tr>
+      <tr>
+        <td class="order">18</td>
+        <td><a href="#s2">M-02</a></td>
+        <td><span class="sev low" style="font-size:10px">LOW</span></td>
+        <td>Add <code>env(safe-area-inset-left/right)</code> to bottom nav</td>
+        <td class="area">Mobile</td>
+        <td class="ref">MobileNav.tsx:61</td>
+      </tr>
+      <tr>
+        <td class="order">19</td>
+        <td><a href="#s6">A-02</a></td>
+        <td><span class="sev low" style="font-size:10px">LOW</span></td>
+        <td>Add <code>htmlFor</code>/<code>id</code> pairs to unlabeled form inputs</td>
+        <td class="area">Accessibility</td>
+        <td class="ref">Multiple page.tsx files</td>
+      </tr>
+      <tr>
+        <td class="order">20</td>
+        <td><a href="#s3">DC-03</a></td>
+        <td><span class="sev low" style="font-size:10px">LOW</span></td>
+        <td>Remove residual <code>console.warn</code> debug statements in client components</td>
+        <td class="area">Cleanup</td>
+        <td class="ref">MapParcelSelector, ContractDocuments, etc.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Footer -->
+<div style="text-align:center;padding:40px 0 20px;font-size:12px;color:var(--muted);border-top:1px solid var(--line)">
+  ArendaPro QA Audit · Generated 2026-07-01 · Branch main · Commit df40b91 · 20 issues across 6 categories
+  <br>Report covers: Next.js 15.5 · TypeScript 5.9 · Supabase · Cloudflare Pages · Leaflet · Groq llama-3.3-70b
+</div>
+
+</div>
+<script>
+// Auto-open first 2 critical issues; close rest
+document.querySelectorAll('details.issue').forEach((d, i) => {
+  if (i >= 2) d.open = false
+})
+</script>
+</body>
+</html>

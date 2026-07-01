@@ -38,6 +38,11 @@ interface UkCommodityResponse {
 }
 
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
+  }
+
   let body: { code?: string; reference_date?: string; language?: string } = {}
   try { body = await req.json() } catch { /* empty body */ }
 

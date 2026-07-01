@@ -218,8 +218,10 @@ export function AppTopbar() {
         <div className="relative" ref={bellRef}>
           <button
             onClick={() => setBellOpen(v => !v)}
-            className="relative p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+            className="relative p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
             aria-label="Alerte"
+            aria-expanded={bellOpen}
+            aria-haspopup="true"
           >
             <Bell className="w-4 h-4" />
             {alerts.total > 0 && (
@@ -233,7 +235,10 @@ export function AppTopbar() {
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(v => !v)}
-            className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center flex-shrink-0 hover:bg-brand-600 transition-colors"
+            className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center flex-shrink-0 hover:bg-brand-600 transition-colors min-w-[44px] min-h-[44px]"
+            aria-label="Meniu profil"
+            aria-expanded={menuOpen}
+            aria-haspopup="true"
           >
             <User className="w-4 h-4 text-white" />
           </button>

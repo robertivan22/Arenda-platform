@@ -58,7 +58,7 @@ export function MobileNav() {
   return (
     <nav
       className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gray-200 md:hidden flex items-stretch"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}
     >
       {/* Fixed Menu button */}
       <button

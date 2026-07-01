@@ -107,6 +107,7 @@ export async function POST(req: NextRequest) {
         ronNet: Number((t as any).ron_net ?? 0),
         taxAmount: Number((t as any).tax_amount ?? 0),
         contractIds: (t as any).contract_id ? [(t as any).contract_id] : [],
+        paymentType: (t as any).payment_type ?? 'CASH',
       })
     }
   }
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
       lessorLastName: lessor?.last_name ?? '-',
       lessorFirstName: lessor?.first_name ?? '-',
       contractId: agg.contractIds.join(', '),
-      paymentType: 'CASH' as const,
+      paymentType: (agg.paymentType ?? 'CASH') as 'CASH' | 'BANK_TRANSFER' | 'OTHER',
       grossAmountRon: gross,
       flatDeductionRon: flatDeduction,
       netTaxableRon: netTaxable,

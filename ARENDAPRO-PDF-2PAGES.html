@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArendaPro — Ofertă Comercială</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --green:#2E7D32;--green-l:#16A34A;--green-bg:#e8f5e9;
+  --blue:#2563EB;--ink:#0b1220;--muted:#6b7280;
+  --line:#e5e9f0;--bg:#fff;--dark:#111827;
+}
+body{font-family:'Inter',sans-serif;color:var(--ink);background:#e8edf2;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+h1,h2,h3,h4,h5{font-family:'Plus Jakarta Sans',sans-serif;line-height:1.1;letter-spacing:-.02em}
+
+/* ── PAGE SHELL ── */
+.page{
+  width:210mm;min-height:297mm;margin:16px auto;background:#fff;
+  box-shadow:0 8px 40px rgba(0,0,0,.18);position:relative;overflow:hidden;
+}
+
+/* ── PAGE 1 ── */
+/* Header strip */
+.p1-head{
+  background:linear-gradient(135deg,#0f2417 0%,#1b4332 55%,#14532d 100%);
+  padding:38px 44px 34px;position:relative;overflow:hidden;
+}
+.p1-head::before{
+  content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+.p1-head::after{content:'';position:absolute;width:420px;height:420px;border-radius:50%;background:#2E7D32;filter:blur(90px);opacity:.35;top:-200px;right:-100px}
+.head-inner{position:relative;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.logo-wrap{display:flex;align-items:center;gap:11px}
+.logo-mark{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#2E7D32,#16A34A);display:grid;place-items:center;flex-shrink:0;box-shadow:0 6px 18px -6px rgba(46,125,50,.7)}
+.logo-mark svg{width:22px;height:22px}
+.logo-name{font-family:'Plus Jakarta Sans';font-weight:900;font-size:22px;color:#fff;letter-spacing:-.01em}
+.logo-name small{display:block;font-size:11px;font-weight:500;color:rgba(255,255,255,.55);letter-spacing:.04em;text-transform:uppercase;font-family:'Inter';margin-top:1px}
+.head-right{text-align:right}
+.head-right .doc-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:4px}
+.head-right .doc-date{font-size:13px;color:rgba(255,255,255,.75);font-weight:500}
+.head-tagline{margin-top:22px;position:relative;z-index:2}
+.head-tagline h1{font-size:28px;font-weight:900;color:#fff;margin-bottom:7px;line-height:1.08}
+.head-tagline h1 .g{background:linear-gradient(90deg,#86efac,#93c5fd);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.head-tagline p{font-size:13px;color:rgba(255,255,255,.72);max-width:520px;line-height:1.55}
+/* 4 stats row */
+.head-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:22px;position:relative;z-index:2}
+.hs{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:12px;padding:11px 13px;backdrop-filter:blur(6px)}
+.hs .n{font-family:'Plus Jakarta Sans';font-size:19px;font-weight:900;color:#fff;line-height:1}
+.hs .l{font-size:10px;color:rgba(255,255,255,.6);margin-top:4px;line-height:1.3}
+
+/* Body of page 1 */
+.p1-body{padding:28px 44px 0}
+
+/* Section title */
+.sec-title{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--green);margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* 3-col about */
+.about-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:26px}
+.acard{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fafbfc}
+.acard .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;margin-bottom:10px}
+.acard .ic svg{width:18px;height:18px;stroke-width:2}
+.ic-g{background:var(--green-bg);color:var(--green)}
+.ic-r{background:#fee2e2;color:#dc2626}
+.ic-b{background:#e0ecff;color:var(--blue)}
+.acard h4{font-size:13px;font-weight:700;margin-bottom:5px}
+.acard p{font-size:11.5px;color:var(--muted);line-height:1.5}
+
+/* 3-col modules mini */
+.mod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:26px}
+.mmod{border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:#fff;display:flex;gap:10px;align-items:flex-start}
+.mmod .dot{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;flex-shrink:0;font-size:14px}
+.mmod .txt h5{font-size:12px;font-weight:700;margin-bottom:2px}
+.mmod .txt p{font-size:10.5px;color:var(--muted);line-height:1.4}
+.mmod .kbadge{display:inline-block;font-size:9.5px;font-weight:700;color:var(--green);background:var(--green-bg);padding:2px 7px;border-radius:100px;margin-top:4px}
+
+/* Dashboard mockup strip */
+.dash-strip{background:linear-gradient(135deg,#0f2417,#1a2e1e);border-radius:16px;padding:16px 18px;margin-bottom:26px}
+.dash-row{display:grid;grid-template-columns:repeat(3,1fr) 2fr;gap:10px;align-items:start}
+.dk{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:11px 12px}
+.dk .v{font-family:'Plus Jakarta Sans';font-size:20px;font-weight:900;color:#fff}
+.dk .l{font-size:10px;color:rgba(255,255,255,.55);margin-top:3px}
+.dk .c{font-size:9.5px;margin-top:4px;font-weight:600;color:#4ade80}
+.dkbar{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:11px 12px}
+.dkbar h6{font-size:10px;color:rgba(255,255,255,.6);margin-bottom:7px;font-weight:600}
+.bars{display:flex;align-items:flex-end;gap:3px;height:40px}
+.bars b{flex:1;border-radius:2px 2px 0 0}
+.bars b.g{background:linear-gradient(180deg,#4ade80,rgba(74,222,128,.2))}
+.bars b.b{background:linear-gradient(180deg,#60a5fa,rgba(96,165,250,.2))}
+.alerts-mini{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:10px 12px;grid-column:span 4}
+.al{display:flex;align-items:center;gap:7px;font-size:10px;color:rgba(255,255,255,.78);padding:3px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.al:last-child{border:none}
+.al .d{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* ── PAGE 2 ── */
+.p2-head{background:var(--dark);padding:24px 44px;display:flex;align-items:center;justify-content:space-between}
+.p2-head .logo-wrap{gap:10px}
+.p2-head .logo-name{font-size:17px}
+.p2-head .pg{font-size:11px;font-weight:600;color:rgba(255,255,255,.5)}
+
+.p2-body{padding:28px 44px}
+
+/* Pricing 3 col */
+.price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:26px}
+.pcard{border:1.5px solid var(--line);border-radius:16px;padding:18px 16px;background:#fff;position:relative}
+.pcard.pop{border-color:var(--green);background:linear-gradient(180deg,#f0faf1,#fff)}
+.pop-tag{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#2E7D32,#16A34A);color:#fff;font-size:10px;font-weight:700;padding:4px 12px;border-radius:100px;white-space:nowrap;letter-spacing:.03em}
+.pcard .pn{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--green);margin-bottom:4px}
+.pcard .pt{font-size:10.5px;color:var(--muted);margin-bottom:12px;min-height:28px;line-height:1.4}
+.pcard .pr{display:flex;align-items:baseline;gap:3px;margin-bottom:4px}
+.pcard .pr .cur{font-size:16px;font-weight:700;color:var(--ink)}
+.pcard .pr .amt{font-family:'Plus Jakarta Sans';font-size:36px;font-weight:900;color:var(--ink);line-height:1}
+.pcard .pr .per{font-size:11px;color:var(--muted)}
+.pcard .ann{font-size:10px;font-weight:700;color:var(--green);background:var(--green-bg);display:inline-block;padding:3px 8px;border-radius:100px;margin-bottom:12px}
+.pcard .lims{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.pcard .lims span{font-size:9.5px;font-weight:600;color:#475467;background:#f3f4f6;border:1px solid var(--line);padding:3px 7px;border-radius:7px}
+.pcard .feats{list-style:none}
+.pcard .feats li{font-size:11px;color:#344054;padding:3.5px 0 3.5px 18px;position:relative;line-height:1.35}
+.pcard .feats li::before{content:'✓';position:absolute;left:0;top:3px;font-size:9px;font-weight:900;color:var(--green)}
+.pcard .feats li.off{color:#b0b9c8}
+.pcard .feats li.off::before{content:'–';color:#d1d5db}
+
+/* Comparison table */
+.comp-table{width:100%;border-collapse:separate;border-spacing:0;border-radius:14px;overflow:hidden;border:1px solid var(--line);margin-bottom:26px}
+.comp-table th,.comp-table td{padding:9px 13px;font-size:11px;border-bottom:1px solid var(--line);text-align:left}
+.comp-table thead th{background:var(--dark);color:#fff;font-weight:700;font-size:10.5px;letter-spacing:.02em}
+.comp-table thead th.hl{background:var(--green)}
+.comp-table tbody tr:last-child td{border-bottom:none}
+.comp-table tbody tr:nth-child(even){background:#fafbfc}
+.comp-table td.feat{font-weight:600;font-size:11px}
+.comp-table td.c{text-align:center}
+.comp-table td.gh{background:rgba(46,125,50,.04);font-weight:600}
+.y{color:var(--green);font-weight:800}
+.n{color:#d1d5db;font-weight:700}
+.p{color:#f59e0b;font-weight:700}
+
+/* ROI band */
+.roi-band{background:linear-gradient(135deg,#2E7D32,#16A34A);border-radius:16px;padding:18px 22px;margin-bottom:26px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.rb{text-align:center;padding:10px;background:rgba(255,255,255,.1);border-radius:12px;border:1px solid rgba(255,255,255,.2)}
+.rb .s{font-family:'Plus Jakarta Sans';font-size:22px;font-weight:900;color:#fff}
+.rb .ll{font-size:10px;color:rgba(255,255,255,.78);margin-top:3px;line-height:1.4}
+.rb .r{font-size:10px;font-weight:700;color:#86efac;margin-top:5px}
+
+/* Security + tech */
+.sec-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:0}
+.sc{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fafbfc;text-align:center}
+.sc .si{font-size:20px;margin-bottom:6px}
+.sc h6{font-size:11px;font-weight:700;margin-bottom:3px}
+.sc p{font-size:10px;color:var(--muted);line-height:1.4}
+
+/* Footer strip page 2 */
+.p2-foot{background:var(--dark);padding:14px 44px;display:flex;align-items:center;justify-content:space-between;margin-top:26px}
+.p2-foot .left{font-size:11px;color:rgba(255,255,255,.55)}
+.p2-foot .left strong{color:#fff}
+.p2-foot .right{display:flex;gap:18px}
+.p2-foot .right span{font-size:11px;color:rgba(255,255,255,.6);display:flex;align-items:center;gap:5px}
+.p2-foot .right span b{color:rgba(255,255,255,.85);font-weight:500}
+
+/* ── Print ── */
+@media print{
+  body{background:#fff}
+  .page{margin:0;box-shadow:none;page-break-after:always}
+  .page:last-child{page-break-after:avoid}
+}
+@page{size:A4;margin:0}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ PAGE 1 ═══════════════ -->
+<div class="page">
+
+  <!-- Header -->
+  <div class="p1-head">
+    <div class="head-inner">
+      <div class="logo-wrap">
+        <span class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v8M12 22c0-6 3-9 8-9-1 6-4 9-8 9zM12 22c0-5-3-7-7-7 1 5 3 7 7 7z"/></svg></span>
+        <div class="logo-name">ArendaPro<small>Ofertă Comercială · 2026</small></div>
+      </div>
+      <div class="head-right">
+        <div class="doc-label">Document Confidențial</div>
+        <div class="doc-date">Versiunea 1.0 · Iunie 2026</div>
+      </div>
+    </div>
+    <div class="head-tagline">
+      <h1>Every hectare. <span class="g">Fully managed.</span></h1>
+      <p>Platforma operațională enterprise pentru fermele românești — de la contracte de arendă și conformitate ANAF, la dosare APIA, satelit NDVI și management flotă, totul într-un singur sistem.</p>
+    </div>
+    <div class="head-stats">
+      <div class="hs"><div class="n">12.400+</div><div class="l">Contracte gestionate</div></div>
+      <div class="hs"><div class="n">340.000</div><div class="l">Hectare monitorizate</div></div>
+      <div class="hs"><div class="n">100%</div><div class="l">APIA compliance</div></div>
+      <div class="hs"><div class="n">90 sec</div><div class="l">e-Factura automation</div></div>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="p1-body">
+
+    <!-- About -->
+    <div class="sec-title">Despre ArendaPro</div>
+    <div class="about-grid">
+      <div class="acard">
+        <div class="ic ic-g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3"/></svg></div>
+        <h4>Ce este</h4>
+        <p>Platformă SaaS care unică — management teren, distribuție arendă, conformitate fiscală, APIA, flotă și satelit, într-un sistem coerent.</p>
+      </div>
+      <div class="acard">
+        <div class="ic ic-r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg></div>
+        <h4>Problema rezolvată</h4>
+        <p>Elimină riscurile Excel: contracte expirate, arendă distribuită greșit, dosare APIA incomplete, amenzi ANAF și downtime utilaje.</p>
+      </div>
+      <div class="acard">
+        <div class="ic ic-b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+        <h4>Avantaj competitiv</h4>
+        <p>e-Factura + APIA + fitosanitar ANF native — legislație românească imposibil de replicat rapid. Motor distribuție arendă unic pe piață.</p>
+      </div>
+    </div>
+
+    <!-- Modules -->
+    <div class="sec-title">Module Principale</div>
+    <div class="mod-grid">
+      <div class="mmod"><div class="dot" style="background:#e8f5e9;font-size:15px">👥</div><div class="txt"><h5>Arendatori & Contracte</h5><p>CRUD complet, 10 tab-uri detaliu, alerte expirare 30 zile.</p><span class="kbadge">⚡ Zero scadențe ratate</span></div></div>
+      <div class="mmod"><div class="dot" style="background:#fef3c7;font-size:15px">📦</div><div class="txt"><h5>Distribuire Arendă</h5><p>Sold cereale/cash în timp real per parcelă, livrări parțiale.</p><span class="kbadge">⚡ Unic pe piață</span></div></div>
+      <div class="mmod"><div class="dot" style="background:#e0ecff;font-size:15px">🧾</div><div class="txt"><h5>e-Factura & D112</h5><p>UBL 2.1, API ANAF, audit trail complet, D112 lunar.</p><span class="kbadge">⚡ -10.000 RON/factură risc</span></div></div>
+      <div class="mmod"><div class="dot" style="background:#e8f5e9;font-size:15px">📂</div><div class="txt"><h5>Dosar APIA</h5><p>20+ intervenții CAP SP, scoring 0–100%, export AGI Online.</p><span class="kbadge">⚡ €50–€500/ha protejat</span></div></div>
+      <div class="mmod"><div class="dot" style="background:#e8f5e9;font-size:15px">🌿</div><div class="txt"><h5>Registru Fitosanitar</h5><p>Conform Legii 150/2004, BBCH indexat, export ANF.</p><span class="kbadge">⚡ Gata inspecție ANSVSA</span></div></div>
+      <div class="mmod"><div class="dot" style="background:#e0ecff;font-size:15px">🗺️</div><div class="txt"><h5>GIS & Hărți</h5><p>Editare poligoane, Stereo 70↔WGS84, overlay tratamente.</p><span class="kbadge">⚡ GIS nativ integrat</span></div></div>
+      <div class="mmod"><div class="dot" style="background:#e8f5e9;font-size:15px">📡</div><div class="txt"><h5>NDVI Satelitar</h5><p>Sentinel-2 per parcelă, trend, umiditate sol, ET₀.</p><span class="kbadge">⚡ -15% costuri inputuri</span></div></div>
+      <div class="mmod"><div class="dot" style="background:#fef3c7;font-size:15px">🚜</div><div class="txt"><h5>Utilaje & Fleet</h5><p>TARIC API, RCA/ITP alerte, combustibil, revizii.</p><span class="kbadge">⚡ -70% downtime</span></div></div>
+      <div class="mmod"><div class="dot" style="background:#fee2e2;font-size:15px">🔔</div><div class="txt"><h5>Alerte & Analytics</h5><p>Motor unificat multi-domeniu + rapoarte XLSX 8 tab-uri.</p><span class="kbadge">⚡ 1 ecran vs 6 verificări</span></div></div>
+    </div>
+
+    <!-- Dashboard mockup -->
+    <div class="sec-title">Dashboard Live</div>
+    <div class="dash-strip">
+      <div class="dash-row">
+        <div class="dk"><div class="v">340k ha</div><div class="l">Hectare monitorizate</div><div class="c">▲ +12% vs 2025</div></div>
+        <div class="dk"><div class="v">€2.4M</div><div class="l">Subvenții protejate</div><div class="c">▲ 100% compliance</div></div>
+        <div class="dk"><div class="v">148</div><div class="l">Contracte active</div><div class="c" style="color:#fbbf24">◆ 6 atenție</div></div>
+        <div class="dkbar"><h6>Randament estimat vs realizat · t/ha</h6><div class="bars"><b class="g" style="height:55%"></b><b class="b" style="height:62%"></b><b class="g" style="height:70%"></b><b class="b" style="height:68%"></b><b class="g" style="height:82%"></b><b class="b" style="height:78%"></b><b class="g" style="height:90%"></b><b class="b" style="height:85%"></b><b class="g" style="height:94%"></b><b class="b" style="height:88%"></b></div></div>
+      </div>
+      <div style="height:10px"></div>
+      <div class="alerts-mini">
+        <div class="al"><span class="d" style="background:#DC2626"></span> Contract #2231 — Ionescu Gh. expiră în 8 zile · 42 ha</div>
+        <div class="al"><span class="d" style="background:#16A34A"></span> e-Factura #1188 acceptată ANAF · acum 12 minute</div>
+        <div class="al"><span class="d" style="background:#F59E0B"></span> RCA scadent · John Deere 6155 — 12 zile · Dosar APIA #08 — 100% complet, gata depunere</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<!-- ═══════════════ END PAGE 1 ═══════════════ -->
+
+
+<!-- ═══════════════ PAGE 2 ═══════════════ -->
+<div class="page">
+
+  <!-- Header bar -->
+  <div class="p2-head">
+    <div class="logo-wrap">
+      <span class="logo-mark" style="width:32px;height:32px;border-radius:10px"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v8M12 22c0-6 3-9 8-9-1 6-4 9-8 9zM12 22c0-5-3-7-7-7 1 5 3 7 7 7z"/></svg></span>
+      <div class="logo-name" style="font-size:16px">ArendaPro<small style="display:none"></small></div>
+    </div>
+    <span class="pg">Ofertă Comercială 2026 · Pagina 2 din 2</span>
+  </div>
+
+  <div class="p2-body">
+
+    <!-- Pricing -->
+    <div class="sec-title">Planuri & Prețuri</div>
+    <div class="price-grid">
+
+      <div class="pcard">
+        <div class="pn">🌱 Câmp</div>
+        <div class="pt">Fermieri 100–500 ha, administrare solo</div>
+        <div class="pr"><span class="cur">€</span><span class="amt">49</span><span class="per">/lună</span></div>
+        <div class="ann">€490/an · 2 luni gratuit</div>
+        <div class="lims"><span>👤 1 user</span><span>🌾 500 ha</span><span>📄 100 arendatori</span></div>
+        <ul class="feats">
+          <li>Registru arendatori & contracte</li>
+          <li>e-Factura UBL 2.1 (XML descărcare)</li>
+          <li>Generator D112 lunar</li>
+          <li>Alerte contracte, plăți, utilaje</li>
+          <li>Rapoarte + export XLSX</li>
+          <li>Aplicație mobilă completă</li>
+          <li class="off">Distribuire arendă</li>
+          <li class="off">Dosar APIA & NDVI</li>
+        </ul>
+      </div>
+
+      <div class="pcard pop">
+        <div class="pop-tag">★ Cel mai popular</div>
+        <div class="pn">🚜 Harvest</div>
+        <div class="pt">Ferme 500–2.000 ha, echipă mică</div>
+        <div class="pr"><span class="cur">€</span><span class="amt">119</span><span class="per">/lună</span></div>
+        <div class="ann">€1.190/an · 2 luni gratuit</div>
+        <div class="lims"><span>👤 3 users</span><span>🌾 2.000 ha</span><span>📄 300 arendatori</span></div>
+        <ul class="feats">
+          <li><strong>Tot din Câmp, plus:</strong></li>
+          <li>Motor distribuire arendă cereale+cash</li>
+          <li>Dosar APIA complet (20+ intervenții)</li>
+          <li>Registru fitosanitar ANF + BBCH</li>
+          <li>Management flotă + validare TARIC</li>
+          <li>NDVI satelitar + GIS editare parcele</li>
+          <li>e-Factura API ANAF transmisie directă</li>
+          <li>Campanie + inventar inputuri</li>
+        </ul>
+      </div>
+
+      <div class="pcard">
+        <div class="pn">🏢 Enterprise</div>
+        <div class="pt">Ferme mari, cooperative, 2.000+ ha</div>
+        <div class="pr"><span class="cur">€</span><span class="amt">199</span><span class="per">/lună</span></div>
+        <div class="ann">€1.990/an · 2 luni gratuit</div>
+        <div class="lims"><span>👤 Nelimitat</span><span>🌾 Nelimitat</span></div>
+        <ul class="feats">
+          <li><strong>Tot din Harvest, plus:</strong></li>
+          <li>Utilizatori & hectare nelimitate</li>
+          <li>Acces API complet (integrare ERP)</li>
+          <li>SLA contractual garantat</li>
+          <li>Onboarding dedicat + training</li>
+          <li>Manager de cont dedicat</li>
+          <li>Migrare date asistată</li>
+          <li>Audit log complet + backup automat</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- Comparison table -->
+    <div class="sec-title">Comparativ</div>
+    <table class="comp-table">
+      <thead><tr><th style="width:32%">Criteriu</th><th class="c" style="width:22%">Excel + Dosare</th><th class="c" style="width:22%">ERP Generic</th><th class="c hl" style="width:24%">ArendaPro</th></tr></thead>
+      <tbody>
+        <tr><td class="feat">e-Factura ANAF nativ</td><td class="c"><span class="n">✕</span></td><td class="c"><span class="p">~</span></td><td class="c gh"><span class="y">✓</span></td></tr>
+        <tr><td class="feat">Dosar APIA complet</td><td class="c"><span class="n">✕</span></td><td class="c"><span class="n">✕</span></td><td class="c gh"><span class="y">✓</span></td></tr>
+        <tr><td class="feat">NDVI satelitar per parcelă</td><td class="c"><span class="n">✕</span></td><td class="c"><span class="n">✕</span></td><td class="c gh"><span class="y">✓</span></td></tr>
+        <tr><td class="feat">Distribuție arendă automată</td><td class="c"><span class="n">✕</span></td><td class="c"><span class="p">~</span></td><td class="c gh"><span class="y">✓</span></td></tr>
+        <tr><td class="feat">GIS editare parcele + Registru fitosanitar</td><td class="c"><span class="n">✕</span></td><td class="c"><span class="n">✕</span></td><td class="c gh"><span class="y">✓</span></td></tr>
+        <tr><td class="feat">Timp implementare</td><td class="c" style="font-size:10.5px">Imediat (fragil)</td><td class="c" style="font-size:10.5px">12–24 luni</td><td class="c gh" style="font-size:10.5px"><strong>2–5 zile</strong></td></tr>
+        <tr><td class="feat">Cost total anual</td><td class="c" style="font-size:10.5px">200h muncă</td><td class="c" style="font-size:10.5px">€50k–€200k+</td><td class="c gh" style="font-size:10.5px"><strong>€490–€1.990</strong></td></tr>
+      </tbody>
+    </table>
+
+    <!-- ROI Band -->
+    <div class="sec-title">ROI — Impact Financiar Estimat</div>
+    <div class="roi-band">
+      <div class="rb"><div class="s">€1.200/an</div><div class="ll">Fermă 300 ha · Pachet Câmp €490/an</div><div class="r">ROI &gt;100% în anul 1</div></div>
+      <div class="rb"><div class="s">€15.000/an</div><div class="ll">Fermă 1.500 ha · Pachet Harvest €1.190/an</div><div class="r">ROI &gt;1.000% în anul 1</div></div>
+      <div class="rb"><div class="s">€65.000/an</div><div class="ll">Fermă 5.000 ha · Pachet Enterprise €1.990/an</div><div class="r">ROI &gt;2.500% în anul 1</div></div>
+    </div>
+
+    <!-- Security & Tech -->
+    <div class="sec-title">Securitate & Arhitectură</div>
+    <div class="sec-row">
+      <div class="sc"><div class="si">🔐</div><h6>Row-Level Security</h6><p>Date izolate per user la nivel PostgreSQL. Standard aur SaaS.</p></div>
+      <div class="sc"><div class="si">⚡</div><h6>Cloudflare Edge</h6><p>300+ PoP global, TTFB &lt;100ms EU, 99.99% uptime.</p></div>
+      <div class="sc"><div class="si">🗄️</div><h6>Supabase PostgreSQL</h6><p>JWT/OAuth2, AES-256 repaus, PgBouncer pooling.</p></div>
+      <div class="sc"><div class="si">🛡️</div><h6>OWASP Compliant</h6><p>Query parametrizate, zero SQL injection, fără secrete în cod.</p></div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="p2-foot">
+    <div class="left"><strong>ArendaPro</strong> · Platforma operațională pentru agricultura modernă din România &nbsp;·&nbsp; contact@arendapro.ro &nbsp;·&nbsp; www.arendapro.ro</div>
+    <div class="right">
+      <span>🔒 <b>TLS 1.3</b></span>
+      <span>📡 <b>Sentinel-2</b></span>
+      <span>🧾 <b>ANAF UBL 2.1</b></span>
+      <span>🌾 <b>CAP SP 2023–2027</b></span>
+    </div>
+  </div>
+
+</div>
+<!-- ═══════════════ END PAGE 2 ═══════════════ -->
+
+</body>
+</html>

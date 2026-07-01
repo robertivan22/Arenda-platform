@@ -73,7 +73,15 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/fitosanitar') ||
     pathname.startsWith('/setari') ||
     pathname.startsWith('/admin-cp') ||
-    pathname.startsWith('/print')
+    pathname.startsWith('/print') ||
+    pathname.startsWith('/efactura') ||
+    pathname.startsWith('/distribuire-arenda') ||
+    pathname.startsWith('/campanie') ||
+    pathname.startsWith('/utilaje') ||
+    pathname.startsWith('/ferma') ||
+    pathname.startsWith('/inventar') ||
+    pathname.startsWith('/apia') ||
+    pathname.startsWith('/alerte')
 
   if (!user && isAppPage) {
     // Not logged in — redirect to login

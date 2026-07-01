@@ -95,3 +95,20 @@ CREATE POLICY "contract_docs_own" ON contract_documents
 CREATE INDEX IF NOT EXISTS idx_contract_docs_contract ON contract_documents(contract_id);
 CREATE INDEX IF NOT EXISTS idx_contract_docs_lessor   ON contract_documents(lessor_id);
 CREATE INDEX IF NOT EXISTS idx_contract_docs_user     ON contract_documents(user_id);
+
+-- --- SEC-01: Fix storage cross-tenant access (path-scoped policy) -------------
+-- Replaces the overly-permissive "documents_auth" policy with a path-scoped one
+-- so users can only access files under their own uid/ folder prefix.
+DROP POLICY IF EXISTS "documents_auth" ON storage.objects;
+CREATE POLICY "documents_own" ON storage.objects
+  FOR ALL
+  USING     (bucket_id = 'documents' AND (storage.foldername(name))[1] = auth.uid()::text)
+  WITH CHECK (bucket_id = 'documents' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+-- --- SEC-04: Enable RLS on efactura_submissions -------------------------------
+ALTER TABLE efactura_submissions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "efactura_own" ON efactura_submissions;
+CREATE POLICY "efactura_own" ON efactura_submissions
+  FOR ALL
+  USING     (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());

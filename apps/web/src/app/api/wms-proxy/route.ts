@@ -48,7 +48,6 @@ const ALLOWED_CONTENT_TYPES = [
   'image/gif',
   'image/webp',
   'application/vnd.ogc',
-  'text/xml',   // allow error responses to pass through for debugging
 ]
 
 export async function GET(request: NextRequest): Promise<NextResponse> {

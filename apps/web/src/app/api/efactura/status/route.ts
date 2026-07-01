@@ -25,6 +25,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'invoice_id este obligatoriu' }, { status: 400 })
   }
 
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!UUID_RE.test(invoice_id)) {
+    return NextResponse.json({ error: 'invoice_id invalid' }, { status: 400 })
+  }
+
   // ── Load invoice ──────────────────────────────────────────────────────────
   const { data: inv } = await db
     .from('invoices')
