@@ -73,24 +73,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ query, suggestions: [] })
   }
 
-  const qn = normalize(query)
+  const qn = normalize(query)        // diacritics-free + lowercase
+  const qLower = query.toLowerCase() // just lowercase (keep diacritics for ILIKE)
   const isSeed      = SEED_SIGNALS.some(s => qn.includes(normalize(s)))
   const isProcessed = PROCESSED_SIGNALS.some(s => qn.includes(normalize(s)))
 
-  // ── Full-text / ILIKE search in customs_codes ─────────────
-  // Search description_ro and keywords (cast array to text for ilike)
+  // ── Multi-variant search ──────────────────────────────────
+  // 1. description ILIKE with original lowercase   → "grâu" matches "grâu dur"
+  // 2. description ILIKE with normalized           → "grau" may match "Grau dur" 
+  // 3. keywords array contains lowercase original  → array has exact 'grâu'
+  // 4. keywords array contains normalized          → array has 'grau'
+  // Both ilike variants are case-insensitive; both cs variants are exact-match.
+  const orFilter = [
+    `description_ro.ilike.%${qLower}%`,
+    `description_ro.ilike.%${qn}%`,
+    `keywords_ro.cs.{${qLower}}`,
+    `keywords_ro.cs.{${qn}}`,
+  ].join(',')
+
   const { data: rows } = await db
     .from('customs_codes')
     .select('id, code, code_type, description_ro, description_en, keywords_ro, chapter, heading, source, source_url, confidence_default')
     .eq('is_active', true)
-    .or(`description_ro.ilike.%${query}%,keywords_ro.cs.{${query}}`)
+    .or(orFilter)
     .limit(10)
 
-  // Also search aliases
+  // Also search aliases (lowercase)
   const { data: aliasRows } = await db
     .from('customs_code_aliases')
     .select('customs_code_id, alias')
-    .ilike('alias', `%${query}%`)
+    .or(`alias.ilike.%${qLower}%,alias.ilike.%${qn}%`)
     .limit(10)
 
   // Collect all matching IDs

@@ -499,6 +499,9 @@ export default function ETransportPage() {
         </>
       )}
 
+      {/* ─── Help / Ghid RO e-Transport ──────────────────────────── */}
+      {tab === 'list' && <ETransportHelp />}
+
       {/* Detail panel */}
       {(detail || detailLoading) && (
         <div className="fixed inset-0 z-50 flex">
@@ -604,6 +607,10 @@ export default function ETransportPage() {
 
       {/* Wizard */}
       {showWizard && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowWizard(false)} />
+          <div className="relative z-10 bg-white w-full sm:max-w-[520px] sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col max-h-[95vh]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowWizard(false)} />
           <div className="relative z-10 bg-white w-full sm:max-w-[520px] sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col max-h-[95vh]">
@@ -904,6 +911,164 @@ export default function ETransportPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Help Panel ───────────────────────────────────────────────────────────────
+
+function ETransportHelp() {
+  const [open, setOpen] = React.useState(false)
+  return (
+    <div className="mt-6 border border-blue-200 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-5 py-3.5 bg-blue-50 hover:bg-blue-100 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="text-lg">📋</span>
+          <span className="text-sm font-semibold text-blue-900">Ghid RO e-Transport — Tot ce trebuie să știi</span>
+        </div>
+        <span className="text-blue-600 text-xs">{open ? '▲ Ascunde' : '▼ Arată'}</span>
+      </button>
+
+      {open && (
+        <div className="px-5 py-4 bg-white space-y-5 text-sm text-gray-700">
+
+          {/* Ce este */}
+          <section>
+            <h3 className="font-bold text-gray-900 mb-2 flex items-center gap-2">🚛 Ce este RO e-Transport?</h3>
+            <p className="text-gray-600 text-xs leading-relaxed">
+              <strong>RO e-Transport</strong> este sistemul informatic al ANAF (Agenția Națională de Administrare Fiscală) prin care se monitorizează transportul rutier de bunuri cu risc fiscal ridicat pe teritoriul României. Aplicat din 2023, sistemul impune declararea prealabilă a transporturilor și generarea unui <strong>cod UIT</strong> unic înainte de începerea transportului.
+            </p>
+          </section>
+
+          {/* Ce este UIT */}
+          <section>
+            <h3 className="font-bold text-gray-900 mb-2 flex items-center gap-2">🔑 Ce este Codul UIT?</h3>
+            <div className="text-xs leading-relaxed space-y-2 text-gray-600">
+              <p><strong>UIT</strong> (Unique Identifier of Transport) este un cod unic generat de <strong>ANAF</strong> după ce declarați transportul în sistemul RO e-Transport. <strong>ArendaPro nu generează local codul UIT</strong> — îl preia din răspunsul ANAF.</p>
+              <div className="bg-gray-50 rounded-lg p-3 font-mono text-xs text-gray-700">
+                Exemplu UIT: <strong>RO2024ABC123456789XYZ012345678901</strong> (36 caractere alfanumerice)
+              </div>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Codul UIT trebuie comunicat șoferului înainte de plecarea în cursă</li>
+                <li>Trebuie afișat la control la cererea organelor de inspecție fiscală</li>
+                <li>Este unic per transport — nu se reutilizează</li>
+              </ul>
+            </div>
+          </section>
+
+          {/* Valabilitate */}
+          <section>
+            <h3 className="font-bold text-gray-900 mb-2 flex items-center gap-2">⏱ Valabilitate coduri UIT</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {[
+                { tip: 'Transport național', zile: '5 zile', color: 'bg-green-50 border-green-200 text-green-800' },
+                { tip: 'Import (extra-UE)', zile: '15 zile', color: 'bg-blue-50 border-blue-200 text-blue-800' },
+                { tip: 'Export (extra-UE)', zile: '15 zile', color: 'bg-blue-50 border-blue-200 text-blue-800' },
+                { tip: 'Intracomunitar (UE)', zile: '15 zile', color: 'bg-purple-50 border-purple-200 text-purple-800' },
+              ].map(v => (
+                <div key={v.tip} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${v.color}`}>
+                  <span>{v.tip}</span>
+                  <strong>{v.zile}</strong>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+              ⚠ Codul UIT trebuie generat înainte de <strong>ora de plecare</strong>. Odată expirat, nu mai poate fi folosit și trebuie generat un cod nou.
+            </p>
+          </section>
+
+          {/* Când este obligatoriu */}
+          <section>
+            <h3 className="font-bold text-gray-900 mb-2 flex items-center gap-2">📋 Când este obligatorie declararea?</h3>
+            <div className="text-xs text-gray-600 space-y-1.5">
+              <p className="font-semibold text-gray-700">Transport național — obligatoriu dacă:</p>
+              <ul className="list-disc list-inside ml-2 space-y-0.5">
+                <li>Masa totală a mărfii depășește <strong>500 kg</strong> SAU valoarea depășește <strong>10.000 RON</strong></li>
+                <li>Vehiculul are masa maximă autorizată ≥ <strong>3,5 tone</strong></li>
+                <li>Bunurile aparțin categoriilor cu risc fiscal (cereale, uleiuri vegetale, materiale de construcții, metale, combustibili etc.)</li>
+              </ul>
+              <p className="font-semibold text-gray-700 mt-2">Transport internațional (import/export/intracomunitar) — obligatoriu pentru:</p>
+              <ul className="list-disc list-inside ml-2 space-y-0.5">
+                <li>Orice transport de bunuri care intră sau iese din România</li>
+                <li>Indiferent de masă sau valoare</li>
+              </ul>
+            </div>
+          </section>
+
+          {/* Flux ArendaPro */}
+          <section>
+            <h3 className="font-bold text-gray-900 mb-2 flex items-center gap-2">🔄 Cum generezi un cod UIT în ArendaPro</h3>
+            <ol className="text-xs text-gray-600 space-y-2 list-decimal list-inside">
+              <li><strong>Configurează tokenul ANAF</strong> — mergi la tab-ul ⚙ Setări și conectează contul ANAF via <code className="bg-gray-100 px-1 rounded">logincert.anaf.ro</code></li>
+              <li><strong>Adaugă transport</strong> — apasă butonul verde „+ Adaugă transport" și completează wizard-ul în 4 pași</li>
+              <li><strong>Completează bunurile</strong> — adaugă denumirea, codul NC/TARIC, cantitatea și greutatea (ArendaPro sugerează automat codul NC)</li>
+              <li><strong>Confirmă codul NC/TARIC</strong> — apasă „✓ Confirmă" după verificare (obligatoriu)</li>
+              <li><strong>Generează cod UIT</strong> — apasă butonul verde „Generează cod UIT" din lista de transporturi sau din panoul de detalii</li>
+              <li><strong>Salvează și comunicați codul</strong> — codul UIT apare imediat, copiați-l și transmiteți-l șoferului</li>
+            </ol>
+          </section>
+
+          {/* Cod NC/TARIC */}
+          <section>
+            <h3 className="font-bold text-gray-900 mb-2 flex items-center gap-2">🏷 Codul NC/TARIC — explicat</h3>
+            <div className="text-xs text-gray-600 space-y-2">
+              <p><strong>CN (Combined Nomenclature)</strong> — 8 cifre, folosit în comerțul intracomunitar UE și pentru RO e-Transport</p>
+              <p><strong>TARIC</strong> — 10 cifre, folosit pentru importuri/exporturi extra-UE (include taxe vamale specifice)</p>
+              <p>Pentru <strong>RO e-Transport</strong>, codul CN de 8 cifre este suficient în większości cazurilor.</p>
+              <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <span className="font-mono text-gray-700">10059000</span><span>Porumb (boabe/furajer/consum)</span>
+                  <span className="font-mono text-gray-700">10051000</span><span>Porumb pentru însămânțare</span>
+                  <span className="font-mono text-gray-700">10011190</span><span>Grâu dur (consum)</span>
+                  <span className="font-mono text-gray-700">12019090</span><span>Soia boabe</span>
+                  <span className="font-mono text-gray-700">12060091</span><span>Floarea-soarelui (semințe)</span>
+                  <span className="font-mono text-gray-700">87019300</span><span>Tractor 37–75 kW</span>
+                </div>
+              </div>
+              <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                ⚠ <strong>Disclaimer:</strong> Codul NC/TARIC este sugerat de ArendaPro pe baza nomenclatorului local.
+                Verificarea finală și responsabilitatea juridică aparțin utilizatorului, brokerului vamal sau consultantului fiscal.
+                Consultați <a href="https://ec.europa.eu/taxation_customs/dds2/taric/taric_consultation.jsp?Lang=ro" target="_blank" rel="noopener noreferrer" className="underline text-blue-700">baza oficială TARIC EU</a> pentru confirmare.
+              </p>
+            </div>
+          </section>
+
+          {/* Sancțiuni */}
+          <section>
+            <h3 className="font-bold text-gray-900 mb-2 flex items-center gap-2">⚠ Sancțiuni pentru nerespectare</h3>
+            <div className="text-xs text-gray-600 space-y-1 bg-red-50 border border-red-200 rounded-lg p-3">
+              <p>Transportul fără cod UIT valabil sau cu date incorecte în declarație poate atrage:</p>
+              <ul className="list-disc list-inside space-y-0.5 ml-2">
+                <li>Amenzi contravenționale conform OUG 41/2022 și reglementărilor ulterioare</li>
+                <li>Reținerea vehiculului până la clarificarea situației</li>
+                <li>Controale fiscale suplimentare la firmă</li>
+              </ul>
+            </div>
+          </section>
+
+          {/* Link-uri */}
+          <section className="border-t border-gray-100 pt-3">
+            <h3 className="font-bold text-gray-900 mb-2 text-xs">🔗 Resurse oficiale</h3>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {[
+                { label: 'Portal RO e-Transport ANAF', url: 'https://etransport.anaf.ro' },
+                { label: 'Documentație tehnică ANAF', url: 'https://mfinante.gov.ro/ro/web/etransport/informatii-tehnice' },
+                { label: 'Baza TARIC EU', url: 'https://ec.europa.eu/taxation_customs/dds2/taric/taric_consultation.jsp?Lang=ro' },
+                { label: 'SPV ANAF (logare/token)', url: 'https://logincert.anaf.ro' },
+              ].map(l => (
+                <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition-colors">
+                  {l.label} <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                </a>
+              ))}
+            </div>
+          </section>
+
         </div>
       )}
     </div>
