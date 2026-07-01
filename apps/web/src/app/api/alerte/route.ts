@@ -570,15 +570,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
       }
     })
 
-    // Add UIT expiry insight if any UITs expiring within 2 days
-    if (uit.length > 0) {
-      insights.push({
-        impact: uit.some(u => u.days_remaining <= 0) ? 'mare' : 'mediu',
-        categorie: 'Transport UIT',
-        titlu: `${uit.length} cod${uit.length > 1 ? 'uri' : ''} UIT expir${uit.length > 1 ? 'ă' : 'ă'} în ${uit[0].days_remaining <= 0 ? 'azi/depășit' : `${uit[0].days_remaining} zile`}`,
-        descriere: `Coduri UIT cu valabilitate critică: ${uit.slice(0, 3).map(u => u.cod_uit.slice(0, 8) + '…').join(', ')}. Generați coduri noi în SPV ANAF înainte de expirare pentru a evita amenzi RO e-Transport.`,
-      })
-    }
+    // Add UIT expiry insight after insights array is populated (see below)
 
     // ── Tranzactii ────────────────────────────────────────────────────────────
     const tranzactii: TranzactieAlerta[] = (txRaw ?? []).map((t: any) => {
@@ -612,7 +604,15 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
 
     // ── Insights ──────────────────────────────────────────────────────────────
     const insights = computeInsights(contracte, tranzactii, utilaje, stocuri, ferma)
-
+    // Add UIT expiry insight if any UITs expiring within 2 days
+    if (uit.length > 0) {
+      insights.push({
+        impact: uit.some(u => u.days_remaining <= 0) ? 'mare' : 'mediu',
+        categorie: 'Transport UIT',
+        titlu: `${uit.length} cod${uit.length > 1 ? 'uri' : ''} UIT expir${uit.length > 1 ? 'ă' : 'ă'} în ${uit[0].days_remaining <= 0 ? 'azi/depășit' : `${uit[0].days_remaining} zile`}`,
+        descriere: `Coduri UIT cu valabilitate critică: ${uit.slice(0, 3).map(u => u.cod_uit.slice(0, 8) + '…').join(', ')}. Generați coduri noi în SPV ANAF înainte de expirare pentru a evita amenzi RO e-Transport.`,
+      })
+    }
     // ── Sumar executiv ────────────────────────────────────────────────────────
     const unpaidTx = tranzactii.filter(t => !t.is_paid)
     const arendasiSet = new Set(unpaidTx.map(t => t.lessor_id).filter(Boolean))
