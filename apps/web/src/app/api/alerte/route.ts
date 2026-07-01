@@ -310,41 +310,45 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
   try {
     const db = await createClient()
 
-    // ── 1. Contracts ──────────────────────────────────────────────────────────
-    const { data: contractsRaw, error: cErr } = await db
-      .from('contracts')
-      .select('id, contract_number, status, end_date, annual_rent, lessor_id, lessors(first_name, last_name, company_name, type)')
-      .neq('status', 'DRAFT')
-      .limit(100)
-    if (cErr) errors.push(`Contracte: ${cErr.message}`)
+    // ── Queries 1–4 run in parallel (independent) ─────────────────────────────
+    const [
+      { data: contractsRaw, error: cErr },
+      { data: ordersRaw,    error: oErr },
+      { data: stockRaw,     error: sErr },
+      { data: machinesRaw,  error: mErr },
+      { data: txRaw,        error: txErr },
+    ] = await Promise.all([
+      db.from('contracts')
+        .select('id, contract_number, status, end_date, annual_rent, lessor_id, lessors(first_name, last_name, company_name, type)')
+        .neq('status', 'DRAFT')
+        .limit(100),
+      db.from('work_orders')
+        .select('id, operation_type, status, planned_date, parcels(bloc_fizic, parcel_nr)')
+        .gte('planned_date', yearStart)
+        .order('planned_date', { ascending: true })
+        .limit(80),
+      db.from('input_lots')
+        .select('id, product_name, category, quantity, quantity_available, unit, expiry_date')
+        .order('category')
+        .limit(100),
+      db.from('machines')
+        .select('id, name, type, brand, model, year, plate, is_active, rca_expiry_date')
+        .eq('is_active', true)
+        .order('name')
+        .limit(50),
+      db.from('transactions')
+        .select('id, lessor_id, contract_id, ron_net, is_paid, campaign_year, transaction_date, product_name, is_previzionata')
+        .eq('is_previzionata', false)
+        .order('transaction_date', { ascending: false })
+        .limit(200),
+    ])
+    if (cErr)   errors.push(`Contracte: ${cErr.message}`)
+    if (oErr)   errors.push(`Activitati: ${oErr.message}`)
+    if (sErr)   errors.push(`Stocuri: ${sErr.message}`)
+    if (mErr)   errors.push(`Utilaje: ${mErr.message}`)
+    if (txErr)  errors.push(`Tranzactii: ${txErr.message}`)
 
-    // ── 2. Work orders (farm activities) ──────────────────────────────────────
-    const { data: ordersRaw, error: oErr } = await db
-      .from('work_orders')
-      .select('id, operation_type, status, planned_date, parcels(bloc_fizic, parcel_nr)')
-      .gte('planned_date', yearStart)
-      .order('planned_date', { ascending: true })
-      .limit(80)
-    if (oErr) errors.push(`Activitati: ${oErr.message}`)
-
-    // ── 3. Input lots (stocuri) ────────────────────────────────────────────────
-    const { data: stockRaw, error: sErr } = await db
-      .from('input_lots')
-      .select('id, product_name, category, quantity, quantity_available, unit, expiry_date')
-      .order('category')
-      .limit(100)
-    if (sErr) errors.push(`Stocuri: ${sErr.message}`)
-
-    // ── 4. Machines ───────────────────────────────────────────────────────────
-    const { data: machinesRaw, error: mErr } = await db
-      .from('machines')
-      .select('id, name, type, brand, model, year, plate, is_active, rca_expiry_date')
-      .eq('is_active', true)
-      .order('name')
-      .limit(50)
-    if (mErr) errors.push(`Utilaje: ${mErr.message}`)
-
-    // ── 5. Maintenance tasks (ITP / SERVICE / REVIZIE) ─────────────────────────
+    // ── 5. Maintenance tasks (depends on machinesRaw) ─────────────────────────
     const machineIds = (machinesRaw ?? []).map((m: any) => m.id as string)
     let maintenanceRaw: any[] = []
     if (machineIds.length > 0) {
@@ -358,15 +362,6 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
       if (mtErr) errors.push(`Mentenanta: ${mtErr.message}`)
       maintenanceRaw = mtRaw ?? []
     }
-
-    // ── 6. Transactions (all, not just unpaid — filter later) ──────────────────
-    const { data: txRaw, error: txErr } = await db
-      .from('transactions')
-      .select('id, lessor_id, contract_id, ron_net, is_paid, campaign_year, transaction_date, product_name, is_previzionata')
-      .eq('is_previzionata', false)
-      .order('transaction_date', { ascending: false })
-      .limit(200)
-    if (txErr) errors.push(`Tranzactii: ${txErr.message}`)
 
     // ── 7. Lessors for transactions (no ambiguous PostgREST join) ──────────────
     const lessorIds = [

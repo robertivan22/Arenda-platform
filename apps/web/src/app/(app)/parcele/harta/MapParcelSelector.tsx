@@ -142,10 +142,12 @@ async function searchNominatim(query: string): Promise<MapSearchResult[]> {
 }
 
 async function reverseGeocode(lat: number, lng: number) {
+  try {
   const res = await fetch(
     `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
     { headers: { 'Accept-Language': 'ro' } },
   )
+  if (!res.ok) return { judet: '', localitate: '', adresa: '' }
   const d = await res.json() as {
     display_name?: string
     address?: { county?: string; state?: string; city?: string; town?: string; village?: string }
@@ -154,6 +156,9 @@ async function reverseGeocode(lat: number, lng: number) {
     judet: d.address?.county ?? d.address?.state ?? '',
     localitate: d.address?.city ?? d.address?.town ?? d.address?.village ?? '',
     adresa: d.display_name ?? '',
+  }
+  } catch {
+    return { judet: '', localitate: '', adresa: '' }
   }
 }
 
@@ -493,12 +498,12 @@ function QuickActivityModal({ parcelId, parcelName, parcelSurface, onClose }: Qu
     const db = createClient()
     db.from('campaigns').select('id,name,year').order('year', { ascending: false }).limit(1).maybeSingle()
       .then(({ data }) => { if (data) setCampaign(data as { id: string; name: string; year: number }) })
-    db.from('machines').select('id,name,type').eq('is_active', true).order('name')
+    db.from('machines').select('id,name,type').eq('is_active', true).order('name').limit(100)
       .then(({ data }) => { if (data) setMachines(data as { id: string; name: string; type: string }[]) })
-    db.from('input_lots').select('id,product_name,unit,category,quantity_available,unit_price').gt('quantity_available', 0).order('product_name')
+    db.from('input_lots').select('id,product_name,unit,category,quantity_available,unit_price').gt('quantity_available', 0).order('product_name').limit(200)
       .then(({ data }) => { if (data) setInventoryLots(data as { id: string; product_name: string; unit: string; category: string; quantity_available: number; unit_price: number | null }[]) })
     if (!parcelId) {
-      db.from('parcels').select('id,bloc_fizic,locality,surface').eq('status', 'ACTIVE').order('bloc_fizic')
+      db.from('parcels').select('id,bloc_fizic,locality,surface').eq('status', 'ACTIVE').order('bloc_fizic').limit(300)
         .then(({ data }) => { if (data) setParcelsForSelect(data as { id: string; bloc_fizic: string | null; locality: string | null; surface: number }[]) })
     }
   }, [parcelId])

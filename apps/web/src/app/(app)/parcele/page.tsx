@@ -2,7 +2,7 @@
 
 export const runtime = 'edge'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -123,12 +123,12 @@ export default function ParceleListPage() {
   }, [])
 
   // Unique dropdown values
-  const uniqueJudete    = [...new Set(rows.map(r => r.county).filter(Boolean))].sort() as string[]
-  const uniqueCulturi   = [...new Set(rows.map(r => r.culture).filter(Boolean))].sort() as string[]
-  const uniqueArendatori = [...new Set(rows.map(r => r.lessor_name).filter(v => v !== '—'))].sort()
+  const uniqueJudete    = useMemo(() => [...new Set(rows.map(r => r.county).filter(Boolean))].sort() as string[], [rows])
+  const uniqueCulturi   = useMemo(() => [...new Set(rows.map(r => r.culture).filter(Boolean))].sort() as string[], [rows])
+  const uniqueArendatori = useMemo(() => [...new Set(rows.map(r => r.lessor_name).filter(v => v !== '—'))].sort(), [rows])
 
   // Filter + search
-  const filtered = rows.filter(r => {
+  const filtered = useMemo(() => rows.filter(r => {
     if (filters.judet    && r.county      !== filters.judet)    return false
     if (filters.status   && r.status       !== filters.status)   return false
     if (filters.cultura  && r.culture      !== filters.cultura)  return false
@@ -146,14 +146,14 @@ export default function ParceleListPage() {
           || (r.county ?? '').toLowerCase().includes(q)
     }
     return true
-  })
+  }), [rows, filters, search])
 
-  const sorted = [...filtered].sort((a, b) => {
+  const sorted = useMemo(() => [...filtered].sort((a, b) => {
     const va = String((a as any)[sortCol] ?? '')
     const vb = String((b as any)[sortCol] ?? '')
     const cmp = va.localeCompare(vb, 'ro', { numeric: true })
     return sortDir === 'asc' ? cmp : -cmp
-  })
+  }), [filtered, sortCol, sortDir])
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
   const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)

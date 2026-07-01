@@ -14,6 +14,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
   }
 
+  // Verify the token is actually valid
+  const { createClient: createSupabase } = await import('@supabase/supabase-js')
+  const supabase = createSupabase(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: authHeader } } },
+  )
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return NextResponse.json({ error: 'Neautorizat' }, { status: 401 })
+
   try {
     const body = (await req.json()) as { parcels?: ParcelInput[] }
     if (!Array.isArray(body.parcels) || body.parcels.length === 0) {

@@ -128,7 +128,11 @@ export async function POST(req: NextRequest) {
       lessorLastName: lessor?.last_name ?? '-',
       lessorFirstName: lessor?.first_name ?? '-',
       contractId: agg.contractIds.join(', '),
-      paymentType: (agg.paymentType ?? 'CASH') as 'CASH' | 'BANK_TRANSFER' | 'OTHER',
+      paymentType: (() => {
+        const VALID = new Set(['CASH', 'BANK_TRANSFER', 'OTHER'])
+        const pt = agg.paymentType ?? 'CASH'
+        return (VALID.has(pt) ? pt : 'CASH') as 'CASH' | 'BANK_TRANSFER' | 'OTHER'
+      })(),
       grossAmountRon: gross,
       flatDeductionRon: flatDeduction,
       netTaxableRon: netTaxable,
