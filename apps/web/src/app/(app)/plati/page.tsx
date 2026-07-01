@@ -89,7 +89,7 @@ export default function TranzactiiArendaPage() {
         contracts(contract_number)
       `)
       .order('transaction_date', { ascending: false })
-      .limit(2000)
+      .limit(200)
     if (error) { toast.error('Eroare la incarcarea tranzactiilor.'); setLoading(false); return }
     setRows((data ?? []).map((t: any) => ({
       ...t,

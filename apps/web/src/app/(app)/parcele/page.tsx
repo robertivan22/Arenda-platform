@@ -98,7 +98,7 @@ export default function ParceleListPage() {
       .from('parcels')
       .select('*, lessors(first_name, last_name, company_name, type), contracts(contract_number, end_date)')
       .order('created_at', { ascending: false })
-      .limit(2000)
+      .limit(200)
       .then(({ data, error }) => {
         if (error) { toast.error('Eroare la încărcarea parcelelor.'); return }
         if (data) setRows((data as any[]).map(p => ({

@@ -80,15 +80,24 @@ export async function getSentinelHubAccessToken(): Promise<string> {
     throw new Error('Missing SENTINEL_HUB_CLIENT_ID or SENTINEL_HUB_CLIENT_SECRET')
   }
 
-  const res = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: clientId,
-      client_secret: clientSecret,
-    }),
-  })
+  const tokenController = new AbortController()
+  const tokenTimeout = setTimeout(() => tokenController.abort(), 8000)
+  let tokenRes: Response
+  try {
+    tokenRes = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+      signal: tokenController.signal,
+    })
+  } finally {
+    clearTimeout(tokenTimeout)
+  }
+  const res = tokenRes
 
   if (!res.ok) {
     const text = await res.text()
@@ -157,11 +166,19 @@ function evaluatePixel(samples) {
     },
   }
 
-  const res = await fetch(`${baseUrl}/api/v1/statistics`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  })
+  const statsController = new AbortController()
+  const statsTimeout = setTimeout(() => statsController.abort(), 15000)
+  let res: Response
+  try {
+    res = await fetch(`${baseUrl}/api/v1/statistics`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+      signal: statsController.signal,
+    })
+  } finally {
+    clearTimeout(statsTimeout)
+  }
 
   // Always read as text first so we can log the raw body on failure or empty data.
   const rawText = await res.text()

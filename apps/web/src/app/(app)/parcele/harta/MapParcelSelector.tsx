@@ -536,28 +536,36 @@ function QuickActivityModal({ parcelId, parcelName, parcelSurface, onClose }: Qu
     }).select('id').single()
     if (error || !wo) { toast.error(error?.message ?? 'Eroare la salvare.'); setSaving(false); return }
 
-    for (const mat of materials) {
-      const { error: iErr } = await db.from('work_order_inputs').insert({
-        user_id: user.id,
-        work_order_id: wo.id,
-        input_type: mat.input_type,
-        product_name: mat.product_name.trim(),
-        quantity: parseFloat(mat.quantity),
-        unit: mat.unit,
-        cost_per_unit: mat.cost_per_unit ? parseFloat(mat.cost_per_unit) : null,
-        lot_id: mat.lot_id || null,
-      })
-      if (!iErr && mat.lot_id) {
-        await db.from('input_stock_mvt').insert({
+    if (materials.length > 0) {
+      // Batch insert all work_order_inputs in a single call (PERF-10)
+      const { data: woInputs, error: inputErr } = await db.from('work_order_inputs').insert(
+        materials.map(mat => ({
           user_id: user.id,
-          lot_id: mat.lot_id,
           work_order_id: wo.id,
-          campaign_id: campaign.id,
-          mvt_type: 'OUT',
+          input_type: mat.input_type,
+          product_name: mat.product_name.trim(),
           quantity: parseFloat(mat.quantity),
-          mvt_date: today,
-          notes: `Consum campanie: ${mat.product_name.trim()}`,
-        })
+          unit: mat.unit,
+          cost_per_unit: mat.cost_per_unit ? parseFloat(mat.cost_per_unit) : null,
+          lot_id: mat.lot_id || null,
+        }))
+      ).select('id, lot_id, quantity, product_name')
+      if (!inputErr && woInputs) {
+        const stockMvts = woInputs
+          .filter(row => row.lot_id)
+          .map(row => ({
+            user_id: user.id,
+            lot_id: row.lot_id,
+            work_order_id: wo.id,
+            campaign_id: campaign.id,
+            mvt_type: 'OUT' as const,
+            quantity: row.quantity,
+            mvt_date: today,
+            notes: `Consum campanie: ${row.product_name}`,
+          }))
+        if (stockMvts.length > 0) {
+          await db.from('input_stock_mvt').insert(stockMvts)
+        }
       }
     }
     setSaving(false)
@@ -1068,6 +1076,7 @@ export default function MapParcelSelector({
       .from('parcele_fitosanitar')
       .select('*')
       .order('created_at', { ascending: false })
+      .limit(300)
     if (error) toast.error('Eroare la incarcare: ' + error.message)
     else setParcels((data ?? []) as ParceleFitosanitar[])
     setLoading(false)
@@ -1083,6 +1092,7 @@ export default function MapParcelSelector({
       .select('id, bloc_fizic, tarla_nr, parcel_nr, county, locality, surface, status, culture, apia_eligible, lat, lng, contract_id, lessors(first_name, last_name, company_name, type), contracts(contract_number, end_date)')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
+      .limit(500)
     if (data) {
       setRegistryParcels((data as any[]).map(p => {
         const lessor = p.lessors
