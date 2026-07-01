@@ -8,12 +8,15 @@ import { toast } from 'sonner'
 import {
   Truck, Plus, Loader2, CheckCircle2, AlertTriangle, Clock,
   RefreshCw, Key, Ban, FileText, Eye, Settings,
-  Copy, ArrowLeft, Trash2,
+  Copy, ArrowLeft, Trash2, ExternalLink, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 
 interface TokenStatus { connected: boolean; expired?: boolean; expires_at?: string; cif?: string }
 interface Good { nc_code: string; name: string; quantity: string; uom: string; gross_weight_kg: string; value_ron: string }
+interface AnafErrorState {
+  type: string; title: string; message: string; actions: string[]; technical: string
+}
 interface Shipment {
   id: string; status: string; operation_type: string; uit_code: string | null
   transport_start_date: string; loading_location: string; unloading_location: string
@@ -36,16 +39,17 @@ const TIP_OPTIONS = [
 ]
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
-  draft:             { label: 'Draft',           color: 'bg-gray-100 text-gray-600' },
-  ready_to_submit:   { label: 'Gata de trimitere',color: 'bg-blue-50 text-blue-700' },
-  validated:         { label: 'Validat',         color: 'bg-blue-50 text-blue-700' },
-  validation_failed: { label: 'Eroare validare', color: 'bg-red-50 text-red-600' },
-  submitted:         { label: 'Trimis ANAF',     color: 'bg-purple-50 text-purple-700' },
-  processing:        { label: 'În procesare',    color: 'bg-yellow-50 text-yellow-700' },
-  accepted:          { label: 'Acceptat',        color: 'bg-green-50 text-green-700' },
-  rejected:          { label: 'Respins ANAF',    color: 'bg-red-50 text-red-600' },
-  uit_generated:     { label: 'UIT Generat ✓',   color: 'bg-green-100 text-green-800' },
-  deleted:           { label: 'Șters',           color: 'bg-gray-100 text-gray-500' },
+  draft:             { label: 'Draft',              color: 'bg-gray-100 text-gray-600' },
+  ready_to_submit:   { label: 'Gata de trimitere',  color: 'bg-blue-50 text-blue-700' },
+  validated:         { label: 'Validat',            color: 'bg-blue-50 text-blue-700' },
+  validation_failed: { label: 'Eroare validare',    color: 'bg-red-50 text-red-600' },
+  submitted:         { label: 'Trimis ANAF',        color: 'bg-purple-50 text-purple-700' },
+  processing:        { label: 'În procesare ANAF',   color: 'bg-yellow-50 text-yellow-700' },
+  accepted:          { label: 'Acceptat ANAF',      color: 'bg-green-50 text-green-700' },
+  rejected:          { label: 'Respins ANAF',       color: 'bg-red-50 text-red-600' },
+  anaf_auth_error:   { label: 'Eroare autentif. ANAF', color: 'bg-orange-50 text-orange-700' },
+  uit_generated:     { label: 'UIT Generat ✓',      color: 'bg-green-100 text-green-800' },
+  deleted:           { label: 'Șters',              color: 'bg-gray-100 text-gray-500' },
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -73,6 +77,8 @@ export default function ETransportPage() {
   const [loading,      setLoading]      = useState(true)
   const [detail,       setDetail]       = useState<ShipmentDetail | null>(null)
   const [detailLoading,setDetailLoading]= useState(false)
+  const [anafError,    setAnafError]    = useState<AnafErrorState | null>(null)
+  const [showTechnical,setShowTechnical]= useState(false)
   const [showWizard,   setShowWizard]   = useState(false)
   const [wizardStep,   setWizardStep]   = useState(1)
   const [saving,       setSaving]       = useState(false)
@@ -86,8 +92,10 @@ export default function ETransportPage() {
     operation_type: 'national', transport_start_date: new Date().toISOString().split('T')[0],
     loading_country: 'RO', loading_location: '', unloading_country: 'RO', unloading_location: '',
     vehicle_no: '', trailer1_no: '', carrier_name: '', carrier_cui: '', source_document_ref: '', notes: '',
+    machine_id: '',
   })
   const [goods, setGoods] = useState<Good[]>([emptyGood()])
+  const [machines, setMachines] = useState<Array<{ id: string; name: string; plate: string | null; taric_code: string | null }>>([])
 
   const loadToken = useCallback(async () => {
     setTokenLoading(true)
@@ -104,6 +112,14 @@ export default function ETransportPage() {
   }, [])
 
   useEffect(() => { void loadToken(); void loadShipments() }, [loadToken, loadShipments])
+
+  // Load machines for auto-fill
+  useEffect(() => {
+    createClient().from('machines')
+      .select('id, name, plate, taric_code')
+      .eq('is_active', true).order('name').limit(100)
+      .then(({ data }) => { if (data) setMachines(data as any[]) })
+  }, [])
 
   async function saveToken(e: React.FormEvent) {
     e.preventDefault(); setSavingToken(true)
@@ -138,25 +154,31 @@ export default function ETransportPage() {
 
   async function generateUit(id: string) {
     setGenerating(id)
+    setAnafError(null)
     try {
       const r = await fetch(`/api/etransport/shipments/${id}/generate-uit`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       })
       const d = await r.json() as any
-      if (!r.ok || d.status === 'validation_failed') {
-        if (d.errors?.length) {
-          toast.error(`Validare eșuată: ${d.errors[0]}${d.errors.length > 1 ? ` (+${d.errors.length-1} erori)` : ''}`)
-        } else {
-          toast.error(d.error ?? 'Eroare generare UIT')
-        }
-        void loadShipments()
-        if (detail?.id === id) void openDetail(id)
-        return
-      }
       if (d.status === 'already_generated') {
         toast.info(`UIT deja generat: ${d.uitCode}`); return
       }
+      if (d.status === 'validation_failed') {
+        toast.error(`Validare eșuată: ${d.errors?.[0] ?? 'Date lipsă'}`)
+        void loadShipments(); if (detail?.id === id) void openDetail(id)
+        return
+      }
+      if (d.error_type || d.title) {
+        // Structured ANAF error — show in card
+        setAnafError({ type: d.error_type ?? 'anaf_unknown', title: d.title, message: d.message, actions: d.actions ?? [], technical: d.technical ?? d.error ?? '' })
+        void loadShipments(); if (detail?.id === id) void openDetail(id)
+        return
+      }
+      if (!r.ok) {
+        toast.error(d.error ?? 'Eroare generare UIT'); return
+      }
+      setAnafError(null)
       toast.success(`✅ Cod UIT generat: ${d.uitCode}`)
       void loadShipments()
       if (detail?.id === id) void openDetail(id)
@@ -187,7 +209,7 @@ export default function ETransportPage() {
       setShowWizard(false); setWizardStep(1)
       setWForm({ operation_type:'national', transport_start_date: new Date().toISOString().split('T')[0],
         loading_country:'RO', loading_location:'', unloading_country:'RO', unloading_location:'',
-        vehicle_no:'', trailer1_no:'', carrier_name:'', carrier_cui:'', source_document_ref:'', notes:'' })
+        vehicle_no:'', trailer1_no:'', carrier_name:'', carrier_cui:'', source_document_ref:'', notes:'', machine_id:'' })
       setGoods([emptyGood()])
       void loadShipments()
     } finally { setSaving(false) }
@@ -235,6 +257,52 @@ export default function ETransportPage() {
           <span>Token ANAF lipsă sau expirat — declararea nu va funcționa.
             <button onClick={() => setTab('settings')} className="ml-1 underline font-semibold">Configurați tokenul →</button>
           </span>
+        </div>
+      )}
+
+      {/* ─── ANAF Error Card ─────────────────────────────────────────────── */}
+      {anafError && (
+        <div className={`rounded-xl border p-5 mb-5 ${
+          anafError.type === 'anaf_unauthorized' ? 'bg-orange-50 border-orange-300' :
+          anafError.type === 'anaf_bad_request'  ? 'bg-yellow-50 border-yellow-300' :
+          'bg-red-50 border-red-300'
+        }`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 flex-1">
+              <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                anafError.type === 'anaf_unauthorized' ? 'text-orange-600' : 'text-red-600'
+              }`} />
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-gray-900 mb-1">{anafError.title}</h3>
+                <p className="text-sm text-gray-700 mb-3">{anafError.message}</p>
+                {anafError.actions.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-xs font-semibold text-gray-700 mb-1">Ce trebuie să faci:</p>
+                    <ol className="text-xs text-gray-600 space-y-0.5 list-decimal list-inside">
+                      {anafError.actions.map((a, i) => <li key={i}>{a}</li>)}
+                    </ol>
+                  </div>
+                )}
+                <button onClick={() => setShowTechnical(v => !v)}
+                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
+                  {showTechnical ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  {showTechnical ? 'Ascunde detalii tehnice' : 'Vezi detalii tehnice'}
+                </button>
+                {showTechnical && (
+                  <pre className="mt-2 text-xs bg-gray-900 text-gray-100 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all">{anafError.technical}</pre>
+                )}
+              </div>
+            </div>
+            <button onClick={() => { setAnafError(null); setShowTechnical(false) }} className="text-gray-400 hover:text-gray-600 flex-shrink-0">✕</button>
+          </div>
+          {anafError.type === 'anaf_unauthorized' && (
+            <div className="mt-3 pt-3 border-t border-orange-200">
+              <button onClick={() => setTab('settings')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded-lg hover:bg-orange-700">
+                <Key className="w-3.5 h-3.5" /> Reconectează contul ANAF →
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -568,7 +636,14 @@ export default function ETransportPage() {
 
               {wizardStep === 3 && <>
                 <p className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                  Codul NC (primele 8 cifre TARIC) este obligatoriu pentru categorii cu risc fiscal ridicat (produse alimentare, combustibili, materiale de construcții, metale, etc.).
+                  Codul NC/TARIC (8 cifre) identifică tariful vamal al bunului.
+                  Obligatoriu pentru declararea e-Transport la ANAF.
+                  <a href="https://ec.europa.eu/taxation_customs/dds2/taric/taric_consultation.jsp?Lang=ro"
+                    target="_blank" rel="noopener noreferrer"
+                    className="ml-1 inline-flex items-center gap-0.5 text-blue-700 underline hover:text-blue-900"
+                    title="Deschide baza TARIC pentru identificarea codului NC/TARIC al bunului">
+                    Caută cod TARIC/NC <ExternalLink className="w-3 h-3" />
+                  </a>
                 </p>
                 {goods.map((g, i) => (
                   <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
@@ -610,6 +685,39 @@ export default function ETransportPage() {
               </>}
 
               {wizardStep === 4 && <>
+                {/* Machine select with auto-fill */}
+                <div>
+                  <label className={lbl}>Utilaj din ArendaPro (opțional — autocomplează vehicul + cod TARIC)</label>
+                  <select className={inp} value={wForm.machine_id}
+                    onChange={e => {
+                      const mid = e.target.value
+                      const m = machines.find(x => x.id === mid)
+                      setWForm(f => ({
+                        ...f,
+                        machine_id: mid,
+                        vehicle_no: m?.plate ?? f.vehicle_no,
+                      }))
+                      // Auto-fill NC code on first good if machine has taric_code
+                      if (m?.taric_code) {
+                        setGoods(gs => gs.map((g, i) => i === 0 && !g.nc_code ? { ...g, nc_code: m.taric_code! } : g))
+                      }
+                    }}>
+                    <option value="">Selectează utilaj (opțional)...</option>
+                    {machines.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}{m.plate ? ` (${m.plate})` : ''}{m.taric_code ? ` — TARIC: ${m.taric_code}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {wForm.machine_id && (() => {
+                    const m = machines.find(x => x.id === wForm.machine_id)
+                    return m && !m.taric_code ? (
+                      <p className="mt-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                        Acest utilaj nu are cod TARIC/NC salvat. Completează codul în pasul Bunuri.
+                      </p>
+                    ) : null
+                  })()}
+                </div>
                 <div>
                   <label className={lbl}>Nr. vehicul (fără spații) *</label>
                   <input className={inp} placeholder="ex: CJ01ABC" value={wForm.vehicle_no}

@@ -98,15 +98,19 @@ export function validateBeforeUpload(
   if (!goods || goods.length === 0) {
     errors.push('Trebuie să existe cel puțin un bun transportat')
   } else {
+    // NC Code is REQUIRED only when transport is reportable (etransport_required=true)
+    const requireNcCode = shipment.etransport_required !== false
     goods.forEach((g, i) => {
       const nr = i + 1
       if (!g.name?.trim()) {
         errors.push(`Bunul ${nr}: denumirea este obligatorie`)
       }
-      if (!g.nc_code?.trim()) {
-        errors.push(`Bunul ${nr} (${g.name || '?'}): codul NC (TARIC 8 cifre) este obligatoriu pentru bunuri cu risc fiscal`)
-      } else if (!/^\d{6,8}$/.test(g.nc_code.replace(/\s/g, ''))) {
-        errors.push(`Bunul ${nr}: codul NC trebuie să aibă 6–8 cifre (primit: "${g.nc_code}")`)
+      if (requireNcCode) {
+        if (!g.nc_code?.trim()) {
+          errors.push(`Bunul ${nr} (${g.name || '?'}): codul NC/TARIC (6–8 cifre) este obligatoriu pentru declarația e-Transport`)
+        } else if (!/^\d{6,8}$/.test(g.nc_code.replace(/\s/g, ''))) {
+          errors.push(`Bunul ${nr}: codul NC trebuie să aibă 6–8 cifre (primit: "${g.nc_code}")`)
+        }
       }
       if (!g.quantity || g.quantity <= 0) {
         errors.push(`Bunul ${nr}: cantitatea trebuie să fie mai mare decât 0`)

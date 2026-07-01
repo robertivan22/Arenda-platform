@@ -27,6 +27,7 @@ ALTER TABLE etransport_shipments
     'processing',
     'accepted',
     'rejected',
+    'anaf_auth_error',
     'uit_generated',
     'corrected',
     'deleted',

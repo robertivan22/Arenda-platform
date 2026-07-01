@@ -20,6 +20,7 @@ import { createClient } from '@/lib/supabase/server'
 import { buildETransportXml } from '@/lib/etransport/xml-builder'
 import { AnafETransportClient } from '@/lib/etransport/anaf-etransport-client'
 import { validateBeforeUpload } from '@/lib/etransport/validator'
+import { classifyAnafError } from '@/lib/etransport/error-classifier'
 import type { ETransportDeclaratie, TipOperatiuneAnaf } from '@/lib/etransport/types'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -73,7 +74,8 @@ export async function POST(
         .eq('id', id).eq('user_id', user.id).maybeSingle(),
       db.from('etransport_goods').select('*').eq('shipment_id', id).order('created_at'),
       db.from('company_settings').select('*').eq('user_id', user.id).maybeSingle(),
-      db.from('anaf_oauth_tokens').select('access_token, expires_at').eq('user_id', user.id).maybeSingle(),
+      // Load refresh_token too for 401 retry
+      db.from('anaf_oauth_tokens').select('access_token, refresh_token, expires_at').eq('user_id', user.id).maybeSingle(),
     ])
 
   if (!ship) return NextResponse.json({ error: 'Transport negăsit' }, { status: 404 })
@@ -162,33 +164,105 @@ export async function POST(
     .update({ status: 'submitted' })
     .eq('id', id).eq('user_id', user.id)
 
-  // ── 6. Upload to ANAF ─────────────────────────────────────
+  // ── 6. Upload to ANAF (with one 401-retry if refresh_token available) ────
   const anafClient = new AnafETransportClient((tokenRow as any).access_token, env)
   let cod_uit: string
   let upload_index: number | null
   let rawResp: unknown
+  let uploadErr: string | null = null
+
+  const attemptUpload = async (client: AnafETransportClient) => {
+    const result = await client.declare(xml, c?.cif ?? cifNum)
+    return result
+  }
 
   try {
-    const result = await anafClient.declare(xml, c?.cif ?? cifNum)
+    const result = await attemptUpload(anafClient)
     cod_uit      = result.cod_uit
     upload_index = result.upload_index
     rawResp      = result.raw
-  } catch (err) {
-    const errMsg = String(err)
-    // Persist failure
-    await Promise.all([
-      db.from('etransport_shipments')
-        .update({ status: 'rejected', anaf_last_status: 'error' })
-        .eq('id', id).eq('user_id', user.id),
-      db.from('etransport_api_logs').insert({
-        shipment_id: id, user_id: user.id, request_type: 'UPLOAD',
-        request_url: `${env}/upload/ETRANSP/${cifNum}/2`,
-        request_xml: xml,
-        error_message: errMsg.slice(0, 500), http_status: 0,
-      }),
-      createAlert(db, id, user.id, 'ANAF_REJECTED', 'high', `Eroare ANAF upload: ${errMsg.slice(0, 200)}`),
-    ])
-    return NextResponse.json({ status: 'rejected', error: errMsg }, { status: 502 })
+  } catch (firstErr) {
+    const firstErrMsg = String(firstErr)
+    uploadErr = firstErrMsg
+
+    // ── 401 retry with refresh_token (once) ─────────────────
+    const is401 = firstErrMsg.includes('401') || firstErrMsg.toLowerCase().includes('unauthorized')
+    const refreshToken = (tokenRow as any)?.refresh_token as string | null
+
+    if (is401 && refreshToken) {
+      // Try to get a new access token using the refresh token
+      try {
+        const tokenUrl = 'https://logincert.anaf.ro/anafserv/login/oauth/access_token'
+        const refreshRes = await fetch(tokenUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+          }),
+          signal: AbortSignal.timeout(8000),
+        })
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json() as { access_token?: string; expires_in?: number }
+          if (refreshData.access_token) {
+            // Persist new token
+            const newExpiry = new Date(Date.now() + (refreshData.expires_in ?? 3600) * 1000).toISOString()
+            await db.from('anaf_oauth_tokens').update({
+              access_token: refreshData.access_token,
+              expires_at: newExpiry,
+              updated_at: new Date().toISOString(),
+            }).eq('user_id', user.id)
+
+            // Retry upload with new token
+            const retryClient = new AnafETransportClient(refreshData.access_token, env)
+            try {
+              const retryResult = await attemptUpload(retryClient)
+              cod_uit      = retryResult.cod_uit
+              upload_index = retryResult.upload_index
+              rawResp      = retryResult.raw
+              uploadErr    = null  // success after retry
+            } catch (retryErr) {
+              uploadErr = String(retryErr)
+            }
+          }
+        }
+      } catch {
+        // refresh failed — keep original error
+      }
+    }
+
+    if (uploadErr !== null) {
+      // Classify the error for structured response
+      const errInfo = classifyAnafError(uploadErr)
+      const isAuthErr = errInfo.type === 'anaf_unauthorized'
+
+      await Promise.all([
+        db.from('etransport_shipments').update({
+          status: isAuthErr ? 'anaf_auth_error' : 'rejected',
+          anaf_last_status: 'error',
+        }).eq('id', id).eq('user_id', user.id),
+        db.from('etransport_api_logs').insert({
+          shipment_id: id, user_id: user.id, request_type: 'UPLOAD',
+          request_url: `${env}/upload/ETRANSP/${cifNum}/2`,
+          request_xml: xml,
+          error_message: uploadErr.slice(0, 500), http_status: isAuthErr ? 401 : 0,
+        }),
+        createAlert(db, id, user.id,
+          isAuthErr ? 'ANAF_UNAUTHORIZED' : 'ANAF_REJECTED',
+          'high',
+          errInfo.message.slice(0, 200)
+        ),
+      ])
+
+      return NextResponse.json({
+        status: isAuthErr ? 'anaf_auth_error' : 'rejected',
+        error_type: errInfo.type,
+        title: errInfo.title,
+        message: errInfo.message,
+        actions: errInfo.actions,
+        technical: errInfo.technical,
+      }, { status: isAuthErr ? 401 : 502 })
+    }
   }
 
   // ── 7. Log + save UIT ─────────────────────────────────────
