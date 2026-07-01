@@ -24,6 +24,31 @@ export interface Machine {
   taric_validated: boolean | null
   taric_description: string | null
   taric_checked_at: string | null
+  // Import fields (added 20260701)
+  tara_origine: string | null
+  data_import: string | null
+  import_extra_ue: boolean | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TransportUit {
+  id: string
+  user_id: string
+  machine_id: string | null
+  transaction_id: string | null
+  cod_uit: string
+  tip_operatiune: 'import' | 'export' | 'national' | 'intracomunitar'
+  status: 'activ' | 'expirat' | 'utilizat' | 'anulat'
+  data_declarare: string
+  valabil_de: string
+  valabil_pana: string
+  loc_incarcare: string | null
+  loc_descarcare: string | null
+  greutate_kg: number | null
+  valoare_ron: number | null
+  document_referinta: string | null
+  notes: string | null
   created_at: string
   updated_at: string
 }

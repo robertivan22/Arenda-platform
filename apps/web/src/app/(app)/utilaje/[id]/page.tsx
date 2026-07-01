@@ -207,6 +207,10 @@ export default function MachineDetailPage() {
       rca_active: editForm.rca_active ?? false,
       rca_price: editForm.rca_price ? Number(editForm.rca_price) : null,
       rca_expiry_date: editForm.rca_expiry_date || null,
+      // Import TARIC fields
+      tara_origine:    (editForm as any).tara_origine    || null,
+      data_import:     (editForm as any).data_import     || null,
+      import_extra_ue: (editForm as any).import_extra_ue ?? false,
       notes: editForm.notes || null,
     }).eq('id', machine.id)
     if (error) { toast.error(error.message); setSaving(false); return }
@@ -374,6 +378,12 @@ export default function MachineDetailPage() {
             {machine.plate && ` · ${machine.plate}`}
           </p>
         </div>
+        <button
+          onClick={() => router.push(`/utilaje/${id}/transporturi`)}
+          className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg border border-brand-200 transition-colors"
+        >
+          🚛 Transporturi UIT
+        </button>
         <span className={`shrink-0 px-2.5 py-1 text-xs rounded-full font-medium ${machine.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
           {machine.is_active ? 'Activ' : 'Inactiv'}
         </span>
@@ -455,6 +465,8 @@ export default function MachineDetailPage() {
               { label: 'Preț achiziție (RON)', key: 'purchase_price', inputType: 'number' },
               { label: 'Preț RCA (RON)', key: 'rca_price', inputType: 'number' },
               { label: 'Data expirare RCA', key: 'rca_expiry_date', inputType: 'date' },
+              { label: 'Țară origine (import)', key: 'tara_origine', inputType: 'text' },
+              { label: 'Data import', key: 'data_import', inputType: 'date' },
             ] as { label: string; key: keyof Machine; required?: boolean; inputType?: string }[]).map(f => (
               <div key={f.key as string}>
                 <label className="block text-xs text-gray-500 mb-1">{f.label}</label>
@@ -510,7 +522,25 @@ export default function MachineDetailPage() {
                   {machine.rca_active ? 'Da' : 'Nu'}
                 </div>
               )}
-            </div>          </div>
+            </div>
+
+            {/* Import extra-UE checkbox */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Import extra-UE</label>
+              {editing ? (
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mt-1">
+                  <input type="checkbox" className="rounded"
+                    checked={(editForm as any).import_extra_ue ?? false}
+                    onChange={e => setEditForm(p => ({ ...p, import_extra_ue: e.target.checked } as any))} />
+                  Importat din afara UE (declarație vamală)
+                </label>
+              ) : (
+                <div className={`text-sm py-0.5 font-medium ${machine.import_extra_ue ? 'text-amber-700' : 'text-gray-400'}`}>
+                  {machine.import_extra_ue ? 'Da — import extra-UE' : 'Nu'}
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* ── TARIC section ─────────────────────────────────────────────── */}
           <div className="mt-5 border border-indigo-100 bg-indigo-50/40 rounded-lg p-4">

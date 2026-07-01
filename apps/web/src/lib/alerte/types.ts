@@ -76,6 +76,20 @@ export interface UtilajeAlerta {
   service_status: DocStatus | null
   service_days: number | null
   overall_priority: 'high' | 'medium' | 'low'
+  // UIT transport fields
+  uit_expiry_days: number | null   // days until nearest active UIT expires (null = no active UIT)
+  uit_cod: string | null
+}
+
+export interface UitAlerta {
+  id: string
+  machine_id: string | null
+  machine_name: string | null
+  cod_uit: string
+  tip_operatiune: string
+  valabil_pana: string
+  days_remaining: number
+  status: string
 }
 
 export interface TranzactieAlerta {
@@ -114,6 +128,7 @@ export interface SumarExecutiv {
   activitati_restante: number
   activitati_azi: number
   arendasi_afectati: number
+  uit_expira_curand: number   // UITs expiring within 2 days
 }
 
 export interface AlerteResponse {
@@ -124,6 +139,7 @@ export interface AlerteResponse {
   stocuri: StocAlerta[]
   utilaje: UtilajeAlerta[]
   tranzactii: TranzactieAlerta[]
+  uit: UitAlerta[]
   insights: AlertaInsight[]
   sumar: SumarExecutiv
   sumar_text: string
