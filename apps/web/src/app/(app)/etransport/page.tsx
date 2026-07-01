@@ -256,7 +256,8 @@ export default function ETransportPage() {
         ) : (
           <form onSubmit={e => void saveToken(e)} className="space-y-3">
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              Obțineți tokenul din <strong>portal.anaf.ro → SPV → OAuth2</strong> și lipiți-l mai jos.
+              Tokenul se obține din <strong>SPV ANAF</strong> (<code>logincert.anaf.ro</code>) prin autentificare cu certificat digital calificat
+              → <strong>Setări cont → Acces API / OAuth2</strong> → generați un token de acces.
               Același token funcționează atât pentru e-Factura cât și pentru e-Transport.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
