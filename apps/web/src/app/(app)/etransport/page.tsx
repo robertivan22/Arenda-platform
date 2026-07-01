@@ -611,10 +611,6 @@ export default function ETransportPage() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowWizard(false)} />
           <div className="relative z-10 bg-white w-full sm:max-w-[520px] sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col max-h-[95vh]">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowWizard(false)} />
-          <div className="relative z-10 bg-white w-full sm:max-w-[520px] sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col max-h-[95vh]">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
               <div>
                 <h2 className="text-sm font-semibold">Adaugă transport RO e-Transport</h2>
                 <div className="flex items-center gap-1 mt-1.5">
