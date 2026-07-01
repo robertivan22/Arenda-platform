@@ -13,7 +13,15 @@ import {
 import { PageHeader } from '@/components/layout/PageHeader'
 
 interface TokenStatus { connected: boolean; expired?: boolean; expires_at?: string; cif?: string }
-interface Good { nc_code: string; name: string; quantity: string; uom: string; gross_weight_kg: string; value_ron: string }
+interface Good {
+  nc_code: string; name: string; quantity: string; uom: string
+  gross_weight_kg: string; value_ron: string
+  nc_code_confirmed: boolean; nc_code_description: string
+}
+interface NcSuggestion {
+  code: string; code_type: string; description_ro: string
+  confidence: number; is_auto: boolean; warning: string | null; source_url: string
+}
 interface AnafErrorState {
   type: string; title: string; message: string; actions: string[]; technical: string
 }
@@ -63,7 +71,7 @@ function fmtDate(s: string | null) {
 }
 
 function emptyGood(): Good {
-  return { nc_code: '', name: '', quantity: '1', uom: 'C62', gross_weight_kg: '', value_ron: '' }
+  return { nc_code: '', name: '', quantity: '1', uom: 'C62', gross_weight_kg: '', value_ron: '', nc_code_confirmed: false, nc_code_description: '' }
 }
 
 export default function ETransportPage() {
@@ -96,6 +104,10 @@ export default function ETransportPage() {
   })
   const [goods, setGoods] = useState<Good[]>([emptyGood()])
   const [machines, setMachines] = useState<Array<{ id: string; name: string; plate: string | null; taric_code: string | null }>>([])
+  // NC/TARIC suggestion state per good index
+  const [ncSuggestions, setNcSuggestions] = useState<Record<number, NcSuggestion[]>>({})
+  const [ncLoading,     setNcLoading]     = useState<Record<number, boolean>>({})
+  const [ncDropdown,    setNcDropdown]    = useState<number | null>(null)
 
   const loadToken = useCallback(async () => {
     setTokenLoading(true)
@@ -189,6 +201,29 @@ export default function ETransportPage() {
     }
   }
 
+  // NC/TARIC suggestion lookup (debounce handled by caller)
+  async function fetchNcSuggestions(goodsIdx: number, name: string) {
+    if (!name || name.length < 3) {
+      setNcSuggestions(s => ({ ...s, [goodsIdx]: [] }))
+      return
+    }
+    setNcLoading(l => ({ ...l, [goodsIdx]: true }))
+    try {
+      const r = await fetch(`/api/customs-codes/suggest?query=${encodeURIComponent(name)}`)
+      const d = await r.json() as { suggestions?: NcSuggestion[] }
+      const suggs = d.suggestions ?? []
+      setNcSuggestions(s => ({ ...s, [goodsIdx]: suggs }))
+      // Auto-fill if top suggestion has high confidence AND no code set yet
+      if (suggs.length > 0 && suggs[0].is_auto && !goods[goodsIdx]?.nc_code) {
+        setGoods(gs => gs.map((g, j) => j === goodsIdx
+          ? { ...g, nc_code: suggs[0].code, nc_code_confirmed: false, nc_code_description: suggs[0].description_ro }
+          : g))
+      }
+    } finally {
+      setNcLoading(l => ({ ...l, [goodsIdx]: false }))
+    }
+  }
+
   async function handleWizardSubmit() {
     const validGoods = goods.filter(g => g.name.trim())
     if (!wForm.vehicle_no.trim() || !wForm.loading_location.trim() || !wForm.unloading_location.trim()) {
@@ -202,7 +237,9 @@ export default function ETransportPage() {
           goods: validGoods.map(g => ({ nc_code: g.nc_code || null, name: g.name,
             quantity: Number(g.quantity) || 1, uom: g.uom || 'C62',
             gross_weight_kg: g.gross_weight_kg ? Number(g.gross_weight_kg) : null,
-            value_ron: g.value_ron ? Number(g.value_ron) : null })) }) })
+            value_ron: g.value_ron ? Number(g.value_ron) : null,
+            nc_code_confirmed: g.nc_code_confirmed,
+            nc_code_description: g.nc_code_description || null })) }) })
       const d = await r.json() as any
       if (!r.ok) { toast.error(d.error ?? 'Eroare creare'); return }
       toast.success('Transport creat')
@@ -635,53 +672,151 @@ export default function ETransportPage() {
               </>}
 
               {wizardStep === 3 && <>
-                <p className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                  Codul NC/TARIC (8 cifre) identifică tariful vamal al bunului.
+                <p className="text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                  Codul <strong>CN (8 cifre)</strong> sau <strong>TARIC (10 cifre)</strong> identifică tariful vamal al bunului.
                   Obligatoriu pentru declararea e-Transport la ANAF.
-                  <a href="https://ec.europa.eu/taxation_customs/dds2/taric/taric_consultation.jsp?Lang=ro"
-                    target="_blank" rel="noopener noreferrer"
-                    className="ml-1 inline-flex items-center gap-0.5 text-blue-700 underline hover:text-blue-900"
-                    title="Deschide baza TARIC pentru identificarea codului NC/TARIC al bunului">
-                    Caută cod TARIC/NC <ExternalLink className="w-3 h-3" />
-                  </a>
+                  Aplicația sugerează automat codul pe baza denumirii —{' '}
+                  <strong>confirmare obligatorie</strong> înainte de trimitere.
                 </p>
-                {goods.map((g, i) => (
-                  <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-gray-600">Bun {i+1}</span>
-                      {goods.length > 1 && (
-                        <button type="button" onClick={() => setGoods(gs => gs.filter((_,j) => j!==i))} className="text-red-400 hover:text-red-600">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                    <input className={inp} placeholder="Denumire bun *" value={g.name}
-                      onChange={e => setGoods(gs => gs.map((x,j) => j===i ? {...x,name:e.target.value} : x))} />
-                    <div className="grid grid-cols-3 gap-2">
-                      <input className={inp} placeholder="Cod NC (8 cif.)" value={g.nc_code} maxLength={8}
-                        onChange={e => setGoods(gs => gs.map((x,j) => j===i ? {...x,nc_code:e.target.value} : x))} />
-                      <input className={inp} placeholder="Cantitate" type="number" min="0" value={g.quantity}
-                        onChange={e => setGoods(gs => gs.map((x,j) => j===i ? {...x,quantity:e.target.value} : x))} />
-                      <select className={inp} value={g.uom}
-                        onChange={e => setGoods(gs => gs.map((x,j) => j===i ? {...x,uom:e.target.value} : x))}>
-                        <option value="C62">buc (C62)</option>
-                        <option value="KGM">kg (KGM)</option>
-                        <option value="TNE">tone (TNE)</option>
-                        <option value="LTR">litri (LTR)</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input className={inp} placeholder="Greutate brută (kg)" type="number" min="0" value={g.gross_weight_kg}
-                        onChange={e => setGoods(gs => gs.map((x,j) => j===i ? {...x,gross_weight_kg:e.target.value} : x))} />
+                {goods.map((g, i) => {
+                  const suggs = ncSuggestions[i] ?? []
+                  const isNcLoading = ncLoading[i] ?? false
+                  const hasConfirmed = g.nc_code && g.nc_code_confirmed
+                  const hasSuggested = g.nc_code && !g.nc_code_confirmed
+                  return (
+                    <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-600">Bun {i+1}</span>
+                        {goods.length > 1 && (
+                          <button type="button" onClick={() => setGoods(gs => gs.filter((_,j) => j!==i))} className="text-red-400 hover:text-red-600">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Denumire + trigger suggestion */}
+                      <input className={inp} placeholder="Denumire bun *" value={g.name}
+                        onChange={e => {
+                          const name = e.target.value
+                          setGoods(gs => gs.map((x,j) => j===i ? {...x, name, nc_code_confirmed: false} : x))
+                          // Debounce suggestion fetch
+                          clearTimeout((window as any)[`_nc_t_${i}`])
+                          ;(window as any)[`_nc_t_${i}`] = setTimeout(() => void fetchNcSuggestions(i, name), 600)
+                        }}
+                      />
+
+                      {/* NC/TARIC field with status indicator */}
+                      <div className="relative">
+                        <div className="flex gap-2 items-start">
+                          <div className="flex-1 relative">
+                            <div className="flex items-center gap-1">
+                              <input
+                                className={`${inp} pr-8 ${hasConfirmed ? 'border-green-400 bg-green-50' : hasSuggested ? 'border-amber-400 bg-amber-50' : ''}`}
+                                placeholder="Cod NC/TARIC (8-10 cifre)"
+                                value={g.nc_code} maxLength={10}
+                                onChange={e => {
+                                  setGoods(gs => gs.map((x,j) => j===i ? {...x, nc_code: e.target.value, nc_code_confirmed: false, nc_code_description: ''} : x))
+                                  setNcDropdown(i)
+                                }}
+                                onFocus={() => { if (suggs.length > 0) setNcDropdown(i) }}
+                              />
+                              {isNcLoading && <Loader2 className="absolute right-2 top-2.5 w-4 h-4 animate-spin text-gray-400" />}
+                            </div>
+
+                            {/* Suggestion dropdown */}
+                            {ncDropdown === i && suggs.length > 0 && (
+                              <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                {suggs.map((s, si) => (
+                                  <button key={si} type="button"
+                                    className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100 last:border-0"
+                                    onClick={() => {
+                                      setGoods(gs => gs.map((x,j) => j===i ? {...x, nc_code: s.code, nc_code_confirmed: false, nc_code_description: s.description_ro} : x))
+                                      setNcDropdown(null)
+                                    }}>
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-mono text-sm font-bold text-gray-800">{s.code}</span>
+                                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${s.confidence >= 0.85 ? 'bg-green-100 text-green-700' : s.confidence >= 0.70 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                                        {Math.round(s.confidence * 100)}% {s.code_type}
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-gray-600 mt-0.5">{s.description_ro}</div>
+                                    {s.warning && <div className="text-xs text-orange-600 mt-0.5">⚠ {s.warning}</div>}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Confirm / TARIC link buttons */}
+                          {g.nc_code && !g.nc_code_confirmed && (
+                            <button type="button"
+                              onClick={() => setGoods(gs => gs.map((x,j) => j===i ? {...x, nc_code_confirmed: true} : x))}
+                              className="flex-shrink-0 px-2.5 py-2.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700"
+                              title="Confirmă codul NC/TARIC">
+                              ✓ Confirmă
+                            </button>
+                          )}
+                          {g.nc_code && (
+                            <a href={`https://ec.europa.eu/taxation_customs/dds2/taric/taric_consultation.jsp?Lang=ro`}
+                              target="_blank" rel="noopener noreferrer"
+                              onClick={() => { void navigator.clipboard?.writeText(g.nc_code) }}
+                              className="flex-shrink-0 p-2.5 border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50"
+                              title="Codul a fost copiat. Verifică-l în pagina oficială TARIC.">
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Status message */}
+                        {hasConfirmed && (
+                          <p className="text-xs text-green-700 mt-1 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Cod confirmat: {g.nc_code_description || g.nc_code}
+                          </p>
+                        )}
+                        {hasSuggested && (
+                          <p className="text-xs text-amber-700 mt-1">
+                            ⚠ Cod sugerat automat — apasă <strong>✓ Confirmă</strong> după verificare sau alege alt cod din listă.
+                          </p>
+                        )}
+                        {!g.nc_code && g.name.length >= 3 && suggs.length === 0 && !isNcLoading && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Nu am găsit cod NC/TARIC pentru „{g.name}".{' '}
+                            <a href="https://ec.europa.eu/taxation_customs/dds2/taric/taric_consultation.jsp?Lang=ro"
+                              target="_blank" rel="noopener noreferrer" className="underline text-blue-600">
+                              Caută în TARIC <ExternalLink className="w-3 h-3 inline" />
+                            </a>
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <input className={inp} placeholder="Cantitate" type="number" min="0" value={g.quantity}
+                          onChange={e => setGoods(gs => gs.map((x,j) => j===i ? {...x,quantity:e.target.value} : x))} />
+                        <select className={inp} value={g.uom}
+                          onChange={e => setGoods(gs => gs.map((x,j) => j===i ? {...x,uom:e.target.value} : x))}>
+                          <option value="C62">buc (C62)</option>
+                          <option value="KGM">kg (KGM)</option>
+                          <option value="TNE">tone (TNE)</option>
+                          <option value="LTR">litri (LTR)</option>
+                        </select>
+                        <input className={inp} placeholder="Greutate brută (kg)" type="number" min="0" value={g.gross_weight_kg}
+                          onChange={e => setGoods(gs => gs.map((x,j) => j===i ? {...x,gross_weight_kg:e.target.value} : x))} />
+                      </div>
                       <input className={inp} placeholder="Valoare RON (fără TVA)" type="number" min="0" value={g.value_ron}
                         onChange={e => setGoods(gs => gs.map((x,j) => j===i ? {...x,value_ron:e.target.value} : x))} />
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
+
                 <button type="button" onClick={() => setGoods(gs => [...gs, emptyGood()])}
                   className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-800">
                   <Plus className="w-4 h-4" /> Adaugă bun
                 </button>
+
+                <p className="text-xs text-gray-400 border-t border-gray-100 pt-2">
+                  Codul NC/TARIC este sugerat de ArendaPro pe baza nomenclatorului local și a denumirii bunului.
+                  Verificarea finală aparține utilizatorului, brokerului vamal sau consultantului fiscal.
+                </p>
               </>}
 
               {wizardStep === 4 && <>
