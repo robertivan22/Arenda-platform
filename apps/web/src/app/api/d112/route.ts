@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
   // Aggregate per lessor
   const grouped = new Map<string, {
     ronBrut: number; ronNet: number; taxAmount: number
-    contractIds: string[]; lessorId: string
+    contractIds: string[]; lessorId: string; paymentType: string
   }>()
   for (const t of transactions) {
     const key = (t as any).lessor_id ?? 'UNKNOWN'
