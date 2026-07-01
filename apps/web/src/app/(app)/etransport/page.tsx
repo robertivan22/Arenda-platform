@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 export const runtime = 'edge'
 
@@ -1019,7 +1019,7 @@ function ETransportHelp() {
             <div className="text-xs text-gray-600 space-y-2">
               <p><strong>CN (Combined Nomenclature)</strong> — 8 cifre, folosit în comerțul intracomunitar UE și pentru RO e-Transport</p>
               <p><strong>TARIC</strong> — 10 cifre, folosit pentru importuri/exporturi extra-UE (include taxe vamale specifice)</p>
-              <p>Pentru <strong>RO e-Transport</strong>, codul CN de 8 cifre este suficient în większości cazurilor.</p>
+              <p>Pentru <strong>RO e-Transport</strong>, codul CN de 8 cifre este suficient în marea majoritate a cazurilor.</p>
               <div className="bg-gray-50 rounded-lg p-3 space-y-1">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                   <span className="font-mono text-gray-700">10059000</span><span>Porumb (boabe/furajer/consum)</span>
