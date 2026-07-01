@@ -9,7 +9,7 @@ const VALID_STATUS = new Set(['activ', 'expirat', 'utilizat', 'anulat'])
 // ── PATCH /api/transporturi-uit/[id] ─────────────────────────────────────────
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
   if (!UUID_RE.test(id)) {

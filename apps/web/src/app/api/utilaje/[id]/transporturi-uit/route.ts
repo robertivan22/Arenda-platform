@@ -19,7 +19,7 @@ const VALID_STATUS = new Set(['activ', 'expirat', 'utilizat', 'anulat'])
 // ── GET /api/utilaje/[id]/transporturi-uit ────────────────────────────────────
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
   if (!UUID_RE.test(id)) {
@@ -54,7 +54,7 @@ export async function GET(
 // ── POST /api/utilaje/[id]/transporturi-uit ───────────────────────────────────
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
   if (!UUID_RE.test(id)) {
