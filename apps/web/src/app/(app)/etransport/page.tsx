@@ -326,7 +326,7 @@ export default function ETransportPage() {
                     {filtered.map(s => {
                       const canGenerate = !s.uit_code
                         && ['draft','ready_to_submit','validated','validation_failed','rejected'].includes(s.status)
-                        && token?.connected && !token.expired
+                      const tokenOk = !!(token?.connected && !token.expired)
                       const canPoll   = ['submitted','processing'].includes(s.status) && !!s.anaf_upload_index
                       const canCancel = !['deleted','confirmed','uit_generated'].includes(s.status)
                       return (
@@ -357,8 +357,15 @@ export default function ETransportPage() {
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
                               {canGenerate && (
-                                <button onClick={() => void generateUit(s.id)} disabled={generating===s.id}
-                                  className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
+                                <button
+                                  onClick={() => tokenOk ? void generateUit(s.id) : toast.error('Configurați tokenul ANAF în tab Setări →')}
+                                  disabled={generating===s.id}
+                                  title={tokenOk ? 'Generează cod UIT via ANAF' : 'Token ANAF lipsă — configurați în Setări'}
+                                  className={`flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                    tokenOk
+                                      ? 'bg-green-600 text-white hover:bg-green-700 disabled:opacity-50'
+                                      : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                                  }`}>
                                   {generating===s.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />} Generează UIT
                                 </button>
                               )}
@@ -457,10 +464,18 @@ export default function ETransportPage() {
                   </div>
                 )}
                 <div className="flex gap-2 pt-2">
-                  {!detail.uit_code && ['draft','ready_to_submit','validated','validation_failed','rejected'].includes(detail.status) && token?.connected && !token.expired && (
-                    <button onClick={() => void generateUit(detail.id)} disabled={generating===detail.id}
-                      className="flex-1 flex items-center justify-center gap-1 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50">
-                      {generating===detail.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} Generează cod UIT
+                  {!detail.uit_code && ['draft','ready_to_submit','validated','validation_failed','rejected'].includes(detail.status) && (
+                    <button
+                      onClick={() => (token?.connected && !token.expired) ? void generateUit(detail.id) : toast.error('Configurați tokenul ANAF în tab Setări →')}
+                      disabled={generating===detail.id}
+                      title={(token?.connected && !token.expired) ? 'Trimite la ANAF și salvează UIT' : 'Token ANAF lipsă — configurați în tab Setări'}
+                      className={`flex-1 flex items-center justify-center gap-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                        (token?.connected && !token.expired)
+                          ? 'bg-green-600 text-white hover:bg-green-700 disabled:opacity-50'
+                          : 'bg-gray-100 text-gray-400 border border-gray-200'
+                      }`}>
+                      {generating===detail.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                      {generating===detail.id ? 'Se generează...' : 'Generează cod UIT'}
                     </button>
                   )}
                   {['submitted','processing'].includes(detail.status) && detail.anaf_upload_index && (
