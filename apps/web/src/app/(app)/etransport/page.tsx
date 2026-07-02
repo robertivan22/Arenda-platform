@@ -163,6 +163,98 @@ export default function ETransportPage() {
     } finally { setter(null) }
   }
 
+  function printDetail(d: ShipmentDetail, asPdf = false) {
+    const tipLabel = TIP_OPTIONS.find(t => t.value === d.operation_type)?.label ?? d.operation_type
+    const totalKg  = d.goods.reduce((s, g) => s + (g.gross_weight_kg ?? 0), 0)
+    const totalRon = d.goods.reduce((s, g) => s + (g.value_ron ?? 0), 0)
+    const statusLabel = STATUS_META[d.status]?.label ?? d.status
+    const goodsRows = d.goods.map(g => `
+      <tr>
+        <td>${g.name}</td>
+        <td>${g.nc_code ?? '—'}</td>
+        <td style="text-align:right">${g.quantity} ${g.uom}</td>
+        <td style="text-align:right">${g.gross_weight_kg ?? '—'} kg</td>
+        <td style="text-align:right">${g.value_ron ? g.value_ron.toLocaleString('ro-RO') + ' RON' : '—'}</td>
+      </tr>`).join('')
+    const html = `<!DOCTYPE html><html lang="ro"><head><meta charset="UTF-8">
+<title>Declarație e-Transport${d.uit_code ? ' — ' + d.uit_code : ''}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 11pt; color: #111; padding: 20mm 15mm; }
+  h1 { font-size: 16pt; margin-bottom: 4px; }
+  .sub { font-size: 9pt; color: #666; margin-bottom: 16px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 9pt; font-weight: 600; background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+  .uit { font-family: monospace; font-size: 10pt; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-top: 4px; }
+  .section { margin-top: 20px; }
+  .section-title { font-size: 8pt; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; margin-bottom: 10px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 10px; background: #f9fafb; }
+  .card-label { font-size: 7.5pt; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; }
+  .card-value { font-size: 10.5pt; font-weight: 600; margin-top: 2px; }
+  .card-sub { font-size: 9pt; color: #6b7280; margin-top: 1px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10pt; }
+  th { text-align: left; font-size: 8pt; font-weight: 700; color: #6b7280; text-transform: uppercase; padding: 4px 6px; border-bottom: 2px solid #e5e7eb; }
+  td { padding: 5px 6px; border-bottom: 1px solid #f3f4f6; }
+  .total-row td { font-weight: 700; border-top: 2px solid #e5e7eb; border-bottom: none; }
+  .loc-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+  .loc-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
+  .footer { margin-top: 30px; font-size: 8pt; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+  @media print { body { padding: 10mm; } }
+</style></head><body>
+  <h1>Declarație RO e-Transport</h1>
+  <div class="sub">Generat de ArendaPro · ${new Date().toLocaleDateString('ro-RO', { day:'2-digit', month:'long', year:'numeric' })}</div>
+  <span class="badge">${statusLabel}</span>
+  ${d.uit_code ? `<div class="uit">Cod UIT: <strong>${d.uit_code}</strong></div>` : ''}
+
+  <div class="section">
+    <div class="section-title">Informații generale</div>
+    <div class="grid2">
+      <div class="card"><div class="card-label">Tip operațiune</div><div class="card-value">${tipLabel}</div></div>
+      <div class="card"><div class="card-label">Data transport</div><div class="card-value">${fmtDate(d.transport_start_date)}</div></div>
+      ${d.carrier_name ? `<div class="card"><div class="card-label">Transportator</div><div class="card-value">${d.carrier_name}</div>${d.carrier_cui ? `<div class="card-sub">${d.carrier_cui}</div>` : ''}</div>` : ''}
+      ${d.source_document_ref ? `<div class="card"><div class="card-label">Document referință</div><div class="card-value">${d.source_document_ref}</div></div>` : ''}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Transport vehicul</div>
+    <div class="grid2">
+      <div class="card"><div class="card-label">Nr. înmatriculare</div><div class="card-value" style="font-family:monospace">${d.vehicle_no}</div></div>
+      <div class="card"><div class="card-label">Tip vehicul</div><div class="card-value">${d.trailer1_no ? 'Camion + remorcă' : 'Camion'}</div></div>
+      ${d.trailer1_no ? `<div class="card"><div class="card-label">Remorcă</div><div class="card-value" style="font-family:monospace">${d.trailer1_no}</div></div>` : ''}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Locații</div>
+    <div class="loc-row"><div class="loc-dot" style="background:#22c55e;outline:2px solid #bbf7d0;outline-offset:2px"></div><div><div class="card-label">Punct încărcare</div><div>${d.loading_location}${d.loading_country !== 'RO' ? ' (' + d.loading_country + ')' : ''}</div></div></div>
+    <div class="loc-row"><div class="loc-dot" style="background:#fff;border:2px solid #fb923c"></div><div><div class="card-label">Punct descărcare</div><div>${d.unloading_location}${d.unloading_country !== 'RO' ? ' (' + d.unloading_country + ')' : ''}</div></div></div>
+  </div>
+
+  ${d.goods.length > 0 ? `
+  <div class="section">
+    <div class="section-title">Bunuri transportate</div>
+    <table>
+      <thead><tr><th>Denumire</th><th>Cod NC/TARIC</th><th style="text-align:right">Cantitate</th><th style="text-align:right">Greutate</th><th style="text-align:right">Valoare</th></tr></thead>
+      <tbody>${goodsRows}</tbody>
+      <tfoot><tr class="total-row"><td colspan="3"><strong>TOTAL</strong></td><td style="text-align:right">${totalKg > 0 ? totalKg.toLocaleString('ro-RO') + ' kg' : '—'}</td><td style="text-align:right">${totalRon > 0 ? totalRon.toLocaleString('ro-RO') + ' RON' : '—'}</td></tr></tfoot>
+    </table>
+  </div>` : ''}
+
+  <div class="footer">ArendaPro · Declarație generată automat · Verificarea datelor aparține utilizatorului</div>
+</body></html>`
+    const w = window.open('', '_blank', 'width=800,height=900')
+    if (!w) { toast.error('Permite ferestrele pop-up pentru a tipări'); return }
+    w.document.write(html)
+    w.document.close()
+    w.focus()
+    if (asPdf) {
+      w.onload = () => { w.print() }
+    } else {
+      setTimeout(() => w.print(), 300)
+    }
+  }
+
   async function generateUit(id: string) {
     setGenerating(id)
     setAnafError(null)
@@ -560,10 +652,12 @@ export default function ETransportPage() {
                         <Copy className="w-3 h-3" /> Copiază UIT
                       </button>
                     )}
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                      onClick={() => printDetail(detail)}>
                       🖨 Printează
                     </button>
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                      onClick={() => printDetail(detail, true)}>
                       ↓ PDF
                     </button>
                   </div>
