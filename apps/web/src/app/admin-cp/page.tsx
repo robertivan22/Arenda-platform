@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Save, ChevronDown, ChevronRight, Shield, FileText, Users, Leaf, MessageSquare, Tractor, Activity, MapPin, LayoutDashboard, ExternalLink } from 'lucide-react'
 import { CONFIG_FIELDS, getDefaults, DocConfig } from '@/lib/doc-config-fields'
+import { LoginAsButton } from '@/components/admin/LoginAsButton'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Profile {
@@ -88,6 +89,7 @@ const tdCls = 'px-3 py-2 text-sm text-gray-800'
 export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [tab, setTab] = useState<'users' | 'templates' | 'fitosanitar' | 'messages' | 'module'>('users')
 
   // Users
@@ -121,6 +123,7 @@ export default function AdminPage() {
     const db = createClient()
     db.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return }
+      setCurrentUserId(user.id)
       const { data: profile } = await db.from('profiles').select('is_admin').eq('id', user.id).single()
       if (profile?.is_admin) {
         setIsAdmin(true)
@@ -344,7 +347,7 @@ export default function AdminPage() {
                     <th className={thCls}>Nume afișat</th>
                     <th className={thCls}>Admin</th>
                     <th className={thCls}>Permisiuni</th>
-                  </tr>
+                    <th className={thCls}>Acțiuni</th>
                 </thead>
                 <tbody>
                   {profiles.map(profile => {
@@ -392,12 +395,16 @@ export default function AdminPage() {
                               {allEnabled ? 'Toate active' : `${PERM_FIELDS.filter(f => perms[f.key]).length}/${PERM_FIELDS.length}`}
                             </button>
                           </td>
-                        </tr>
+                          <td className={tdCls}>
+                            {profile.id !== currentUserId && (
+                              <LoginAsButton userId={profile.id} email={profile.email} />
+                            )}
+                          </td>
 
                         {/* Expanded permissions row */}
                         {isExpanded && (
                           <tr key={`${profile.id}-perms`}>
-                            <td colSpan={4} className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                            <td colSpan={5} className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                               <div className="flex items-center gap-2 mb-3">
                                 <Shield className="w-3.5 h-3.5 text-gray-400" />
                                 <span className="text-xs font-semibold text-gray-500 uppercase">Permisiuni acces secțiuni</span>

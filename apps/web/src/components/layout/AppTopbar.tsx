@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAlerts } from '@/lib/alerte/useAlerts'
+import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner'
 
 function Breadcrumb() {
   const pathname = usePathname()
@@ -198,6 +199,7 @@ export function AppTopbar() {
 
   return (
     <>
+    <ImpersonationBanner />
     <header className="h-12 bg-white border-b border-gray-200 flex items-center px-4 gap-3 flex-shrink-0">
       <button
         onClick={toggle}
