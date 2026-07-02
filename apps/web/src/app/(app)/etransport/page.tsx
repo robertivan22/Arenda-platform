@@ -6,11 +6,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
-  Truck, Plus, Loader2, CheckCircle2, AlertTriangle, Clock,
-  RefreshCw, Key, Ban, FileText, Eye, Settings,
-  Copy, ArrowLeft, Trash2, ExternalLink, ChevronDown, ChevronUp,
+  Truck, Plus, Loader2, CheckCircle2, AlertTriangle,
+  RefreshCw, Key, FileText, Settings,
+  Copy, Trash2, ExternalLink, ChevronDown, ChevronUp,
 } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
 
 interface TokenStatus { connected: boolean; expired?: boolean; expires_at?: string; cif?: string }
 interface Good {
@@ -46,22 +45,22 @@ const TIP_OPTIONS = [
   { value: 'intracomunitar', label: 'Intracomunitar',     desc: '15 zile valabilitate' },
 ]
 
-const STATUS_META: Record<string, { label: string; color: string }> = {
-  draft:             { label: 'Draft',              color: 'bg-gray-100 text-gray-600' },
-  ready_to_submit:   { label: 'Gata de trimitere',  color: 'bg-blue-50 text-blue-700' },
-  validated:         { label: 'Validat',            color: 'bg-blue-50 text-blue-700' },
-  validation_failed: { label: 'Eroare validare',    color: 'bg-red-50 text-red-600' },
-  submitted:         { label: 'Trimis ANAF',        color: 'bg-purple-50 text-purple-700' },
-  processing:        { label: 'În procesare ANAF',   color: 'bg-yellow-50 text-yellow-700' },
-  accepted:          { label: 'Acceptat ANAF',      color: 'bg-green-50 text-green-700' },
-  rejected:          { label: 'Respins ANAF',       color: 'bg-red-50 text-red-600' },
-  anaf_auth_error:   { label: 'Eroare autentif. ANAF', color: 'bg-orange-50 text-orange-700' },
-  uit_generated:     { label: 'UIT Generat ✓',      color: 'bg-green-100 text-green-800' },
-  deleted:           { label: 'Șters',              color: 'bg-gray-100 text-gray-500' },
+const STATUS_META: Record<string, { label: string; color: string; dot: string }> = {
+  draft:             { label: 'Proiect',              color: 'bg-blue-50 text-blue-700',    dot: 'bg-blue-400' },
+  ready_to_submit:   { label: 'Gata de trimitere',    color: 'bg-blue-50 text-blue-700',    dot: 'bg-blue-400' },
+  validated:         { label: 'Validat',              color: 'bg-blue-50 text-blue-700',    dot: 'bg-blue-400' },
+  validation_failed: { label: 'Eroare validare',      color: 'bg-red-50 text-red-600',      dot: 'bg-red-400' },
+  submitted:         { label: 'Trimis ANAF',          color: 'bg-amber-50 text-amber-700',  dot: 'bg-amber-400' },
+  processing:        { label: 'În transport',         color: 'bg-amber-50 text-amber-700',  dot: 'bg-amber-400' },
+  accepted:          { label: 'Aprobat',              color: 'bg-green-50 text-green-700',  dot: 'bg-green-500' },
+  rejected:          { label: 'Expirat',              color: 'bg-red-50 text-red-600',      dot: 'bg-red-400' },
+  anaf_auth_error:   { label: 'Eroare ANAF',          color: 'bg-orange-50 text-orange-700',dot: 'bg-orange-400' },
+  uit_generated:     { label: 'Aprobat',              color: 'bg-green-100 text-green-800', dot: 'bg-green-500' },
+  deleted:           { label: 'Șters',                color: 'bg-gray-100 text-gray-500',   dot: 'bg-gray-300' },
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const m = STATUS_META[status] ?? { label: status, color: 'bg-gray-100 text-gray-600' }
+  const m = STATUS_META[status] ?? { label: status, color: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' }
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${m.color}`}>{m.label}</span>
 }
 
@@ -255,7 +254,15 @@ export default function ETransportPage() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return shipments.filter(s => {
-      if (filterStatus !== 'all' && s.status !== filterStatus) return false
+      const matchFilter = () => {
+        if (filterStatus === 'all') return true
+        if (filterStatus === 'proiect')   return ['draft','ready_to_submit','validated'].includes(s.status)
+        if (filterStatus === 'aprobat')   return ['accepted','uit_generated'].includes(s.status)
+        if (filterStatus === 'transport') return ['submitted','processing'].includes(s.status)
+        if (filterStatus === 'expirat')   return ['rejected','validation_failed'].includes(s.status)
+        return s.status === filterStatus
+      }
+      if (!matchFilter()) return false
       if (!q) return true
       return (s.uit_code ?? '').toLowerCase().includes(q) || s.vehicle_no.toLowerCase().includes(q)
           || (s.machine_name ?? '').toLowerCase().includes(q) || s.loading_location.toLowerCase().includes(q)
@@ -263,30 +270,47 @@ export default function ETransportPage() {
   }, [shipments, filterStatus, search])
 
   const stats = useMemo(() => ({
-    total: shipments.length, draft: shipments.filter(s => s.status === 'draft').length,
-    pending: shipments.filter(s => ['submitted','processing'].includes(s.status)).length,
-    accepted: shipments.filter(s => s.status === 'accepted').length,
-    rejected: shipments.filter(s => s.status === 'rejected').length,
+    active:    shipments.filter(s => ['accepted','uit_generated'].includes(s.status)).length,
+    transport: shipments.filter(s => ['submitted','processing'].includes(s.status)).length,
+    proiecte:  shipments.filter(s => ['draft','ready_to_submit','validated'].includes(s.status)).length,
+    expirate:  shipments.filter(s => ['rejected','validation_failed'].includes(s.status)).length,
   }), [shipments])
 
   const inp = 'w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500'
   const lbl = 'block text-xs font-semibold text-gray-700 mb-1'
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <PageHeader title="RO e-Transport" subtitle="Declarații transport ANAF — MVP 1" />
-        <div className="flex items-center gap-2">
-          <button onClick={() => setTab(tab === 'list' ? 'settings' : 'list')}
-            className="p-2 text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
-            <Settings className="w-4 h-4" />
-          </button>
-          <button onClick={() => { setShowWizard(true); setWizardStep(1) }}
-            className="flex items-center gap-1.5 px-3 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700">
-            <Plus className="w-4 h-4" /> Adaugă transport
-          </button>
+    <div className="min-h-screen bg-gray-50">
+
+      {/* ─── Page Header ──────────────────────────────────────────────────── */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest mb-0.5">E-TRANSPORT · ANAF</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Transport Mărfuri</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <a href="https://etransport.anaf.ro" target="_blank" rel="noopener noreferrer"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                <ExternalLink className="w-3.5 h-3.5" /> ANAF Portal
+              </a>
+              <button onClick={() => setTab(tab === 'list' ? 'settings' : 'list')}
+                className={`p-2 border rounded-lg transition-colors ${tab === 'settings' ? 'border-brand-500 text-brand-600 bg-brand-50' : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}>
+                <Settings className="w-4 h-4" />
+              </button>
+              <button onClick={() => { setShowWizard(true); setWizardStep(1) }}
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-600 transition-colors shadow-sm">
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Declarație nouă</span>
+                <span className="sm:hidden">Adaugă</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
 
       {!tokenLoading && (!token?.connected || token.expired) && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5 flex items-center gap-3 text-sm text-amber-800">
@@ -383,219 +407,328 @@ export default function ETransportPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-5">
-            {[{l:'Total',v:stats.total,c:'text-gray-700'},{l:'Draft',v:stats.draft,c:'text-amber-600'},
-              {l:'În procesare',v:stats.pending,c:'text-purple-600'},{l:'Acceptate',v:stats.accepted,c:'text-green-600'},
-              {l:'Respinse',v:stats.rejected,c:'text-red-600'}].map(s => (
-              <div key={s.l} className="bg-white border border-gray-200 rounded-xl p-3 text-center">
-                <div className={`text-xl font-bold ${s.c}`}>{s.v}</div>
-                <div className="text-xs text-gray-500">{s.l}</div>
+          {/* ─── Stats ────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            {([
+              { label: 'UIT-uri active', value: stats.active,    bg: 'bg-green-50',  border: 'border-green-200', num: 'text-green-800', sub: 'text-green-600', icon: <CheckCircle2 className="w-5 h-5 text-green-500" /> },
+              { label: 'În transport',   value: stats.transport,  bg: 'bg-orange-50', border: 'border-orange-200',num: 'text-orange-800',sub: 'text-orange-600',icon: <Truck className="w-5 h-5 text-orange-400" /> },
+              { label: 'Proiecte',       value: stats.proiecte,  bg: 'bg-blue-50',   border: 'border-blue-200',  num: 'text-blue-800',  sub: 'text-blue-600',  icon: <FileText className="w-5 h-5 text-blue-400" /> },
+              { label: 'Expirate',       value: stats.expirate,  bg: 'bg-red-50',    border: 'border-red-200',   num: 'text-red-800',   sub: 'text-red-600',   icon: <AlertTriangle className="w-5 h-5 text-red-400" /> },
+            ] as const).map(s => (
+              <div key={s.label} className={`${s.bg} border ${s.border} rounded-xl p-4`}>
+                <div className="flex items-start justify-between mb-3">{s.icon}</div>
+                <div className={`text-2xl font-bold ${s.num}`}>{s.value}</div>
+                <div className={`text-xs font-medium mt-0.5 ${s.sub}`}>{s.label}</div>
               </div>
             ))}
           </div>
 
-          <div className="flex gap-2 mb-4">
-            <input className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder="Caută UIT, vehicul, localitate..." value={search} onChange={e => setSearch(e.target.value)} />
-            <select className="px-3 py-2 text-sm border border-gray-300 rounded-lg" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-              <option value="all">Toate</option>
-              {Object.entries(STATUS_META).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-            <button onClick={() => void loadShipments()} className="p-2 text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg">
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center py-12 text-gray-400"><Loader2 className="w-5 h-5 animate-spin mr-2" />Se încarcă...</div>
-          ) : filtered.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400">
-              <Truck className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">Niciun transport. Apăsați „Adaugă transport" pentru a crea primul.</p>
-            </div>
-          ) : (
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[680px]">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tip / Dată</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Rută</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vehicul</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Cod UIT</th>
-                      <th className="px-4 py-3 text-right"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filtered.map(s => {
-                      const canGenerate = !s.uit_code
-                        && ['draft','ready_to_submit','validated','validation_failed','rejected'].includes(s.status)
-                      const tokenOk = !!(token?.connected && !token.expired)
-                      const canPoll   = ['submitted','processing'].includes(s.status) && !!s.anaf_upload_index
-                      const canCancel = !['deleted','confirmed','uit_generated'].includes(s.status)
-                      return (
-                        <tr key={s.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-gray-800">{TIP_OPTIONS.find(t => t.value===s.operation_type)?.label ?? s.operation_type}</div>
-                            <div className="text-xs text-gray-400">{fmtDate(s.transport_start_date)}</div>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-600">
-                            <div>{s.loading_location||'—'}</div>
-                            <div className="text-gray-400">→ {s.unloading_location||'—'}</div>
-                          </td>
-                          <td className="px-4 py-3 text-gray-700 font-mono text-xs">{s.vehicle_no||'—'}</td>
-                          <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
-                          <td className="px-4 py-3">
-                            {s.uit_code ? (
-                              <div className="flex items-center gap-1">
-                                <span className="font-mono text-xs text-gray-700" title={s.uit_code}>{s.uit_code.slice(0,10)}…</span>
-                                <button onClick={() => { void navigator.clipboard?.writeText(s.uit_code!); toast.success('Copiat!') }}>
-                                  <Copy className="w-3 h-3 text-gray-400 hover:text-gray-600" />
-                                </button>
-                              </div>
-                            ) : <span className="text-xs text-gray-400 italic">—</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-1">
-                              <button onClick={() => void openDetail(s.id)} className="p-1.5 text-gray-400 hover:text-gray-700 rounded hover:bg-gray-100" title="Detalii">
-                                <Eye className="w-3.5 h-3.5" />
-                              </button>
-                              {canGenerate && (
-                                <button
-                                  onClick={() => tokenOk ? void generateUit(s.id) : toast.error('Configurați tokenul ANAF în tab Setări →')}
-                                  disabled={generating===s.id}
-                                  title={tokenOk ? 'Generează cod UIT via ANAF' : 'Token ANAF lipsă — configurați în Setări'}
-                                  className={`flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                                    tokenOk
-                                      ? 'bg-green-600 text-white hover:bg-green-700 disabled:opacity-50'
-                                      : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
-                                  }`}>
-                                  {generating===s.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />} Generează UIT
-                                </button>
-                              )}
-                              {canPoll && (
-                                <button onClick={() => void doAction(s.id, 'poll', setPolling)} disabled={polling===s.id}
-                                  className="p-1.5 text-purple-500 hover:text-purple-700 rounded hover:bg-purple-50" title="Verifică status">
-                                  {polling===s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                                </button>
-                              )}
-                              {canCancel && (
-                                <button onClick={() => void doAction(s.id, 'cancel', setCancelling)} disabled={cancelling===s.id}
-                                  className="p-1.5 text-red-400 hover:text-red-600 rounded hover:bg-red-50" title="Șterge">
-                                  {cancelling===s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+          {/* ─── List panel ──────────────────────────────────────────── */}
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+            {/* Search + filter tabs */}
+            <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <input
+                  className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-gray-50"
+                  placeholder="Caută UIT, vehicul, localitate..."
+                  value={search} onChange={e => setSearch(e.target.value)} />
+                <button onClick={() => void loadShipments()} className="p-2 text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg flex-shrink-0">
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex items-center gap-1 mt-3 overflow-x-auto pb-0.5 [scrollbar-width:none] [-webkit-overflow-scrolling:touch]">
+                {([
+                  { key: 'all',       label: 'Toate' },
+                  { key: 'proiect',   label: 'Proiect' },
+                  { key: 'aprobat',   label: 'Aprobat' },
+                  { key: 'transport', label: 'În transport' },
+                  { key: 'expirat',   label: 'Expirat' },
+                ] as const).map(f => (
+                  <button key={f.key} onClick={() => setFilterStatus(f.key)}
+                    className={`flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
+                      filterStatus === f.key
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                    }`}>
+                    {f.label}
+                  </button>
+                ))}
+                <span className="ml-auto pl-3 text-xs text-gray-400 flex-shrink-0">{filtered.length} declarații</span>
               </div>
             </div>
-          )}
+
+            {/* Cards */}
+            {loading ? (
+              <div className="flex justify-center items-center gap-2 py-14 text-gray-400">
+                <Loader2 className="w-5 h-5 animate-spin" />Se încarcă...
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="py-16 text-center text-gray-400">
+                <Truck className="w-10 h-10 mx-auto mb-3 opacity-25" />
+                <p className="text-sm">Niciun transport. Apăsați „Declarație nouă" pentru a crea primul.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {filtered.map(s => {
+                  const meta = STATUS_META[s.status] ?? { label: s.status, color: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' }
+                  const isSelected = detail?.id === s.id
+                  const canGenerate = !s.uit_code && ['draft','ready_to_submit','validated','validation_failed','rejected'].includes(s.status)
+                  const tokenOk = !!(token?.connected && !token.expired)
+                  return (
+                    <button key={s.id} onClick={() => void openDetail(s.id)}
+                      className={`w-full text-left px-4 py-3.5 hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50/70' : ''}`}>
+                      <div className="flex items-start gap-3">
+                        <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ring-2 ring-white ring-offset-1 ${meta.dot}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${meta.color}`}>{meta.label}</span>
+                            {s.uit_code && <span className="text-xs text-gray-400 font-mono truncate max-w-[160px] sm:max-w-none">{s.uit_code}</span>}
+                          </div>
+                          <p className="text-sm font-medium text-gray-900 truncate mb-1">
+                            {s.loading_location || '—'} → {s.unloading_location || '—'}
+                          </p>
+                          <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                            <span className="font-mono font-semibold">{s.vehicle_no}</span>
+                            <span>{fmtDate(s.transport_start_date)}</span>
+                            {s.machine_name && <span className="text-gray-400 italic">{s.machine_name}</span>}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                            {TIP_OPTIONS.find(t => t.value === s.operation_type)?.label ?? s.operation_type}
+                          </span>
+                          {canGenerate && (
+                            <button
+                              onClick={e => { e.stopPropagation(); tokenOk ? void generateUit(s.id) : toast.error('Configurați tokenul ANAF în tab Setări →') }}
+                              disabled={generating === s.id}
+                              className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg transition-colors ${
+                                tokenOk ? 'bg-green-600 text-white hover:bg-green-700 disabled:opacity-50' : 'bg-gray-100 text-gray-400 border border-gray-200'
+                              }`}>
+                              {generating === s.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+                              UIT
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ─── Help ─────────────────────────────────────────────────── */}
+          <ETransportHelp />
         </>
       )}
+      </div>
 
-      {/* ─── Help / Ghid RO e-Transport ──────────────────────────── */}
-      {tab === 'list' && <ETransportHelp />}
-
-      {/* Detail panel */}
+      {/* ─── Detail drawer ────────────────────────────────────────────────── */}
       {(detail || detailLoading) && (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDetail(null)} />
-          <div className="relative z-10 ml-auto bg-white w-full sm:w-[480px] h-full shadow-2xl flex flex-col">
+          {/* Mobile: bottom sheet | Desktop: right drawer */}
+          <div className="absolute inset-x-0 bottom-0 sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[460px] bg-white rounded-t-2xl sm:rounded-none shadow-2xl flex flex-col max-h-[90vh] sm:max-h-full">
+            {/* Drag handle mobile */}
+            <div className="sm:hidden flex justify-center pt-2.5 flex-shrink-0">
+              <div className="w-10 h-1 rounded-full bg-gray-200" />
+            </div>
+            {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-              <h2 className="text-sm font-semibold">Detalii transport</h2>
-              <button onClick={() => setDetail(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                <ArrowLeft className="w-4 h-4" />
-              </button>
+              <h2 className="text-sm font-semibold text-gray-900">Detalii declarație</h2>
+              <button onClick={() => setDetail(null)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 text-lg leading-none">✕</button>
             </div>
             {detailLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
             ) : detail && (
-              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 text-sm">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <StatusBadge status={detail.status} />
-                  {detail.uit_code && (
-                    <div className="flex items-center gap-1.5 bg-green-50 border border-green-300 px-3 py-1.5 rounded-lg">
-                      <span className="text-xs font-semibold text-green-800">Cod UIT:</span>
-                      <span className="font-mono text-xs font-bold text-green-900">{detail.uit_code}</span>
-                      <button onClick={() => { void navigator.clipboard?.writeText(detail.uit_code!); toast.success('Copiat!') }} title="Copiază">
-                        <Copy className="w-3.5 h-3.5 text-green-600" />
+              <div className="flex-1 overflow-y-auto">
+                {/* Status + UIT + Actions */}
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <StatusBadge status={detail.status} />
+                    {detail.uit_code && (
+                      <span className="font-mono text-xs bg-green-50 border border-green-200 text-green-800 px-2 py-0.5 rounded-lg font-semibold break-all">
+                        {detail.uit_code}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mb-3">Creat: {fmtDate(detail.created_at)}</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {detail.uit_code && (
+                      <button onClick={() => { void navigator.clipboard?.writeText(detail.uit_code!); toast.success('Copiat!') }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                        <Copy className="w-3 h-3" /> Copiază UIT
                       </button>
-                    </div>
-                  )}
+                    )}
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                      🖨 Printează
+                    </button>
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                      ↓ PDF
+                    </button>
+                  </div>
                 </div>
+
+                {/* Validation errors */}
                 {detail.validation_errors && detail.validation_errors.length > 0 && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <div className="text-xs font-semibold text-red-700 mb-1">Erori validare ({detail.validation_errors.length})</div>
+                  <div className="mx-5 mt-4 bg-red-50 border border-red-200 rounded-xl p-3">
+                    <p className="text-xs font-semibold text-red-700 mb-1">Erori validare ({detail.validation_errors.length})</p>
                     <ul className="text-xs text-red-600 space-y-0.5 list-disc list-inside">
                       {detail.validation_errors.map((e, i) => <li key={i}>{e}</li>)}
                     </ul>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div><span className="text-gray-500">Tip:</span> <strong>{detail.operation_type}</strong></div>
-                  <div><span className="text-gray-500">Data:</span> <strong>{fmtDate(detail.transport_start_date)}</strong></div>
-                  <div><span className="text-gray-500">Vehicul:</span> <strong>{detail.vehicle_no}</strong></div>
-                  {detail.carrier_name && <div><span className="text-gray-500">Transportator:</span> <strong>{detail.carrier_name}</strong></div>}
-                  <div className="col-span-2"><span className="text-gray-500">Rută:</span> <strong>{detail.loading_location} → {detail.unloading_location}</strong></div>
-                  {detail.source_document_ref && <div className="col-span-2"><span className="text-gray-500">Ref. document:</span> <strong>{detail.source_document_ref}</strong></div>}
+
+                {/* PARTENERI */}
+                <div className="px-5 pt-4 pb-3 border-b border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Parteneri</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Transportator</p>
+                      <p className="text-sm font-semibold text-gray-900 leading-tight">{detail.carrier_name || '—'}</p>
+                      {detail.carrier_cui && <p className="text-xs text-gray-400 mt-0.5">{detail.carrier_cui}</p>}
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Tip operațiune</p>
+                      <p className="text-sm font-semibold text-gray-900 leading-tight">{TIP_OPTIONS.find(t => t.value === detail.operation_type)?.label ?? detail.operation_type}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{fmtDate(detail.transport_start_date)}</p>
+                    </div>
+                  </div>
                 </div>
+
+                {/* BUNURI TRANSPORTATE */}
                 {detail.goods.length > 0 && (
-                  <div>
-                    <div className="text-xs font-semibold text-gray-700 mb-1">Bunuri ({detail.goods.length})</div>
-                    <div className="space-y-1">
+                  <div className="px-5 py-4 border-b border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Bunuri transportate</p>
+                    <div className="space-y-2.5">
                       {detail.goods.map(g => (
-                        <div key={g.id} className="flex justify-between text-xs bg-gray-50 rounded-lg px-3 py-1.5">
-                          <span>{g.name}{g.nc_code && <span className="text-gray-400 ml-1">({g.nc_code})</span>}</span>
-                          <span className="text-gray-500">{g.quantity} {g.uom}{g.gross_weight_kg ? ` · ${g.gross_weight_kg}kg` : ''}</span>
+                        <div key={g.id} className="flex justify-between items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{g.name}</p>
+                            {g.nc_code && <p className="text-xs text-gray-400">CN: {g.nc_code}</p>}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-sm font-semibold text-gray-900">{g.gross_weight_kg ? `${g.gross_weight_kg} kg` : `${g.quantity} ${g.uom}`}</p>
+                            {g.value_ron && <p className="text-xs text-gray-500">{g.value_ron.toLocaleString('ro-RO')} RON</p>}
+                          </div>
                         </div>
                       ))}
                     </div>
+                    {detail.goods.some(g => g.gross_weight_kg || g.value_ron) && (
+                      <div className="flex justify-between items-center pt-3 mt-3 border-t border-gray-200">
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Total</span>
+                        <div className="flex items-center gap-3">
+                          {detail.goods.some(g => g.gross_weight_kg) && (
+                            <span className="text-sm font-bold text-gray-900">
+                              {detail.goods.reduce((sum, g) => sum + (g.gross_weight_kg ?? 0), 0).toLocaleString('ro-RO')} kg
+                            </span>
+                          )}
+                          {detail.goods.some(g => g.value_ron) && (
+                            <span className="text-sm font-bold text-orange-600">
+                              {detail.goods.reduce((sum, g) => sum + (g.value_ron ?? 0), 0).toLocaleString('ro-RO')} RON
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
+
+                {/* TRANSPORT */}
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Transport</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide mb-0.5">Nr. înmatriculare</p>
+                      <p className="text-sm font-bold text-gray-900 font-mono">{detail.vehicle_no}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide mb-0.5">Tip vehicul</p>
+                      <p className="text-sm font-semibold text-gray-900">{detail.trailer1_no ? 'Camion + remorcă' : 'Camion'}</p>
+                    </div>
+                    {detail.trailer1_no && (
+                      <div>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide mb-0.5">Remorcă</p>
+                        <p className="text-sm font-semibold text-gray-900 font-mono">{detail.trailer1_no}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide mb-0.5">Data încărcare</p>
+                      <p className="text-sm font-semibold text-gray-900">{fmtDate(detail.transport_start_date)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* LOCAȚII */}
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Locații</p>
+                  <div className="flex items-start gap-3 pb-2">
+                    <div className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0 mt-0.5 ring-2 ring-green-200" />
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Punct încărcare</p>
+                      <p className="text-sm text-gray-900">{detail.loading_location}</p>
+                      {detail.loading_country !== 'RO' && <p className="text-xs text-gray-400">{detail.loading_country}</p>}
+                    </div>
+                  </div>
+                  <div className="ml-1.5 w-px h-5 bg-gray-200" />
+                  <div className="flex items-start gap-3 pt-2">
+                    <div className="w-3 h-3 rounded-full border-2 border-orange-400 bg-white flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Punct descărcare</p>
+                      <p className="text-sm text-gray-900">{detail.unloading_location}</p>
+                      {detail.unloading_country !== 'RO' && <p className="text-xs text-gray-400">{detail.unloading_country}</p>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ISTORIC STATUS */}
                 {detail.logs.length > 0 && (
-                  <div>
-                    <div className="text-xs font-semibold text-gray-700 mb-1">Log ANAF</div>
-                    <div className="space-y-1">
+                  <div className="px-5 py-4 border-b border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Istoric status</p>
+                    <div className="space-y-3">
                       {detail.logs.map(l => (
-                        <div key={l.id} className={`text-xs rounded-lg px-3 py-1.5 flex justify-between ${l.error_message ? 'bg-red-50' : 'bg-gray-50'}`}>
-                          <span className={l.error_message ? 'text-red-600' : 'text-gray-600'}>{l.request_type} · {l.http_status ?? '—'} · {l.anaf_status ?? '—'}{l.error_message ? ` · ${l.error_message.slice(0,40)}` : ''}</span>
-                          <span className="text-gray-400">{fmtDate(l.created_at)}</span>
+                        <div key={l.id} className="flex items-start gap-2.5">
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${l.error_message ? 'bg-red-500' : 'bg-green-500'}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-semibold ${l.error_message ? 'text-red-700' : 'text-gray-800'}`}>
+                              {l.request_type}{l.anaf_status ? ` · ${l.anaf_status}` : l.http_status ? ` · HTTP ${l.http_status}` : ''}
+                            </p>
+                            {l.cod_uit && <p className="text-xs text-green-700 font-mono">UIT: {l.cod_uit}</p>}
+                            {l.error_message && <p className="text-xs text-red-500 truncate">{l.error_message}</p>}
+                            <p className="text-[10px] text-gray-400 mt-0.5">{fmtDate(l.created_at)}</p>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-                <div className="flex gap-2 pt-2">
+
+                {/* Actions */}
+                <div className="px-5 py-4 space-y-2">
                   {!detail.uit_code && ['draft','ready_to_submit','validated','validation_failed','rejected'].includes(detail.status) && (
                     <button
                       onClick={() => (token?.connected && !token.expired) ? void generateUit(detail.id) : toast.error('Configurați tokenul ANAF în tab Setări →')}
-                      disabled={generating===detail.id}
-                      title={(token?.connected && !token.expired) ? 'Trimite la ANAF și salvează UIT' : 'Token ANAF lipsă — configurați în tab Setări'}
-                      className={`flex-1 flex items-center justify-center gap-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                      disabled={generating === detail.id}
+                      className={`w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl transition-colors ${
                         (token?.connected && !token.expired)
                           ? 'bg-green-600 text-white hover:bg-green-700 disabled:opacity-50'
                           : 'bg-gray-100 text-gray-400 border border-gray-200'
                       }`}>
-                      {generating===detail.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                      {generating===detail.id ? 'Se generează...' : 'Generează cod UIT'}
+                      {generating === detail.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                      {generating === detail.id ? 'Se generează...' : 'Generează cod UIT'}
                     </button>
                   )}
                   {['submitted','processing'].includes(detail.status) && detail.anaf_upload_index && (
-                    <button onClick={() => void doAction(detail.id, 'poll', setPolling)} disabled={polling===detail.id}
-                      className="flex-1 flex items-center justify-center gap-1 py-2 border border-purple-300 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-50 disabled:opacity-50">
-                      {polling===detail.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Verifică status
+                    <button onClick={() => void doAction(detail.id, 'poll', setPolling)} disabled={polling === detail.id}
+                      className="w-full flex items-center justify-center gap-2 py-3 border border-purple-300 text-purple-700 text-sm font-semibold rounded-xl hover:bg-purple-50 disabled:opacity-50">
+                      {polling === detail.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Verifică status ANAF
                     </button>
                   )}
                   {!['deleted','confirmed'].includes(detail.status) && (
-                    <button onClick={() => void doAction(detail.id, 'cancel', setCancelling)} disabled={cancelling===detail.id}
-                      className="py-2 px-3 border border-red-200 text-red-600 text-sm rounded-lg hover:bg-red-50 disabled:opacity-50">
-                      {cancelling===detail.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    <button onClick={() => void doAction(detail.id, 'cancel', setCancelling)} disabled={cancelling === detail.id}
+                      className="w-full flex items-center justify-center gap-2 py-3 border border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 disabled:opacity-50">
+                      {cancelling === detail.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      Anulează declarația
                     </button>
                   )}
                 </div>
