@@ -21,9 +21,13 @@ import { jsonError, jsonResponse } from '@/lib/api/response'
 export async function POST(request: NextRequest) {
   const cookieStore = await cookies()
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey || !serviceKey) {
+    return jsonError(request, 'Configurație server incompletă (env vars lipsă)', 500)
+  }
 
   // 1. Read impersonation cookie
   const sessionId = cookieStore.get(IMPERSONATION_COOKIE)?.value

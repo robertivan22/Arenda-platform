@@ -24,9 +24,17 @@ import { jsonError, jsonResponse } from '@/lib/api/response'
 export async function POST(request: NextRequest) {
   const cookieStore = await cookies()
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey || !serviceKey) {
+    return jsonError(request, 'Configurație server incompletă (env vars lipsă)', 500)
+  }
+
+  if (!process.env.IMPERSONATION_ENCRYPTION_KEY) {
+    return jsonError(request, 'IMPERSONATION_ENCRYPTION_KEY nu este configurat pe server', 500)
+  }
 
   // ── SSR client — reads/writes cookies for session management ──────────────
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {

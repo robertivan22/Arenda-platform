@@ -21,8 +21,12 @@ export async function GET(request: NextRequest) {
     return Response.json({ active: false })
   }
 
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+  if (!serviceKey || !supabaseUrl) {
+    return Response.json({ active: false })
+  }
 
   const serviceClient = createServiceClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
