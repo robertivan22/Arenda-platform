@@ -78,11 +78,12 @@ export async function POST(request: NextRequest) {
   }
 
   // 5. Parse + validate request body
-  let targetUserId: string, reason: string
+  let targetUserId: string, reason: string, durationMinutes: number
   try {
     const body = await request.json()
     targetUserId = body.targetUserId
     reason = body.reason
+    durationMinutes = Number(body.durationMinutes) || 30
   } catch {
     return jsonError(request, 'Body invalid', 400)
   }
@@ -92,6 +93,9 @@ export async function POST(request: NextRequest) {
   }
   if (!reason || reason.trim().length < 10) {
     return jsonError(request, 'Motivul trebuie să aibă minimum 10 caractere', 400)
+  }
+  if (durationMinutes < 1 || durationMinutes > 480) {
+    return jsonError(request, 'Durata trebuie să fie între 1 și 480 minute', 400)
   }
   if (adminUser.id === targetUserId) {
     return jsonError(request, 'Nu poți impersona propriul cont', 400)
@@ -142,6 +146,7 @@ export async function POST(request: NextRequest) {
         null,
       user_agent: request.headers.get('user-agent'),
       admin_refresh_token_encrypted: encryptedToken,
+      expires_at: new Date(Date.now() + durationMinutes * 60 * 1000).toISOString(),
     })
     .select('id')
     .single()
@@ -150,13 +155,13 @@ export async function POST(request: NextRequest) {
     return jsonError(request, 'Eroare la salvarea sesiunii în baza de date', 500)
   }
 
-  // 11. Set impersonation cookie (httpOnly, 30 min)
+  // 11. Set impersonation cookie (httpOnly, durationMinutes)
   cookieStore.set(IMPERSONATION_COOKIE, session.id, {
     httpOnly: true,
     secure: true,
     sameSite: 'lax',
     path: '/',
-    maxAge: 30 * 60,
+    maxAge: durationMinutes * 60,
   })
 
   return jsonResponse(request, { success: true, targetEmail })

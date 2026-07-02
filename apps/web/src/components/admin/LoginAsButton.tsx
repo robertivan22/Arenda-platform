@@ -4,6 +4,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserCheck, X } from 'lucide-react'
 
+const DURATION_OPTIONS = [
+  { label: '30 minute', value: 30 },
+  { label: '1 oră', value: 60 },
+  { label: '2 ore', value: 120 },
+  { label: '4 ore', value: 240 },
+  { label: '8 ore', value: 480 },
+]
+
 interface Props {
   userId: string
   email: string | null
@@ -13,11 +21,13 @@ export function LoginAsButton({ userId, email }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
+  const [duration, setDuration] = useState(30)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function openModal() {
     setReason('')
+    setDuration(30)
     setError(null)
     setOpen(true)
   }
@@ -41,7 +51,7 @@ export function LoginAsButton({ userId, email }: Props) {
       const res = await fetch('/api/admin/impersonate/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUserId: userId, reason: reason.trim() }),
+        body: JSON.stringify({ targetUserId: userId, reason: reason.trim(), durationMinutes: duration }),
       })
 
       const data = await res.json()
@@ -102,6 +112,29 @@ export function LoginAsButton({ userId, email }: Props) {
                 <strong>Atenție:</strong> Vei prelua complet sesiunea acestui utilizator.
                 Toate acțiunile efectuate vor fi înregistrate în audit log.
                 Sesiunea expiră automat după 30 de minute.
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Durata sesiunii
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {DURATION_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setDuration(opt.value)}
+                      disabled={loading}
+                      className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
+                        duration === opt.value
+                          ? 'bg-amber-500 border-amber-500 text-white'
+                          : 'bg-white border-gray-200 text-gray-600 hover:border-amber-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>

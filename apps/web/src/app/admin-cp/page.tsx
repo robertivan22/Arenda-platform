@@ -5,7 +5,7 @@ export const runtime = 'edge'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Save, ChevronDown, ChevronRight, Shield, FileText, Users, Leaf, MessageSquare, Tractor, Activity, MapPin, LayoutDashboard, ExternalLink } from 'lucide-react'
+import { Save, ChevronDown, ChevronRight, Shield, FileText, Users, Leaf, MessageSquare, Tractor, Activity, MapPin, LayoutDashboard, ExternalLink, Eye } from 'lucide-react'
 import { CONFIG_FIELDS, getDefaults, DocConfig } from '@/lib/doc-config-fields'
 import { LoginAsButton } from '@/components/admin/LoginAsButton'
 
@@ -90,7 +90,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [tab, setTab] = useState<'users' | 'templates' | 'fitosanitar' | 'messages' | 'module'>('users')
+  const [tab, setTab] = useState<'users' | 'templates' | 'fitosanitar' | 'messages' | 'module' | 'impersonare'>('users')
 
   // Users
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -118,8 +118,21 @@ export default function AdminPage() {
   const [fitoRows, setFitoRows] = useState<FitoRow[]>([])
   const [fitoLoading, setFitoLoading] = useState(false)
 
-  // ── Auth check ──────────────────────────────────────────────────────────────
-  useEffect(() => {
+  // Impersonation sessions
+  interface ImpersonSession {
+    id: string; admin_user_id: string; target_user_id: string
+    reason: string; started_at: string; expires_at: string; ended_at: string | null
+    ip_address: string | null; admin_email?: string; target_email?: string
+    audit_count?: number
+  }
+  interface AuditEntry {
+    id: string; session_id: string; action: string; resource: string
+    record_id: string | null; detail: Record<string, unknown> | null; created_at: string
+  }
+  const [impersonSessions, setImpersonSessions] = useState<ImpersonSession[]>([])
+  const [impersonLoading, setImpersonLoading] = useState(false)
+  const [expandedSession, setExpandedSession] = useState<string | null>(null)
+  const [auditLogs, setAuditLogs] = useState<Record<string, AuditEntry[]>>({})  useEffect(() => {
     const db = createClient()
     db.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return }
@@ -206,6 +219,31 @@ export default function AdminPage() {
     setFitoRows(((entries ?? []) as FitoRow[]).map(r => ({ ...r, user_email: emailMap[r.user_id] ?? r.user_id })))
     setFitoLoading(false)
   }, [])
+
+  const loadImpersonSessions = useCallback(async () => {
+    setImpersonLoading(true)
+    const db = createClient()
+    const [{ data: sessions }, { data: profs }] = await Promise.all([
+      db.from('admin_impersonation_sessions').select('id,admin_user_id,target_user_id,reason,started_at,expires_at,ended_at,ip_address').order('started_at', { ascending: false }).limit(200),
+      db.from('profiles').select('id,email'),
+    ])
+    const emailMap: Record<string, string> = {}
+    ;(profs ?? []).forEach((p: { id: string; email: string | null }) => { emailMap[p.id] = p.email ?? p.id })
+    setImpersonSessions(((sessions ?? []) as ImpersonSession[]).map(s => ({
+      ...s,
+      admin_email: emailMap[s.admin_user_id] ?? s.admin_user_id,
+      target_email: emailMap[s.target_user_id] ?? s.target_user_id,
+    })))
+    setImpersonLoading(false)
+  }, [])
+
+  async function loadAuditLog(sessionId: string) {
+    if (auditLogs[sessionId]) { setExpandedSession(expandedSession === sessionId ? null : sessionId); return }
+    const db = createClient()
+    const { data } = await db.from('admin_impersonation_audit_log').select('*').eq('session_id', sessionId).order('created_at', { ascending: true })
+    setAuditLogs(prev => ({ ...prev, [sessionId]: (data ?? []) as AuditEntry[] }))
+    setExpandedSession(sessionId)
+  }
 
   // ── Toggle is_admin ─────────────────────────────────────────────────────────
   async function toggleAdmin(profile: Profile) {
@@ -321,11 +359,17 @@ export default function AdminPage() {
             )}
           </button>
           <button
-            onClick={() => setTab('module')}
+            onClick={() => { setTab('module') }}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
               tab === 'module' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >Module noi</button>
+          <button
+            onClick={() => { setTab('impersonare'); void loadImpersonSessions() }}
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+              tab === 'impersonare' ? 'border-amber-500 text-amber-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >Impersonare</button>
         </div>
       </div>
 
@@ -802,6 +846,123 @@ export default function AdminPage() {
               </div>
               <p className="text-xs text-gray-400 mt-3">Permisiune: <code className="bg-gray-100 px-1 rounded">can_parcele</code> · SQL necesar: supabase-migration-fleet.sql + supabase-fix-rls-defaults.sql</p>
             </div>
+          </div>
+        )}
+
+        {/* ══ IMPERSONARE TAB ════════════════════════════════════════════════ */}
+        {tab === 'impersonare' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Shield className="w-4 h-4 text-gray-500" />
+              <h2 className="font-semibold text-gray-800">Sesiuni de impersonare</h2>
+              <button onClick={() => void loadImpersonSessions()} className="ml-auto text-xs text-brand-600 hover:underline">Reîncarcă</button>
+            </div>
+
+            {impersonLoading ? (
+              <p className="text-sm text-gray-400 py-8 text-center">Se încarcă...</p>
+            ) : impersonSessions.length === 0 ? (
+              <p className="text-sm text-gray-400 py-8 text-center">Nicio sesiune înregistrată</p>
+            ) : (
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <table className="min-w-full">
+                  <thead>
+                    <tr>
+                      <th className={thCls}>Data</th>
+                      <th className={thCls}>Admin</th>
+                      <th className={thCls}>Utilizator</th>
+                      <th className={thCls}>Motiv</th>
+                      <th className={thCls}>Durata</th>
+                      <th className={thCls}>Status</th>
+                      <th className={thCls}>Audit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {impersonSessions.map(s => {
+                      const isExp = expandedSession === s.id
+                      const logs = auditLogs[s.id] ?? []
+                      const ended = s.ended_at ?? (new Date(s.expires_at) < new Date() ? s.expires_at : null)
+                      const durationMs = ended
+                        ? new Date(ended).getTime() - new Date(s.started_at).getTime()
+                        : Date.now() - new Date(s.started_at).getTime()
+                      const durMin = Math.round(durationMs / 60000)
+                      return (
+                        <>
+                          <tr key={s.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className={`${tdCls} text-xs tabular-nums`}>
+                              {new Date(s.started_at).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td className={`${tdCls} text-xs`}>{s.admin_email ?? s.admin_user_id.slice(0, 8)}</td>
+                            <td className={`${tdCls} text-xs font-medium`}>{s.target_email ?? s.target_user_id.slice(0, 8)}</td>
+                            <td className={`${tdCls} text-xs max-w-[180px] truncate`} title={s.reason}>{s.reason}</td>
+                            <td className={`${tdCls} text-xs tabular-nums`}>{durMin}min</td>
+                            <td className={tdCls}>
+                              {s.ended_at ? (
+                                <span className="px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-500 rounded font-medium">Terminat</span>
+                              ) : new Date(s.expires_at) < new Date() ? (
+                                <span className="px-1.5 py-0.5 text-[10px] bg-orange-100 text-orange-600 rounded font-medium">Expirat</span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 text-[10px] bg-red-100 text-red-600 rounded font-medium">Activ</span>
+                              )}
+                            </td>
+                            <td className={tdCls}>
+                              <button
+                                onClick={() => void loadAuditLog(s.id)}
+                                className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800 font-medium"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                {isExp ? 'Ascunde' : `Log${logs.length > 0 ? ` (${logs.length})` : ''}`}
+                              </button>
+                            </td>
+                          </tr>
+
+                          {isExp && (
+                            <tr key={`${s.id}-log`}>
+                              <td colSpan={7} className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                                {logs.length === 0 ? (
+                                  <p className="text-xs text-gray-400 italic">Nicio acțiune înregistrată în această sesiune.</p>
+                                ) : (
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full text-xs">
+                                      <thead>
+                                        <tr className="text-gray-500 uppercase text-[10px]">
+                                          <th className="pr-4 py-1 text-left font-semibold">Ora</th>
+                                          <th className="pr-4 py-1 text-left font-semibold">Metodă</th>
+                                          <th className="pr-4 py-1 text-left font-semibold">Resursă</th>
+                                          <th className="pr-4 py-1 text-left font-semibold">ID Înregistrare</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {logs.map(log => (
+                                          <tr key={log.id} className="border-t border-gray-100">
+                                            <td className="pr-4 py-1 tabular-nums text-gray-500">
+                                              {new Date(log.created_at).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            </td>
+                                            <td className="pr-4 py-1">
+                                              <span className={`px-1.5 py-0.5 rounded font-mono font-bold ${
+                                                log.action === 'DELETE' ? 'bg-red-100 text-red-700' :
+                                                log.action === 'POST' ? 'bg-green-100 text-green-700' :
+                                                log.action === 'PUT' || log.action === 'PATCH' ? 'bg-blue-100 text-blue-700' :
+                                                'bg-gray-100 text-gray-600'
+                                              }`}>{log.action}</span>
+                                            </td>
+                                            <td className="pr-4 py-1 font-mono text-gray-700">{log.resource}</td>
+                                            <td className="pr-4 py-1 text-gray-500">{log.record_id ?? '—'}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
