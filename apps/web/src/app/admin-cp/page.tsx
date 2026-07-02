@@ -132,7 +132,10 @@ export default function AdminPage() {
   const [impersonSessions, setImpersonSessions] = useState<ImpersonSession[]>([])
   const [impersonLoading, setImpersonLoading] = useState(false)
   const [expandedSession, setExpandedSession] = useState<string | null>(null)
-  const [auditLogs, setAuditLogs] = useState<Record<string, AuditEntry[]>>({})  useEffect(() => {
+  const [auditLogs, setAuditLogs] = useState<Record<string, AuditEntry[]>>({})
+
+  // ── Auth check ──────────────────────────────────────────────────────────────
+  useEffect(() => {
     const db = createClient()
     db.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { setLoading(false); return }
