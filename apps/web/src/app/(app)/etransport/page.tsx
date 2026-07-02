@@ -383,9 +383,10 @@ export default function ETransportPage() {
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Transport Mărfuri</h1>
             </div>
             <div className="flex items-center gap-2">
-              <a href="https://etransport.anaf.ro" target="_blank" rel="noopener noreferrer"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                <ExternalLink className="w-3.5 h-3.5" /> ANAF Portal
+              <a href="https://spcv.anaf.ro/anaf/internet/RO/etransport" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">ANAF Portal</span>
               </a>
               <button onClick={() => setTab(tab === 'list' ? 'settings' : 'list')}
                 className={`p-2 border rounded-lg transition-colors ${tab === 'settings' ? 'border-brand-500 text-brand-600 bg-brand-50' : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}>
@@ -1279,7 +1280,7 @@ function ETransportHelp() {
             <h3 className="font-bold text-gray-900 mb-2 text-xs">🔗 Resurse oficiale</h3>
             <div className="flex flex-wrap gap-2 text-xs">
               {[
-                { label: 'Portal RO e-Transport ANAF', url: 'https://etransport.anaf.ro' },
+                { label: 'Portal RO e-Transport ANAF', url: 'https://spcv.anaf.ro/anaf/internet/RO/etransport' },
                 { label: 'Documentație tehnică ANAF', url: 'https://mfinante.gov.ro/ro/web/etransport/informatii-tehnice' },
                 { label: 'Baza TARIC EU', url: 'https://ec.europa.eu/taxation_customs/dds2/taric/taric_consultation.jsp?Lang=ro' },
                 { label: 'SPV ANAF (logare/token)', url: 'https://logincert.anaf.ro' },
