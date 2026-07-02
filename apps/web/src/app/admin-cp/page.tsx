@@ -348,6 +348,7 @@ export default function AdminPage() {
                     <th className={thCls}>Admin</th>
                     <th className={thCls}>Permisiuni</th>
                     <th className={thCls}>Acțiuni</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {profiles.map(profile => {
@@ -400,6 +401,7 @@ export default function AdminPage() {
                               <LoginAsButton userId={profile.id} email={profile.email} />
                             )}
                           </td>
+                        </tr>
 
                         {/* Expanded permissions row */}
                         {isExpanded && (
