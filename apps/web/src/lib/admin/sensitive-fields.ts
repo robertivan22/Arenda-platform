@@ -40,7 +40,7 @@ const SENSITIVE_PATTERN = /password|_secret$|_token$|_encrypted$|^totp_|^recover
 // Ex: "access_token" trimis explicit de client ca Bearer token este OK în
 // contextul răspunsului de autentificare propriu-zisă, dar acolo impersonarea
 // nu e activă. Lista de mai jos e de siguranță.
-const REDACTION_EXCEPTIONS = new Set([
+const REDACTION_EXCEPTIONS = new Set<string>([
   // Nimic deocamdată — adaugă dacă apar false positives
 ])
 
