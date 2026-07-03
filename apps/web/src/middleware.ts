@@ -107,6 +107,49 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(dashboardUrl)
   }
 
+  // ── Onboarding redirect ────────────────────────────────────────────────────
+  // Authenticated users who haven't finished onboarding are redirected to
+  // /onboarding when they try to access /dashboard/* routes.
+  // Exemptions: /onboarding itself, /api/onboarding/*, /logout, /settings/account
+  const ONBOARDING_EXEMPT = ['/onboarding', '/api/onboarding', '/logout', '/settings/account']
+  const needsOnboardingCheck =
+    user !== null &&
+    pathname.startsWith('/dashboard') &&
+    !ONBOARDING_EXEMPT.some(p => pathname.startsWith(p))
+
+  if (needsOnboardingCheck) {
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+    if (serviceKey && supabaseUrl) {
+      try {
+        const onboardingRes = await fetch(
+          `${supabaseUrl}/rest/v1/onboarding_state?user_id=eq.${user.id}&select=completed_at`,
+          {
+            headers: {
+              apikey: serviceKey,
+              Authorization: `Bearer ${serviceKey}`,
+            },
+          },
+        )
+
+        if (onboardingRes.ok) {
+          const rows = await onboardingRes.json() as Array<{ completed_at: string | null }>
+          const isComplete = rows.length > 0 && rows[0].completed_at !== null
+
+          if (!isComplete) {
+            const onboardingUrl = request.nextUrl.clone()
+            onboardingUrl.pathname = '/onboarding'
+            return NextResponse.redirect(onboardingUrl)
+          }
+        }
+      } catch {
+        // If the check fails (e.g. DB unreachable), allow the request through
+        // rather than blocking the user indefinitely.
+      }
+    }
+  }
+
   // ── Impersonation guards ───────────────────────────────────────────────────
   const impersonationSessionId = request.cookies.get(IMPERSONATION_COOKIE)?.value
 
