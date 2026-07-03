@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen, Package, Bot, Truck,
+  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen, Package, Bot,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -16,7 +16,8 @@ interface NavItem {
   href?: string
   icon: React.ElementType
   permKey?: string
-  children?: { label: string; href: string }[]
+  tourKey?: string
+  children?: { label: string; href: string; tourKey?: string }[]
 }
 
 const SECTIONS: { label: string; items: NavItem[] }[] = [
@@ -32,27 +33,27 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
     label: 'GESTIUNE',
     items: [
       {
-        label: 'Arendatori', icon: Users, permKey: 'can_arendasi',
+        label: 'Arendatori', icon: Users, permKey: 'can_arendasi', tourKey: 'nav-arendatori',
         children: [
           { label: 'Lista arendatori', href: '/arendatori' },
           { label: 'Adaugă arendator', href: '/arendatori/nou' },
         ],
       },
       {
-        label: 'Contracte', icon: FileText, permKey: 'can_contracte',
+        label: 'Contracte', icon: FileText, permKey: 'can_contracte', tourKey: 'nav-contracte',
         children: [
           { label: 'Lista contracte', href: '/contracte' },
           { label: 'Contract nou', href: '/contracte/nou' },
         ],
       },
       { label: 'Tranzactii Arenda', href: '/plati', icon: CreditCard, permKey: 'can_facturi' },
-      { label: 'Distribuire Arendă', href: '/distribuire-arenda', icon: Wheat, permKey: 'can_facturi' },
+      { label: 'Distribuire Arendă', href: '/distribuire-arenda', icon: Wheat, permKey: 'can_facturi', tourKey: 'nav-distribuire' },
       {
-        label: 'Parcele', icon: MapPin, permKey: 'can_parcele',
+        label: 'Parcele', icon: MapPin, permKey: 'can_parcele', tourKey: 'nav-parcele',
         children: [
           { label: 'Lista parcele', href: '/parcele' },
           { label: 'Parcelă nouă', href: '/parcele/nou' },
-          { label: 'Hartă Parcele', href: '/parcele/harta' },
+          { label: 'Hartă Parcele', href: '/parcele/harta', tourKey: 'nav-harta-parcele' },
         ],
       },
     ],
@@ -61,11 +62,11 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
     label: 'PRODUCȚIE',
     items: [
       {
-        label: 'Campanie', icon: Wheat, permKey: 'can_utilaje',
+        label: 'Campanie', icon: Wheat, permKey: 'can_utilaje', tourKey: 'nav-campanie',
         children: [
           { label: 'Planuri culturi', href: '/campanie' },
-          { label: 'Activități câmp', href: '/campanie/activitati' },
-          { label: 'Stocuri & Inputuri', href: '/campanie/stocuri' },
+          { label: 'Activități câmp', href: '/campanie/activitati', tourKey: 'nav-activitati' },
+          { label: 'Stocuri & Inputuri', href: '/campanie/stocuri', tourKey: 'nav-stocuri' },
         ],
       },
       {
@@ -76,7 +77,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
           { label: 'Operatori', href: '/utilaje/operatori' },
         ],
       },
-      { label: 'Monitorizare Fermă', href: '/ferma', icon: Activity, permKey: 'can_ferma' },
+      { label: 'Monitorizare Fermă', href: '/ferma', icon: Activity, permKey: 'can_ferma', tourKey: 'nav-ferma' },
     ],
   },
   {
@@ -96,8 +97,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: 'FINANCIAR',
     items: [
-      { label: 'e-Factura ANAF',  href: '/efactura',   icon: Receipt,  permKey: 'can_facturi' },
-      { label: 'e-Transport ANAF', href: '/etransport', icon: Truck,    permKey: 'can_facturi' },
+      { label: 'e-Factura ANAF', href: '/efactura', icon: Receipt, permKey: 'can_facturi' },
     ],
   },
   {
@@ -169,6 +169,7 @@ export function AppSidebar() {
           key={item.label}
           href={item.href!}
           onClick={close}
+          data-tour={item.tourKey}
           className={clsx(
             'relative flex items-center gap-3 mx-2 px-3 py-2 rounded-lg text-sm transition-all duration-150',
             active
@@ -194,6 +195,7 @@ export function AppSidebar() {
       <div key={item.label}>
         <button
           onClick={() => toggleGroup(item.label)}
+          data-tour={item.tourKey}
           className={clsx(
             'relative w-full flex items-center gap-3 mx-2 px-3 py-2 rounded-lg text-sm transition-all duration-150',
             groupActive
@@ -219,6 +221,7 @@ export function AppSidebar() {
                   key={child.href}
                   href={child.href}
                   onClick={close}
+                  data-tour={child.tourKey}
                   className={clsx(
                     'flex items-center gap-2 pl-11 pr-4 py-1.5 text-xs transition-colors',
                     childActive ? 'text-emerald-300 font-medium' : 'text-white/40 hover:text-white/75',

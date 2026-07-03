@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Users, FileText, MapPin, CreditCard, AlertTriangle, Clock, Plus, BarChart3, MessageSquare, Wheat, Tractor, ArrowRight } from 'lucide-react'
+import { GuidedTour } from '@/components/onboarding/GuidedTour'
 
 export const runtime = 'edge'
 
@@ -275,6 +276,9 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* Guided tour — runs once after onboarding completion */}
+      <GuidedTour />
     </div>
   )
 }
