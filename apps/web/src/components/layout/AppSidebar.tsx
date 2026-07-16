@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Settings2, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen, Package, Bot,
+  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Settings2, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen, Package, Bot, Truck,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -99,6 +99,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
     label: 'FINANCIAR',
     items: [
       { label: 'e-Factura ANAF', href: '/efactura', icon: Receipt, permKey: 'can_facturi' },
+      { label: 'e-Transport ANAF', href: '/etransport', icon: Truck, permKey: 'can_facturi' },
     ],
   },
   {
