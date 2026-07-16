@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen, Package, Bot,
+  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Settings2, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen, Package, Bot,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
@@ -27,6 +27,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permKey: 'can_dashboard' },
       { label: 'Alerte AI', href: '/alerte', icon: Bot, permKey: 'can_dashboard' },
       { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3, permKey: 'can_rapoarte' },
+      { label: 'Configurează Ferma', href: '/general/configureaza-ferma', icon: Settings2, permKey: 'can_dashboard' },
     ],
   },
   {
