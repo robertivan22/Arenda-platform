@@ -107,10 +107,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(dashboardUrl)
   }
 
-  // ── Onboarding redirect ────────────────────────────────────────────────────
-  // Authenticated users who haven't finished onboarding are redirected to
-  // /onboarding when they try to access /dashboard/* routes.
-  // Exemptions: /onboarding itself, /api/onboarding/*, /logout, /settings/account
+  // ── Onboarding redirect — DISABLED (kept for future re-activation) ─────────
+  /*
   const ONBOARDING_EXEMPT = ['/onboarding', '/api/onboarding', '/logout', '/settings/account']
   const needsOnboardingCheck =
     user !== null &&
@@ -149,6 +147,7 @@ export async function middleware(request: NextRequest) {
       }
     }
   }
+  */
 
   // ── Impersonation guards ───────────────────────────────────────────────────
   const impersonationSessionId = request.cookies.get(IMPERSONATION_COOKIE)?.value
