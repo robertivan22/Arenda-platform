@@ -259,7 +259,7 @@ interface SupabaseParcel {
 
 export default function FermaPage() {
   const [parcelsDb, setParcelsDb] = useState<SupabaseParcel[]>([])
-  const [noGpsCount, setNoGpsCount] = useState(0)
+  const [noGpsParcels, setNoGpsParcels] = useState<SupabaseParcel[]>([])
   const [data, setData] = useState<FarmDashboardResult | null>(null)
   const [loadingDb, setLoadingDb] = useState(true)
   const [loadingApi, setLoadingApi] = useState(false)
@@ -274,17 +274,15 @@ export default function FermaPage() {
 
   useEffect(() => {
     const db = createClient()
-    // Load ALL active parcels to count those without valid GPS
     db.from('parcels')
       .select('id,bloc_fizic,tarla_nr,parcel_nr,culture,surface,lat,lng,status')
       .eq('status', 'ACTIVE').limit(200)
       .then(({ data, error }) => {
         if (error) { setError(error.message); setLoadingDb(false); return }
         const all = (data ?? []) as SupabaseParcel[]
-        // Valid: has non-null, non-zero lat/lng (Romania: lat 43-48, lng 20-30)
         const valid = all.filter(p => p.lat != null && p.lng != null && p.lat !== 0 && p.lng !== 0)
-        const noGps = all.length - valid.length
-        setNoGpsCount(noGps)
+        const noGps = all.filter(p => !valid.some(v => v.id === p.id))
+        setNoGpsParcels(noGps)
         setParcelsDb(valid.slice(0, 100))
         setLoadingDb(false)
       })
@@ -363,21 +361,11 @@ export default function FermaPage() {
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
 
-      {!loadingDb && parcelsDb.length === 0 && (
+      {!loadingDb && parcelsDb.length === 0 && noGpsParcels.length === 0 && (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
           <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm font-medium mb-1">Nu există parcele active cu coordonate GPS valide.</p>
-          <p className="text-gray-400 text-xs">Deschide <a href="/parcele/harta" className="text-green-600 underline">Harta Parcele</a> și desenează parcelele pe hartă pentru a seta coordonatele automat.</p>
-        </div>
-      )}
-
-      {!loadingDb && noGpsCount > 0 && parcelsDb.length > 0 && (
-        <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-800">
-          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-500" />
-          <span>
-            <strong>{noGpsCount} parcele</strong> nu au coordonate GPS și nu pot fi monitorizate.
-            Deschide <a href="/parcele/harta" className="underline font-medium">Harta Parcele</a> și desenează-le pentru a le activa.
-          </span>
+          <p className="text-gray-500 text-sm font-medium mb-1">Nu există parcele active.</p>
+          <p className="text-gray-400 text-xs">Adaugă parcele din secțiunea <a href="/parcele" className="text-green-600 underline">Parcele</a> sau desenează-le pe <a href="/parcele/harta" className="text-green-600 underline">Hartă</a>.</p>
         </div>
       )}
 
@@ -468,6 +456,42 @@ export default function FermaPage() {
             )}
           </div>
         </>
+      )}
+
+      {/* ── Parcele fără GPS ── */}
+      {!loadingDb && noGpsParcels.length > 0 && (
+        <div className="mt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+            <h2 className="text-sm font-semibold text-gray-700">
+              Parcele fără coordonate GPS ({noGpsParcels.length})
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {noGpsParcels.map(p => {
+              const name = [p.bloc_fizic, p.tarla_nr, p.parcel_nr].filter(Boolean).join(' - ') || `Parcela ${p.id.slice(0, 6)}`
+              return (
+                <div key={p.id} className="bg-white rounded-xl border-2 border-dashed border-amber-200 p-4 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm text-gray-700 truncate">{name}</p>
+                    {p.culture && <p className="text-xs text-gray-400 mt-0.5">{p.culture} · {p.surface ? `${Number(p.surface).toFixed(2)} ha` : '—'}</p>}
+                    <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 flex-shrink-0" />
+                      Fără coordonate GPS — nu poate fi monitorizată
+                    </p>
+                  </div>
+                  <a href={`/parcele/${p.id}`}
+                    className="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-amber-50 border border-amber-200 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors whitespace-nowrap">
+                    Adaugă GPS
+                  </a>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs text-gray-400 mt-3">
+            Alternativ, <a href="/parcele/harta" className="text-green-600 underline">desenează parcelele pe hartă</a> — coordonatele se setează automat.
+          </p>
+        </div>
       )}
 
       <KpiGuide />
