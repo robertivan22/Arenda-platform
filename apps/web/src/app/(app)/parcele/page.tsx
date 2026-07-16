@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   Plus, Search, SlidersHorizontal, Columns, Download, MapIcon,
-  X, ChevronUp, ChevronDown, MapPin, Users, Activity, Layers, Pencil, Trash2, Eye, AlertTriangle,
+  X, ChevronUp, ChevronDown, MapPin, Users, Activity, Layers, Pencil, Trash2, Eye, AlertTriangle, Upload, Check, Loader2,
 } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { toast } from 'sonner'
@@ -35,6 +35,9 @@ interface Parcel {
   contract_number: string | null
   contract_end_date: string | null
 }
+
+interface LessorOption { id: string; name: string }
+interface ContractOption { id: string; contract_number: string; lessor_id: string | null }
 
 const CULTURE_COLORS: Record<string, string> = {
   'Grau':              'bg-amber-100 text-amber-700',
@@ -93,12 +96,18 @@ export default function ParceleListPage() {
   const [showColSelector, setShowColSelector] = useState(false)
   const colRef = useRef<HTMLDivElement>(null)
 
+  // Inline editing
+  const [editingCell, setEditingCell] = useState<{ id: string; field: 'lessor' | 'contract' } | null>(null)
+  const [savingCell, setSavingCell] = useState(false)
+  const [lessors, setLessors] = useState<LessorOption[]>([])
+  const [contracts, setContracts] = useState<ContractOption[]>([])
+
   useEffect(() => {
-    createClient()
-      .from('parcels')
+    const db = createClient()
+    db.from('parcels')
       .select('*, lessors(first_name, last_name, company_name, type), contracts(contract_number, end_date)')
       .order('created_at', { ascending: false })
-      .limit(200)
+      .limit(2000)
       .then(({ data, error }) => {
         if (error) { toast.error('Eroare la încărcarea parcelelor.'); return }
         if (data) setRows((data as any[]).map(p => ({
@@ -112,6 +121,26 @@ export default function ParceleListPage() {
           contract_end_date: p.contracts?.end_date ?? null,
         })))
       })
+    // Load lessors + contracts for inline editing dropdowns
+    db.from('lessors')
+      .select('id, first_name, last_name, company_name, type')
+      .eq('status', 'ACTIVE')
+      .order('last_name')
+      .limit(500)
+      .then(({ data }) => {
+        if (data) setLessors((data as any[]).map(l => ({
+          id: l.id,
+          name: l.type === 'LEGAL'
+            ? l.company_name
+            : `${l.last_name} ${l.first_name}`.trim(),
+        })))
+      })
+    db.from('contracts')
+      .select('id, contract_number, lessor_id')
+      .eq('status', 'ACTIVE')
+      .order('contract_number')
+      .limit(500)
+      .then(({ data }) => { if (data) setContracts(data as ContractOption[]) })
   }, [])
 
   useEffect(() => {
@@ -212,6 +241,9 @@ export default function ParceleListPage() {
     if (!deleteId) return
     setDeleting(true)
     const db = createClient()
+    // 1. Delete associated map polygon from parcele_fitosanitar
+    await db.from('parcele_fitosanitar').delete().eq('parcela_id', deleteId)
+    // 2. Delete registry entry
     const { error } = await db.from('parcels').delete().eq('id', deleteId)
     setDeleting(false)
     if (error) { toast.error('Eroare la ștergere: ' + error.message); return }
@@ -219,6 +251,28 @@ export default function ParceleListPage() {
     setRows(prev => prev.filter(r => r.id !== deleteId))
     if (selectedId === deleteId) setSelectedId(null)
     setDeleteId(null)
+  }
+
+  async function saveInlineEdit(id: string, field: 'lessor' | 'contract', value: string) {
+    setSavingCell(true)
+    const db = createClient()
+    const update = field === 'lessor'
+      ? { lessor_id: value || null }
+      : { contract_id: value || null }
+    const { error } = await db.from('parcels').update(update).eq('id', id)
+    if (error) { toast.error('Eroare: ' + error.message); setSavingCell(false); return }
+    setRows(prev => prev.map(r => {
+      if (r.id !== id) return r
+      if (field === 'lessor') {
+        const l = lessors.find(x => x.id === value)
+        return { ...r, lessor_id: value || null, lessor_name: l?.name ?? '—' }
+      }
+      const c = contracts.find(x => x.id === value)
+      return { ...r, contract_id: value || null, contract_number: c?.contract_number ?? null }
+    }))
+    setSavingCell(false)
+    setEditingCell(null)
+    toast.success(field === 'lessor' ? 'Arendator actualizat.' : 'Contract actualizat.')
   }
 
   const visibleList = ALL_COLS.filter(c => visibleCols.has(c.key))
@@ -343,6 +397,14 @@ export default function ParceleListPage() {
             >
               <Download className="w-3.5 h-3.5" /> Export CSV
             </button>
+
+            <a
+              href="/parcele/harta"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-orange-300 rounded hover:bg-orange-50 text-orange-700 font-medium"
+              title="Import parcele din Shapefile APIA / GeoJSON"
+            >
+              <Upload className="w-3.5 h-3.5" /> Import
+            </a>
 
             <button
               onClick={() => router.push('/parcele/nou')}
@@ -487,7 +549,31 @@ export default function ParceleListPage() {
                     </td>
                   )}
                   {visibleCols.has('lessor_name') && (
-                    <td className="px-3 py-2 text-brand-700 font-medium">{row.lessor_name}</td>
+                    <td
+                      className="px-3 py-2"
+                      onClick={e => { e.stopPropagation(); setEditingCell({ id: row.id, field: 'lessor' }) }}
+                    >
+                      {editingCell?.id === row.id && editingCell.field === 'lessor' ? (
+                        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                          <select
+                            autoFocus
+                            defaultValue={row.lessor_id ?? ''}
+                            onChange={e => void saveInlineEdit(row.id, 'lessor', e.target.value)}
+                            onBlur={() => !savingCell && setEditingCell(null)}
+                            className="text-xs border border-brand-400 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white max-w-[160px]"
+                          >
+                            <option value="">— Fără arendator —</option>
+                            {lessors.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                          </select>
+                          {savingCell && <Loader2 className="w-3 h-3 animate-spin text-brand-500 flex-shrink-0" />}
+                        </div>
+                      ) : (
+                        <span className="group flex items-center gap-1 text-brand-700 font-medium cursor-pointer hover:text-brand-900">
+                          {row.lessor_name}
+                          <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-40 flex-shrink-0" />
+                        </span>
+                      )}
+                    </td>
                   )}
                   {visibleCols.has('nr_cadastral') && (
                     <td className="px-3 py-2 font-mono text-xs text-gray-500">{row.nr_cadastral ?? '—'}</td>
@@ -502,15 +588,39 @@ export default function ParceleListPage() {
                     </td>
                   )}
                   {visibleCols.has('contract_number') && (
-                    <td className="px-3 py-2">
-                      {row.contract_number ? (
-                        <span
-                          onClick={e => { e.stopPropagation(); router.push(`/contracte/${row.contract_id}`) }}
-                          className="text-brand-600 font-medium hover:underline cursor-pointer"
-                        >
-                          {row.contract_number}
+                    <td
+                      className="px-3 py-2"
+                      onClick={e => { e.stopPropagation(); setEditingCell({ id: row.id, field: 'contract' }) }}
+                    >
+                      {editingCell?.id === row.id && editingCell.field === 'contract' ? (
+                        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                          <select
+                            autoFocus
+                            defaultValue={row.contract_id ?? ''}
+                            onChange={e => void saveInlineEdit(row.id, 'contract', e.target.value)}
+                            onBlur={() => !savingCell && setEditingCell(null)}
+                            className="text-xs border border-brand-400 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white max-w-[160px]"
+                          >
+                            <option value="">— Fără contract —</option>
+                            {contracts
+                              .filter(c => !row.lessor_id || c.lessor_id === row.lessor_id || !c.lessor_id)
+                              .map(c => <option key={c.id} value={c.id}>{c.contract_number}</option>)}
+                          </select>
+                          {savingCell && <Loader2 className="w-3 h-3 animate-spin text-brand-500 flex-shrink-0" />}
+                        </div>
+                      ) : (
+                        <span className="group flex items-center gap-1 cursor-pointer">
+                          {row.contract_number ? (
+                            <span
+                              onClick={e => { e.stopPropagation(); router.push(`/contracte/${row.contract_id}`) }}
+                              className="text-brand-600 font-medium hover:underline"
+                            >
+                              {row.contract_number}
+                            </span>
+                          ) : <span className="text-gray-300">—</span>}
+                          <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-40 flex-shrink-0" />
                         </span>
-                      ) : <span className="text-gray-300">—</span>}
+                      )}
                     </td>
                   )}
                   {visibleCols.has('created_at') && (
