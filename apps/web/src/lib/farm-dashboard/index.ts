@@ -106,7 +106,7 @@ async function processParcel(input: ParcelInput): Promise<ParcelResult> {
 }
 
 /** Process in batches to stay well within Cloudflare Worker concurrent fetch limits */
-async function processBatched(inputs: ParcelInput[], batchSize = 4): Promise<ParcelResult[]> {
+async function processBatched(inputs: ParcelInput[], batchSize = 10): Promise<ParcelResult[]> {
   const results: ParcelResult[] = []
   for (let i = 0; i < inputs.length; i += batchSize) {
     const batch = inputs.slice(i, i + batchSize)

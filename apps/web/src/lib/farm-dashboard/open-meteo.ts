@@ -49,7 +49,7 @@ export async function fetchOpenMeteo(lat: number, lng: number): Promise<OpenMete
       timezone: 'Europe/Bucharest',
     })
     const controller = new AbortController()
-    const id = setTimeout(() => controller.abort(), 12000)
+    const id = setTimeout(() => controller.abort(), 7000)
     const res = await fetch(`${BASE_URL}?${params}`, {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
