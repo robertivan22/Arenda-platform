@@ -894,15 +894,16 @@ export default function MapParcelSelector({
   const [parcelLegendMap, setParcelLegendMap] = useState<Record<string, string>>({})
   const [saveLegendId, setSaveLegendId] = useState(DEFAULT_LEGEND_ITEMS[0].id)
   const [showLegendAdd, setShowLegendAdd] = useState(false)
-  const [legendCollapsed, setLegendCollapsed] = useState(false)
   const [newLegendLabel, setNewLegendLabel] = useState('')
   const [newLegendColor, setNewLegendColor] = useState('#22c55e')
   const [showCulturePicker, setShowCulturePicker] = useState(false)
+  const [apiaColorOverrides, setApiaColorOverrides] = useState<Record<string, string>>({})
 
   useEffect(() => {
     try {
       const rawLegend = localStorage.getItem('map_legend_items')
       const rawParcelLegend = localStorage.getItem('map_parcel_legend_map')
+      const rawOverrides = localStorage.getItem('apia_color_overrides')
       if (rawLegend) {
         const parsed = JSON.parse(rawLegend) as LegendItem[]
         if (Array.isArray(parsed) && parsed.length > 0) setLegendItems(parsed)
@@ -910,6 +911,10 @@ export default function MapParcelSelector({
       if (rawParcelLegend) {
         const parsed = JSON.parse(rawParcelLegend) as Record<string, string>
         if (parsed && typeof parsed === 'object') setParcelLegendMap(parsed)
+      }
+      if (rawOverrides) {
+        const parsed = JSON.parse(rawOverrides) as Record<string, string>
+        if (parsed && typeof parsed === 'object') setApiaColorOverrides(parsed)
       }
     } catch {
       // ignore localStorage parsing errors
@@ -926,7 +931,6 @@ export default function MapParcelSelector({
 
   useEffect(() => {
     localStorage.setItem('map_legend_items', JSON.stringify(legendItems))
-    // Persist to Supabase user metadata (debounced — only after first user change)
     const t = setTimeout(() => {
       createClient().auth.updateUser({ data: { map_legend_items: legendItems } }).catch(() => { /* ignore */ })
     }, 1500)
@@ -936,6 +940,10 @@ export default function MapParcelSelector({
   useEffect(() => {
     localStorage.setItem('map_parcel_legend_map', JSON.stringify(parcelLegendMap))
   }, [parcelLegendMap])
+
+  useEffect(() => {
+    localStorage.setItem('apia_color_overrides', JSON.stringify(apiaColorOverrides))
+  }, [apiaColorOverrides])
 
   useEffect(() => {
     if (!legendItems.some(item => item.id === saveLegendId) && legendItems[0]) {
@@ -1184,7 +1192,7 @@ export default function MapParcelSelector({
       const isSelected = parcel.id === selectedId
       const legendId = parcelLegendMap[parcel.id]
       const legend = legendItems.find(item => item.id === legendId)
-      const parcelColor = legend?.color ?? parcel.cultura_color ?? '#22c55e'
+      const parcelColor = legend?.color ?? apiaColorOverrides[parcel.cultura_label ?? ''] ?? parcel.cultura_color ?? '#22c55e'
       const layer = L.geoJSON(
         { type: 'Polygon', coordinates: [ringWgs84] } as GeoJSON.GeoJsonObject,
         {
@@ -1227,7 +1235,8 @@ export default function MapParcelSelector({
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parcels, selectedId, parcelLegendMap, legendItems, registryParcels])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parcels, selectedId, parcelLegendMap, legendItems, apiaColorOverrides, registryParcels])
 
   // ── Render registry-parcel markers (parcels with coords but no polygon) ─
   const hasFitToMarkers = useRef(false)
@@ -1456,6 +1465,10 @@ export default function MapParcelSelector({
       localStorage.setItem('map_legend_items', JSON.stringify(updated))
       return updated
     })
+  }
+
+  function updateApiaColorOverride(cultureName: string, color: string) {
+    setApiaColorOverrides(prev => ({ ...prev, [cultureName]: color }))
   }
 
   function getLegendForParcel(parcelId: string) {
@@ -1950,70 +1963,6 @@ export default function MapParcelSelector({
             </div>
           )}
 
-          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-              <button
-                onClick={() => setLegendCollapsed(v => !v)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wide hover:text-gray-800 transition-colors"
-              >
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${legendCollapsed ? '-rotate-90' : ''}`} />
-                Legenda culturi
-                <span className="font-normal text-gray-400 normal-case tracking-normal">({legendItems.length})</span>
-              </button>
-              {!legendCollapsed && (
-                <button
-                  onClick={() => setShowLegendAdd(v => !v)}
-                  className="inline-flex items-center justify-center w-6 h-6 rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
-                  title="Adauga legenda"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-            {!legendCollapsed && (
-              <div className="p-3 space-y-2 bg-white">
-                {legendItems.map(item => (
-                  <div key={item.id} className="flex items-center gap-2 text-sm text-gray-700 group">
-                    <span className="inline-block w-3 h-3 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="flex-1">{item.label}</span>
-                    <button
-                      onClick={() => deleteLegendItem(item.id)}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                      title="Șterge"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-                {showLegendAdd && (
-                  <div className="mt-2 pt-2 border-t border-gray-100 space-y-2">
-                    <input
-                      type="text"
-                      value={newLegendLabel}
-                      onChange={e => setNewLegendLabel(e.target.value)}
-                      placeholder="Ex: Rapita"
-                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={newLegendColor}
-                        onChange={e => setNewLegendColor(e.target.value)}
-                        className="w-10 h-8 p-0 border border-gray-300 rounded cursor-pointer"
-                      />
-                      <button
-                        onClick={addLegendItem}
-                        className="px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded"
-                      >
-                        Adauga
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
           {/* ── APIA Culturi Legend (auto-computed from loaded parcels) ── */}
           {(() => {
             // Build stats: cultura_label → { color, count, totalHa }
@@ -2021,7 +1970,7 @@ export default function MapParcelSelector({
             for (const p of parcels) {
               const name = p.cultura_label
               if (!name) continue
-              const color = p.cultura_color ?? apiaColorForCulture(name) ?? '#94a3b8'
+              const color = apiaColorOverrides[name] ?? p.cultura_color ?? apiaColorForCulture(name) ?? '#94a3b8'
               const existing = statsMap.get(name)
               if (existing) {
                 existing.count++
@@ -2045,19 +1994,30 @@ export default function MapParcelSelector({
                   </span>
                 </div>
                 <div className="divide-y divide-green-100">
-                  {stats.map(s => (
-                    <div key={s.name} className="flex items-center gap-2.5 px-3 py-1.5">
-                      <span
-                        className="inline-block w-3 h-3 rounded-sm flex-shrink-0 border border-white/60 shadow-sm"
-                        style={{ backgroundColor: s.color }}
-                      />
-                      <span className="flex-1 text-xs text-gray-700 truncate" title={s.name}>{s.name}</span>
-                      <span className="text-[10px] text-gray-500 flex-shrink-0">{s.count}p</span>
-                      <span className="text-[10px] font-semibold text-green-700 flex-shrink-0 w-14 text-right">
-                        {s.totalHa.toFixed(2)} ha
-                      </span>
-                    </div>
-                  ))}
+                  {stats.map(s => {
+                    const displayColor = apiaColorOverrides[s.name] ?? s.color
+                    return (
+                      <div key={s.name} className="flex items-center gap-2.5 px-3 py-1.5 group">
+                        <label className="relative cursor-pointer flex-shrink-0" title="Click pentru a schimba culoarea">
+                          <span
+                            className="inline-block w-4 h-4 rounded-sm border border-white/60 shadow-sm transition-transform group-hover:scale-110 group-hover:ring-2 group-hover:ring-green-400"
+                            style={{ backgroundColor: displayColor }}
+                          />
+                          <input
+                            type="color"
+                            value={displayColor}
+                            onChange={e => updateApiaColorOverride(s.name, e.target.value)}
+                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          />
+                        </label>
+                        <span className="flex-1 text-xs text-gray-700 truncate" title={s.name}>{s.name}</span>
+                        <span className="text-[10px] text-gray-500 flex-shrink-0">{s.count}p</span>
+                        <span className="text-[10px] font-semibold text-green-700 flex-shrink-0 w-14 text-right">
+                          {s.totalHa.toFixed(2)} ha
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )

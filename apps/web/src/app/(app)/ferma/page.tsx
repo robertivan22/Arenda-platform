@@ -259,6 +259,7 @@ interface SupabaseParcel {
 
 export default function FermaPage() {
   const [parcelsDb, setParcelsDb] = useState<SupabaseParcel[]>([])
+  const [noGpsCount, setNoGpsCount] = useState(0)
   const [data, setData] = useState<FarmDashboardResult | null>(null)
   const [loadingDb, setLoadingDb] = useState(true)
   const [loadingApi, setLoadingApi] = useState(false)
@@ -273,12 +274,18 @@ export default function FermaPage() {
 
   useEffect(() => {
     const db = createClient()
+    // Load ALL active parcels to count those without valid GPS
     db.from('parcels')
       .select('id,bloc_fizic,tarla_nr,parcel_nr,culture,surface,lat,lng,status')
-      .eq('status', 'ACTIVE').not('lat', 'is', null).not('lng', 'is', null).limit(100)
+      .eq('status', 'ACTIVE').limit(200)
       .then(({ data, error }) => {
         if (error) { setError(error.message); setLoadingDb(false); return }
-        setParcelsDb((data ?? []) as SupabaseParcel[])
+        const all = (data ?? []) as SupabaseParcel[]
+        // Valid: has non-null, non-zero lat/lng (Romania: lat 43-48, lng 20-30)
+        const valid = all.filter(p => p.lat != null && p.lng != null && p.lat !== 0 && p.lng !== 0)
+        const noGps = all.length - valid.length
+        setNoGpsCount(noGps)
+        setParcelsDb(valid.slice(0, 100))
         setLoadingDb(false)
       })
   }, [])
@@ -359,7 +366,18 @@ export default function FermaPage() {
       {!loadingDb && parcelsDb.length === 0 && (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
           <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">Nu exista parcele active cu coordonate geografice.<br />Adauga coordonate parcelelor din sectiunea Parcele.</p>
+          <p className="text-gray-500 text-sm font-medium mb-1">Nu există parcele active cu coordonate GPS valide.</p>
+          <p className="text-gray-400 text-xs">Deschide <a href="/parcele/harta" className="text-green-600 underline">Harta Parcele</a> și desenează parcelele pe hartă pentru a seta coordonatele automat.</p>
+        </div>
+      )}
+
+      {!loadingDb && noGpsCount > 0 && parcelsDb.length > 0 && (
+        <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-800">
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-500" />
+          <span>
+            <strong>{noGpsCount} parcele</strong> nu au coordonate GPS și nu pot fi monitorizate.
+            Deschide <a href="/parcele/harta" className="underline font-medium">Harta Parcele</a> și desenează-le pentru a le activa.
+          </span>
         </div>
       )}
 
