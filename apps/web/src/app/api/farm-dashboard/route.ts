@@ -1,6 +1,7 @@
 export const runtime = 'edge'
 
 import { type NextRequest, NextResponse } from 'next/server'
+import { createClient as createSupabase } from '@supabase/supabase-js'
 import { computeFarmDashboard } from '@/lib/farm-dashboard'
 import type { ParcelInput } from '@/lib/farm-dashboard/types'
 
@@ -15,7 +16,6 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify the token is actually valid
-  const { createClient: createSupabase } = await import('@supabase/supabase-js')
   const supabase = createSupabase(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

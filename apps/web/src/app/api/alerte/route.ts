@@ -618,6 +618,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
       { headers: { 'Cache-Control': 'no-store, max-age=0' } },
     )
   } catch (err) {
+    console.error('[Alerte] Uncaught error in GET handler:', err)
     return NextResponse.json(
       {
         ok: false,
