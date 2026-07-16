@@ -280,8 +280,10 @@ export default function FermaPage() {
       .then(({ data, error }) => {
         if (error) { setError(error.message); setLoadingDb(false); return }
         const all = (data ?? []) as SupabaseParcel[]
-        const valid = all.filter(p => p.lat != null && p.lng != null && p.lat !== 0 && p.lng !== 0)
-        const noGps = all.filter(p => !valid.some(v => v.id === p.id))
+        // Supabase returns NUMERIC columns as strings — coerce to number
+        const parsed = all.map(p => ({ ...p, lat: p.lat != null ? Number(p.lat) : null, lng: p.lng != null ? Number(p.lng) : null }))
+        const valid = parsed.filter(p => p.lat != null && p.lng != null && !isNaN(p.lat) && !isNaN(p.lng) && p.lat !== 0 && p.lng !== 0)
+        const noGps = parsed.filter(p => !valid.some(v => v.id === p.id))
         setNoGpsParcels(noGps)
         setParcelsDb(valid.slice(0, 100))
         setLoadingDb(false)
@@ -294,7 +296,8 @@ export default function FermaPage() {
     try {
       const inputs = parcels.map(p => ({
         id: p.id, apia_code: p.bloc_fizic, crop_type: p.culture,
-        bbch_stage: null, area_ha: p.surface, lat: p.lat!, lng: p.lng!,
+        bbch_stage: null, area_ha: p.surface != null ? Number(p.surface) : null,
+        lat: Number(p.lat), lng: Number(p.lng),
       }))
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()

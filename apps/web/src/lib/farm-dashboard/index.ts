@@ -33,13 +33,16 @@ function nullParcel(input: ParcelInput): ParcelResult {
   }
 }
 
-function validCoords(lat: unknown, lng: unknown): lat is number {
+function validCoords(lat: unknown, lng: unknown): boolean {
+  // Supabase may return NUMERIC as string — coerce safely
+  const la = typeof lat === 'string' ? parseFloat(lat) : lat
+  const lo = typeof lng === 'string' ? parseFloat(lng) : lng
   return (
-    typeof lat === 'number' && typeof lng === 'number' &&
-    isFinite(lat) && isFinite(lng) &&
-    lat >= -90 && lat <= 90 &&
-    lng >= -180 && lng <= 180 &&
-    !(lat === 0 && lng === 0)
+    typeof la === 'number' && typeof lo === 'number' &&
+    isFinite(la) && isFinite(lo) &&
+    la >= -90 && la <= 90 &&
+    lo >= -180 && lo <= 180 &&
+    !(la === 0 && lo === 0)
   )
 }
 
@@ -49,12 +52,16 @@ async function processParcel(input: ParcelInput): Promise<ParcelResult> {
     return nullParcel(input)
   }
 
+  // Coerce to number (Supabase may return NUMERIC as string)
+  const lat = typeof input.lat === 'string' ? parseFloat(input.lat) : input.lat as number
+  const lng = typeof input.lng === 'string' ? parseFloat(input.lng) : input.lng as number
+
   // Compute inside the request so Cloudflare Workers' Date API is fully live.
   const today = new Date().toISOString().split('T')[0]
 
   const [weatherSettled, ndviSettled] = await Promise.allSettled([
-    fetchOpenMeteo(input.lat, input.lng),
-    getParcelNdviFromLatLng({ lat: input.lat, lng: input.lng, fetchDate: today }),
+    fetchOpenMeteo(lat, lng),
+    getParcelNdviFromLatLng({ lat, lng, fetchDate: today }),
   ])
 
   if (weatherSettled.status === 'rejected') {
