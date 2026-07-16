@@ -310,6 +310,12 @@ export default function ConfigureazaFermaPage() {
       if (!user) throw new Error('Neautentificat')
       const { error } = await db.from('company_settings').upsert({ ...farm, user_id: user.id }, { onConflict: 'user_id' })
       if (error) throw new Error(error.message)
+      // Ensure campaign record exists before user moves to contracts
+      await db.from('campaigns').upsert({
+        user_id: user.id, name: `Campania ${campaignYear}`,
+        year: parseInt(campaignYear), start_date: `${campaignYear}-01-01`,
+        end_date: `${campaignYear}-12-31`, is_active: true, notes: null,
+      }, { onConflict: 'user_id,year' })
       toast.success('Date fermă salvate')
       if (contracts.length === 0) addContract()
       setStep(4)
@@ -327,6 +333,17 @@ export default function ConfigureazaFermaPage() {
       if (!user) throw new Error('Neautentificat')
 
       await db.from('company_settings').upsert({ ...farm, user_id: user.id }, { onConflict: 'user_id' })
+
+      // Create / upsert campaign
+      await db.from('campaigns').upsert({
+        user_id: user.id,
+        name: `Campania ${campaignYear}`,
+        year: parseInt(campaignYear),
+        start_date: `${campaignYear}-01-01`,
+        end_date: `${campaignYear}-12-31`,
+        is_active: true,
+        notes: null,
+      }, { onConflict: 'user_id,year' })
 
       const savedIds: string[] = []
 
@@ -392,9 +409,10 @@ export default function ConfigureazaFermaPage() {
 
       if (errors.length > 0) {
         errors.forEach(msg => toast.error(msg, { duration: 7000 }))
+        if (savedIds.length > 0) toast.success(`${savedIds.length} contract(e) salvat(e).`)
       } else {
-        toast.success(`${savedIds.length} contract(e) salvat(e)!`)
-        router.push(savedIds.length === 1 ? `/contracte/${savedIds[0]}` : '/contracte')
+        toast.success(`Campania ${campaignYear} configurată! ${savedIds.length} contract(e) create.`)
+        router.push(`/campanie/${campaignYear}`)
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Eroare la salvare')
