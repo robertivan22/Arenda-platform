@@ -467,45 +467,65 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
 
         if (mapErr) throw new Error(`Hartă: ${mapErr.message}`)
 
-        // ── 2. Insert parcels registry (all APIA fields) ──────────────────
-        const { data: regParcel, error: regErr } = await db
-          .from('parcels')
-          .insert({
-            user_id: user.id,
-            // Generic fields
-            bloc_fizic,
-            parcel_nr: parcelNrStr ?? null,
-            county: judet ?? null,
-            locality: localitate ?? null,
-            land_use_category: getStr(fieldMapping.cat_use) ?? null,
-            culture: cropName ?? null,
-            surface: suprafata,
-            status: isApia ? getStatus(fieldMapping.status) : 'ACTIVE',
-            lat: centruLat,
-            lng: centruLng,
-            // APIA 1:1 fields
-            apia_farm_id: getStr(fieldMapping.farm_id),
-            apia_year:    getInt(fieldMapping.year),
-            siruta:       getStr(fieldMapping.siruta),
-            crop_nr:      cropNr,
-            crop_code:    getInt(fieldMapping.crop_code),
-            agro_env:     getBool(fieldMapping.agro_env),
-            full_bloc:    getInt(fieldMapping.full_bloc),
-            apia_comment: getStr(fieldMapping.comment),
-            apia_inserted: getDate(fieldMapping.inserted),
-            apia_updated:  getDate(fieldMapping.updated),
-            // Geometry in WGS84 for spatial queries
-            geom_geojson: geomWgs84,
-            centru_lat: centruLat,
-            centru_lng: centruLng,
-          })
+        // ── 2. Insert parcels registry ────────────────────────────────────
+        // Base payload: always-present columns (safe without APIA migration)
+        const basePayload = {
+          user_id: user.id,
+          bloc_fizic,
+          parcel_nr: parcelNrStr ?? null,
+          county: judet ?? null,
+          locality: localitate ?? null,
+          land_use_category: getStr(fieldMapping.cat_use) ?? null,
+          culture: cropName ?? null,
+          surface: suprafata,
+          status: isApia ? getStatus(fieldMapping.status) : 'ACTIVE',
+          lat: centruLat,
+          lng: centruLng,
+        }
+        // APIA extras: only available after supabase-migration-apia-fields.sql
+        const apiaPayload = isApia ? {
+          apia_farm_id:  getStr(fieldMapping.farm_id),
+          apia_year:     getInt(fieldMapping.year),
+          siruta:        getStr(fieldMapping.siruta),
+          crop_nr:       cropNr,
+          crop_code:     getInt(fieldMapping.crop_code),
+          agro_env:      getBool(fieldMapping.agro_env),
+          full_bloc:     getInt(fieldMapping.full_bloc),
+          apia_comment:  getStr(fieldMapping.comment),
+          apia_inserted: getDate(fieldMapping.inserted),
+          apia_updated:  getDate(fieldMapping.updated),
+          geom_geojson:  geomWgs84,
+          centru_lat:    centruLat,
+          centru_lng:    centruLng,
+        } : {}
+
+        // Try full insert first; fall back to base if APIA columns don't exist
+        let regParcelId: string | null = null
+        const fullRes = await db.from('parcels')
+          .insert({ ...basePayload, ...apiaPayload })
           .select('id').single()
 
+        if (fullRes.error) {
+          console.warn('[Import] Full insert failed, retrying with base fields:', fullRes.error.message)
+          const baseRes = await db.from('parcels')
+            .insert(basePayload)
+            .select('id').single()
+          if (baseRes.error) {
+            // Both failed — clean up orphaned polygon and surface the real error
+            await db.from('parcele_fitosanitar').delete().eq('id', mapParcel.id)
+            throw new Error(baseRes.error.message)
+          }
+          regParcelId = baseRes.data?.id ?? null
+        } else {
+          regParcelId = fullRes.data?.id ?? null
+        }
+
         // ── 3. Link map polygon → registry parcel ────────────────────────
-        if (!regErr && regParcel && mapParcel) {
-          await db.from('parcele_fitosanitar')
-            .update({ parcela_id: regParcel.id })
+        if (regParcelId && mapParcel) {
+          const { error: linkErr } = await db.from('parcele_fitosanitar')
+            .update({ parcela_id: regParcelId })
             .eq('id', mapParcel.id)
+          if (linkErr) console.warn('[Import] Link error:', linkErr.message)
         }
 
         results[i] = { ...results[i], status: 'ok' }
