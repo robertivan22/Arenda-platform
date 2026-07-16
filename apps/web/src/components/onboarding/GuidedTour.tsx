@@ -117,7 +117,7 @@ export function GuidedTourImpl() {
 
   async function dismiss() {
     setActive(false)
-    try { await fetch('/api/onboarding/tour-seen', { method: 'POST' }) } catch { /* silent */ }
+    try { await fetch('/api/onboarding/tour-seen', { method: 'POST' }) } catch (_) { }
   }
 
   function handleNext() {
