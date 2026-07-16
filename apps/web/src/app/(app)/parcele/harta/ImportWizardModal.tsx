@@ -27,12 +27,31 @@ export interface ParsedFeature {
 }
 
 export interface FieldMapping {
-  bloc_fizic: string    // DBF column → bloc_fizic
-  suprafata_ha: string  // DBF column → suprafata_ha ('' = use calculated)
-  cultura: string
-  judet: string
-  localitate: string
-  cod_parcela: string
+  // Generic fields (all shapefiles)
+  bloc_fizic: string    // → parcels.bloc_fizic
+  suprafata_ha: string  // → parcels.surface ('' = use calculated)
+  cultura: string       // → parcels.culture
+  judet: string         // → parcels.county
+  localitate: string    // → parcels.locality
+  cod_parcela: string   // → parcels.parcel_nr (legacy)
+  // APIA 1:1 fields
+  farm_id: string       // → parcels.apia_farm_id
+  year: string          // → parcels.apia_year
+  siruta: string        // → parcels.siruta
+  commune: string       // → parcels.locality (overrides localitate for APIA)
+  bloc_nr: string       // → parcels.bloc_fizic (overrides bloc_fizic for APIA)
+  parcel_nr: string     // → parcels.parcel_nr
+  crop_nr: string       // → parcels.crop_nr
+  cat_use: string       // → parcels.land_use_category
+  crop_code: string     // → parcels.crop_code
+  crop_name: string     // → parcels.culture (overrides cultura for APIA)
+  area_dec: string      // → parcels.surface (overrides suprafata_ha for APIA)
+  agro_env: string      // → parcels.agro_env
+  comment: string       // → parcels.apia_comment
+  inserted: string      // → parcels.apia_inserted
+  updated: string       // → parcels.apia_updated
+  status: string        // → parcels.status (APIA: 1=ACTIVE, 0=INACTIVE)
+  full_bloc: string     // → parcels.full_bloc
 }
 
 interface SaveResult {
@@ -42,10 +61,36 @@ interface SaveResult {
   error?: string
 }
 
-const MAPPING_KEY = 'arenda_import_field_mapping_v1'
+const MAPPING_KEY = 'arenda_import_field_mapping_v3'
+
+/** Default mapping for generic (non-APIA) shapefiles */
 const DEFAULT_MAPPING: FieldMapping = {
   bloc_fizic: 'BLOC_FIZIC', suprafata_ha: 'SUPRAFATA',
   cultura: 'CULTURA', judet: 'JUDET', localitate: 'LOCALITATE', cod_parcela: 'NR_PARCEL',
+  // APIA fields — empty until auto-detected
+  farm_id: '', year: '', siruta: '', commune: '', bloc_nr: '', parcel_nr: '',
+  crop_nr: '', cat_use: '', crop_code: '', crop_name: '', area_dec: '',
+  agro_env: '', comment: '', inserted: '', updated: '', status: '', full_bloc: '',
+}
+
+/** 1:1 auto-mapping for APIA shapefiles (column names match exactly) */
+const APIA_AUTO_MAPPING: FieldMapping = {
+  bloc_fizic: 'bloc_nr', suprafata_ha: 'area_dec',
+  cultura: 'crop_name', judet: 'judet', localitate: 'commune', cod_parcela: 'parcel_nr',
+  farm_id: 'farm_id', year: 'year', siruta: 'siruta', commune: 'commune',
+  bloc_nr: 'bloc_nr', parcel_nr: 'parcel_nr', crop_nr: 'crop_nr',
+  cat_use: 'cat_use', crop_code: 'crop_code', crop_name: 'crop_name',
+  area_dec: 'area_dec', agro_env: 'agro_env', comment: 'comment',
+  inserted: 'inserted', updated: 'updated', status: 'status', full_bloc: 'full_bloc',
+}
+
+/** APIA shapefiles have these characteristic columns */
+const APIA_SIGNATURE_COLS = ['farm_id', 'year', 'bloc_nr', 'parcel_nr', 'crop_name', 'area_dec']
+
+function isApiaShapefile(cols: string[]): boolean {
+  const lower = cols.map(c => c.toLowerCase())
+  const hits = APIA_SIGNATURE_COLS.filter(s => lower.includes(s.toLowerCase()))
+  return hits.length >= 4
 }
 
 function loadMapping(): FieldMapping {
@@ -75,7 +120,7 @@ interface ImportWizardModalProps {
 
 function detectDeclaredAreaHa(attrs: Record<string, unknown>): number | null {
   // Common APIA / IPA Online / ANCPI field names
-  const haFields = ['SUPRAFATA', 'Suprafata', 'suprafata', 'AREA_HA', 'area_ha', 'SP_HA', 'GIS_AREA']
+  const haFields = ['area_dec', 'AREA_DEC', 'SUPRAFATA', 'Suprafata', 'suprafata', 'AREA_HA', 'area_ha', 'SP_HA', 'GIS_AREA']
   const m2Fields = ['Shape_Area', 'shape_area', 'AREA', 'area', 'AREA_M2']
   for (const k of haFields) {
     const v = attrs[k]
@@ -95,6 +140,28 @@ function fmt2(n: number) { return n.toFixed(2) }
 function fmtPct(n: number) {
   const s = (n > 0 ? '+' : '') + n.toFixed(1) + '%'
   return s
+}
+
+/** APIA official crop color palette */
+export const APIA_CROP_COLORS: Record<string, string> = {
+  'PORUMB':                '#f59e0b',
+  'FLOAREA SOARELUI':      '#f97316',
+  'GRÂU COMUN de toamnă': '#fbbf24',
+  'GRÂU':                  '#fbbf24',
+  'ORZOAICĂ de toamnă':   '#84cc16',
+  'ORZ de toamnă':         '#22c55e',
+  'ORZ':                   '#22c55e',
+  'LUCERNĂ':              '#10b981',
+  'LUCERNĂ AMESTEC':      '#06b6d4',
+  'PLANTE DE NUTREŢ':     '#3b82f6',
+  'SOIA':                  '#8b5cf6',
+  'RAPIŢĂ':               '#a3e635',
+  'SFECLĂ DE ZAHĂR':      '#ec4899',
+  'CARTOF':                '#d97706',
+  'TEREN NECULTIVAT':      '#94a3b8',
+  'ZONE TAMPON':           '#cbd5e1',
+  'PAȘUNE':               '#86efac',
+  'FÂNEAŢ':               '#4ade80',
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -179,7 +246,14 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
       validFeatures.slice(0, 20).forEach(f => {
         Object.keys(f.properties ?? {}).forEach(k => colSet.add(k))
       })
-      setColumnNames(Array.from(colSet))
+      const detectedCols = Array.from(colSet)
+      setColumnNames(detectedCols)
+
+      // Auto-apply APIA mapping if this looks like an APIA shapefile
+      if (isApiaShapefile(detectedCols)) {
+        setFieldMapping(APIA_AUTO_MAPPING)
+        saveMapping(APIA_AUTO_MAPPING)
+      }
 
       // Parse each GeoJSON.Feature
       const parsed: ParsedFeature[] = validFeatures.map((f, idx) => {
@@ -285,6 +359,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
     setStep('saving')
 
     const results = [...initial]
+    const isApia = isApiaShapefile(columnNames)
 
     for (let i = 0; i < fcToSave.features.length; i++) {
       results[i] = { ...results[i], status: 'saving' }
@@ -294,37 +369,86 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
         const f = fcToSave.features[i]
         const attrs = (f.properties ?? {}) as Record<string, unknown>
 
-        const get = (col: string) => col && attrs[col] != null ? String(attrs[col]) : ''
-        const bloc_fizic = get(fieldMapping.bloc_fizic) || `Parcelă import ${i + 1}`
-        const cultura    = get(fieldMapping.cultura) || null
-        const judet      = get(fieldMapping.judet) || null
-        const localitate = get(fieldMapping.localitate) || null
-        const suprafataDeclared = fieldMapping.suprafata_ha && attrs[fieldMapping.suprafata_ha]
-          ? Number(attrs[fieldMapping.suprafata_ha]) : null
+        // ── Helpers ──────────────────────────────────────────────────────
+        const getStr = (col: string): string | null =>
+          col && attrs[col] != null ? String(attrs[col]).trim() || null : null
+        const getNum = (col: string): number | null => {
+          if (!col || attrs[col] == null) return null
+          const n = Number(attrs[col])
+          return isNaN(n) ? null : n
+        }
+        const getInt = (col: string): number | null => {
+          const n = getNum(col)
+          return n != null ? Math.round(n) : null
+        }
+        /** APIA date: 'YYYYMMDD' → 'YYYY-MM-DD' */
+        const getDate = (col: string): string | null => {
+          if (!col || attrs[col] == null) return null
+          const raw = String(attrs[col]).trim()
+          if (/^\d{8}$/.test(raw)) return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`
+          return raw || null
+        }
+        /** APIA agro_env: 'da'/'nu' → boolean */
+        const getBool = (col: string): boolean | null => {
+          if (!col || attrs[col] == null) return null
+          const v = String(attrs[col]).toLowerCase().trim()
+          if (v === 'da' || v === '1' || v === 'true') return true
+          if (v === 'nu' || v === '0' || v === 'false') return false
+          return null
+        }
+        /** APIA status: 1.0 → 'ACTIVE', 0.0 → 'INACTIVE' */
+        const getStatus = (col: string): string => {
+          if (!col || attrs[col] == null) return 'ACTIVE'
+          const n = Number(attrs[col])
+          return !isNaN(n) && n === 0 ? 'INACTIVE' : 'ACTIVE'
+        }
+
+        // ── Resolved values ───────────────────────────────────────────────
+        // For APIA files: bloc_nr + parcel_nr form the display name
+        const blocNr = getStr(fieldMapping.bloc_nr)
+        const parcelNrStr = getStr(fieldMapping.parcel_nr) ?? getStr(fieldMapping.cod_parcela)
+        const cropName = getStr(fieldMapping.crop_name) ?? getStr(fieldMapping.cultura)
+        const cropNr = getStr(fieldMapping.crop_nr)
+
+        const bloc_fizic = isApia
+          ? (blocNr ? `Bloc ${blocNr}` + (parcelNrStr ? ` / P${parcelNrStr}` : '') + (cropNr ? cropNr : '') : `Parcelă import ${i + 1}`)
+          : (getStr(fieldMapping.bloc_fizic) || `Parcelă import ${i + 1}`)
+
+        const judet     = getStr(fieldMapping.judet)
+        const localitate = isApia
+          ? (getStr(fieldMapping.commune) ?? getStr(fieldMapping.localitate))
+          : getStr(fieldMapping.localitate)
+
+        const suprafataDeclared = isApia
+          ? getNum(fieldMapping.area_dec)
+          : getNum(fieldMapping.suprafata_ha)
         const calcArea = turfArea(f as GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>) / 10000
         const suprafata = suprafataDeclared && suprafataDeclared > 0 ? suprafataDeclared : calcArea
 
+        // APIA crop color for map legend
+        const apiaColor = cropName ? APIA_CROP_COLORS[cropName] ?? null : null
+
         results[i].name = bloc_fizic
 
-        // Convert WGS84 polygon → Stereo 70 for storage
+        // ── Geometry: WGS84 ring for map + Stereo70 for parcele_fitosanitar ──
         const geom = f.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon
-        let ringStereo: number[][]
+        let ringWgs84: number[][]
         if (geom.type === 'Polygon') {
-          ringStereo = ringWgs84ToStereo70(geom.coordinates[0] as [number, number][])
+          ringWgs84 = geom.coordinates[0] as number[][]
         } else {
-          // MultiPolygon — use largest exterior ring
-          let biggest = geom.coordinates[0][0] as [number, number][]
+          let biggest = geom.coordinates[0][0] as number[][]
           for (const poly of geom.coordinates) {
-            if (poly[0].length > biggest.length) biggest = poly[0] as [number, number][]
+            if (poly[0].length > biggest.length) biggest = poly[0] as number[][]
           }
-          ringStereo = ringWgs84ToStereo70(biggest)
+          ringWgs84 = biggest
         }
-
+        const ringStereo = ringWgs84ToStereo70(ringWgs84 as [number, number][])
         const geometryStereo70 = { type: 'Polygon' as const, coordinates: [ringStereo] }
+        const geomWgs84 = { type: 'Polygon' as const, coordinates: [ringWgs84] }
         const [cx, cy] = centroidStereo70(ringStereo)
         const [centruLat, centruLng] = stereo70ToLeaflet(cx, cy)
 
-        // 1. Insert parcele_fitosanitar (map polygon)
+        // ── 1. Insert parcele_fitosanitar (map polygon in Stereo 70) ─────
         const { data: mapParcel, error: mapErr } = await db
           .from('parcele_fitosanitar')
           .insert({
@@ -334,31 +458,50 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
             centru_lat: centruLat,
             centru_lng: centruLng,
             suprafata_ha: suprafata,
-            judet: judet || null,
-            localitate: localitate || null,
-            cultura_label: cultura || null,
+            judet: judet ?? null,
+            localitate: localitate ?? null,
+            cultura_label: cropName ?? null,
+            cultura_color: apiaColor ?? null,
           })
           .select('id').single()
 
         if (mapErr) throw new Error(`Hartă: ${mapErr.message}`)
 
-        // 2. Insert parcels (registry entry so parcel appears in dropdowns)
+        // ── 2. Insert parcels registry (all APIA fields) ──────────────────
         const { data: regParcel, error: regErr } = await db
           .from('parcels')
           .insert({
             user_id: user.id,
+            // Generic fields
             bloc_fizic,
+            parcel_nr: parcelNrStr ?? null,
+            county: judet ?? null,
+            locality: localitate ?? null,
+            land_use_category: getStr(fieldMapping.cat_use) ?? null,
+            culture: cropName ?? null,
             surface: suprafata,
-            culture: cultura || null,
-            county: judet || null,
-            locality: localitate || null,
+            status: isApia ? getStatus(fieldMapping.status) : 'ACTIVE',
             lat: centruLat,
             lng: centruLng,
-            status: 'ACTIVE',
+            // APIA 1:1 fields
+            apia_farm_id: getStr(fieldMapping.farm_id),
+            apia_year:    getInt(fieldMapping.year),
+            siruta:       getStr(fieldMapping.siruta),
+            crop_nr:      cropNr,
+            crop_code:    getInt(fieldMapping.crop_code),
+            agro_env:     getBool(fieldMapping.agro_env),
+            full_bloc:    getInt(fieldMapping.full_bloc),
+            apia_comment: getStr(fieldMapping.comment),
+            apia_inserted: getDate(fieldMapping.inserted),
+            apia_updated:  getDate(fieldMapping.updated),
+            // Geometry in WGS84 for spatial queries
+            geom_geojson: geomWgs84,
+            centru_lat: centruLat,
+            centru_lng: centruLng,
           })
           .select('id').single()
 
-        // 3. Link map polygon → registry parcel
+        // ── 3. Link map polygon → registry parcel ────────────────────────
         if (!regErr && regParcel && mapParcel) {
           await db.from('parcele_fitosanitar')
             .update({ parcela_id: regParcel.id })
@@ -390,21 +533,43 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
   const validCount = features.filter(f => f.isValid).length
   const warnCount = features.filter(f => !f.isValid).length
 
-  // Pick up to 3 "interesting" attribute columns for the preview table
-  const PRIORITY_COLS = ['BLOC_FIZIC', 'NR_PARCEL', 'CULTURA', 'COD_UNIC', 'TARLA', 'JUDET', 'LOCALITATE']
+  // Pick up to 5 "interesting" attribute columns for the preview table
+  const isApia = isApiaShapefile(columnNames)
+  const PRIORITY_COLS = isApia
+    ? ['bloc_nr', 'parcel_nr', 'crop_name', 'area_dec', 'commune', 'judet']
+    : ['BLOC_FIZIC', 'NR_PARCEL', 'CULTURA', 'COD_UNIC', 'TARLA', 'JUDET', 'LOCALITATE']
   const displayCols = [
     ...PRIORITY_COLS.filter(c => columnNames.includes(c)),
     ...columnNames.filter(c => !PRIORITY_COLS.includes(c)),
-  ].slice(0, 3)
+  ].slice(0, isApia ? 5 : 3)
 
-  // DB fields available for mapping
-  const DB_FIELDS: { key: keyof FieldMapping; label: string; required?: boolean }[] = [
+  // DB fields available for mapping (grouped: generic + APIA)
+  const DB_FIELDS: { key: keyof FieldMapping; label: string; required?: boolean; group?: string }[] = [
+    // Generic
     { key: 'bloc_fizic',   label: 'Bloc fizic / Nume parcelă', required: true },
     { key: 'suprafata_ha', label: 'Suprafață (ha)' },
     { key: 'cultura',      label: 'Cultură' },
     { key: 'judet',        label: 'Județ' },
     { key: 'localitate',   label: 'Localitate' },
-    { key: 'cod_parcela',  label: 'Cod parcelă / NR_PARCEL' },
+    { key: 'cod_parcela',  label: 'Cod parcelă (legacy)' },
+    // APIA 1:1
+    { key: 'farm_id',   label: 'farm_id → apia_farm_id',  group: 'APIA' },
+    { key: 'year',      label: 'year → apia_year',         group: 'APIA' },
+    { key: 'siruta',    label: 'siruta → siruta',           group: 'APIA' },
+    { key: 'commune',   label: 'commune → locality',        group: 'APIA' },
+    { key: 'bloc_nr',   label: 'bloc_nr → bloc_fizic',      group: 'APIA' },
+    { key: 'parcel_nr', label: 'parcel_nr → parcel_nr',     group: 'APIA' },
+    { key: 'crop_nr',   label: 'crop_nr → crop_nr',         group: 'APIA' },
+    { key: 'cat_use',   label: 'cat_use → land_use_category', group: 'APIA' },
+    { key: 'crop_code', label: 'crop_code → crop_code',     group: 'APIA' },
+    { key: 'crop_name', label: 'crop_name → culture',       group: 'APIA' },
+    { key: 'area_dec',  label: 'area_dec → surface',        group: 'APIA' },
+    { key: 'agro_env',  label: 'agro_env → agro_env',       group: 'APIA' },
+    { key: 'comment',   label: 'comment → apia_comment',    group: 'APIA' },
+    { key: 'inserted',  label: 'inserted → apia_inserted',  group: 'APIA' },
+    { key: 'updated',   label: 'updated → apia_updated',    group: 'APIA' },
+    { key: 'status',    label: 'status → status',           group: 'APIA' },
+    { key: 'full_bloc', label: 'full_bloc → full_bloc',      group: 'APIA' },
   ]
 
   if (!open) return null
@@ -565,6 +730,18 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
                 ))}
               </div>
 
+              {/* APIA auto-detected banner */}
+              {isApia && (
+                <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg text-xs text-green-800">
+                  <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-green-600" />
+                  <span>
+                    <strong>Shapefile APIA detectat</strong> — mapare automată 1:1 aplicată.
+                    {' '}{columnNames.length} coloane, inclusiv <code className="bg-green-100 px-1 rounded">farm_id</code>,{' '}
+                    <code className="bg-green-100 px-1 rounded">crop_name</code>, <code className="bg-green-100 px-1 rounded">area_dec</code>.
+                  </span>
+                </div>
+              )}
+
               {/* Column names detected */}
               {columnNames.length > 0 && (
                 <div className="flex items-start gap-2 p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
@@ -673,10 +850,15 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
               </div>
 
               <div className="space-y-3">
-                {DB_FIELDS.map(dbf => (
-                  <div key={dbf.key} className="grid grid-cols-5 gap-3 items-center">
+                {DB_FIELDS
+                  .filter(dbf => !dbf.group || isApia)
+                  .map(dbf => (
+                  <div key={dbf.key} className={`grid grid-cols-5 gap-3 items-center ${dbf.group === 'APIA' ? 'pl-2 border-l-2 border-green-200' : ''}`}>
                     <div className="col-span-2 text-xs font-medium text-gray-700">
-                      {dbf.label}
+                      {dbf.group === 'APIA'
+                        ? <span className="font-mono text-green-700 text-[11px]">{dbf.label}</span>
+                        : dbf.label
+                      }
                       {dbf.required && <span className="text-red-500 ml-0.5">*</span>}
                     </div>
                     <div className="col-span-3">
@@ -707,15 +889,54 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="bg-gray-50 text-gray-400 text-[10px] uppercase tracking-wide">
-                          <th className="px-3 py-2 text-left">Bloc fizic</th>
-                          <th className="px-3 py-2 text-right">Suprafață</th>
-                          <th className="px-3 py-2 text-left">Cultură</th>
-                          <th className="px-3 py-2 text-left">Județ</th>
+                          {isApia ? (
+                            <>
+                              <th className="px-3 py-2 text-left">Bloc / Parcelă</th>
+                              <th className="px-3 py-2 text-left">Cultură</th>
+                              <th className="px-3 py-2 text-right">Suprafață</th>
+                              <th className="px-3 py-2 text-left">Comună</th>
+                              <th className="px-3 py-2 text-left">SIRUTA</th>
+                            </>
+                          ) : (
+                            <>
+                              <th className="px-3 py-2 text-left">Bloc fizic</th>
+                              <th className="px-3 py-2 text-right">Suprafață</th>
+                              <th className="px-3 py-2 text-left">Cultură</th>
+                              <th className="px-3 py-2 text-left">Județ</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {features.slice(0, 3).map(f => {
                           const get = (col: string) => col && f.attributes[col] != null ? String(f.attributes[col]) : '—'
+                          if (isApia) {
+                            const blocNr = get(fieldMapping.bloc_nr)
+                            const pNr = get(fieldMapping.parcel_nr)
+                            const cn = get(fieldMapping.crop_name)
+                            const color = cn !== '—' ? APIA_CROP_COLORS[cn] : undefined
+                            return (
+                              <tr key={f.idx}>
+                                <td className="px-3 py-2 text-gray-800 font-mono font-medium">
+                                  B{blocNr}/{pNr}{get(fieldMapping.crop_nr) !== '—' ? get(fieldMapping.crop_nr) : ''}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span className="flex items-center gap-1.5">
+                                    {color && <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />}
+                                    <span className="text-gray-700 font-medium">{cn}</span>
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-right text-gray-600 font-mono">
+                                  {fieldMapping.area_dec && f.attributes[fieldMapping.area_dec]
+                                    ? Number(f.attributes[fieldMapping.area_dec]).toFixed(2) + ' ha'
+                                    : f.areaHa.toFixed(2) + ' ha (calc.)'}
+                                </td>
+                                <td className="px-3 py-2 text-gray-600">{get(fieldMapping.commune)}</td>
+                                <td className="px-3 py-2 text-gray-500 font-mono">{get(fieldMapping.siruta)}</td>
+                              </tr>
+                            )
+                          }
+                          // Generic non-APIA row
                           return (
                             <tr key={f.idx}>
                               <td className="px-3 py-2 text-gray-800 font-medium">{get(fieldMapping.bloc_fizic)}</td>

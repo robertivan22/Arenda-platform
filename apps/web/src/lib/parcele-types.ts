@@ -37,6 +37,20 @@ export interface RegistryParcel {
   contract_id?: string | null
   contract_number?: string | null
   contract_end_date?: string | null
+  // APIA shapefile fields (1:1)
+  apia_farm_id?: string | null
+  apia_year?: number | null
+  siruta?: string | null
+  crop_nr?: string | null
+  crop_code?: number | null
+  agro_env?: boolean | null
+  full_bloc?: number | null
+  apia_comment?: string | null
+  apia_inserted?: string | null
+  apia_updated?: string | null
+  geom_geojson?: GeoJSONPolygon | null
+  centru_lat?: number | null
+  centru_lng?: number | null
 }
 
 export interface GeoJSONPolygon {

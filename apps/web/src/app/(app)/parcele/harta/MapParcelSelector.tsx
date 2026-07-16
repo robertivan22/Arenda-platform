@@ -16,6 +16,7 @@ import {
 import { area as turfArea } from '@turf/area'
 import ImportWizardModal from './ImportWizardModal'
 import type { ParsedFeature } from './ImportWizardModal'
+import { APIA_CROP_COLORS } from './ImportWizardModal'
 import type { ParceleFitosanitar, GeoJSONPolygon, MapSearchResult, RegistryParcel } from '@/lib/parcele-types'
 import {
   wgs84ToStereo70,
@@ -86,6 +87,19 @@ const DEFAULT_LEGEND_ITEMS: LegendItem[] = [
   { id: 'grau', label: 'Grau', color: '#ef4444' },
   { id: 'porumb', label: 'Porumb', color: '#f59e0b' },
 ]
+
+/** Return an APIA crop color by cultura_label, with case-insensitive fallback */
+function apiaColorForCulture(label: string | null | undefined): string | null {
+  if (!label) return null
+  // Exact match first
+  if (APIA_CROP_COLORS[label]) return APIA_CROP_COLORS[label]
+  // Case-insensitive prefix match
+  const upper = label.toUpperCase()
+  for (const [key, color] of Object.entries(APIA_CROP_COLORS)) {
+    if (upper.startsWith(key.toUpperCase().split(' ')[0])) return color
+  }
+  return null
+}
 
 const OPERATION_TYPES = [
   { value: 'ARAT', label: 'Arat' },
@@ -281,6 +295,8 @@ function ParcelMapPopup({ parcel, onClose, onRegisterActivity, onEditGeometry }:
     INACTIVE: 'bg-gray-100 text-gray-600 border-gray-200',
     EXPIRED: 'bg-orange-100 text-orange-600 border-orange-200',
   }
+  const cropColor = apiaColorForCulture(parcel.culture)
+  const hasApia = !!(parcel.apia_farm_id || parcel.apia_year)
   return (
     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden w-72">
       {/* Header */}
@@ -307,8 +323,11 @@ function ParcelMapPopup({ parcel, onClose, onRegisterActivity, onEditGeometry }:
         )}
         {parcel.culture && (
           <div className="flex items-center gap-2 text-sm">
-            <span>🌾</span>
+            {cropColor
+              ? <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cropColor }} />
+              : <span>🌾</span>}
             <span className="text-green-700 font-medium">{parcel.culture}</span>
+            {parcel.crop_nr && <span className="text-gray-400 text-xs">({parcel.crop_nr})</span>}
           </div>
         )}
         {parcel.lessor_name && (
@@ -321,6 +340,38 @@ function ParcelMapPopup({ parcel, onClose, onRegisterActivity, onEditGeometry }:
           <div className="flex items-center gap-2 text-sm text-green-600">
             <Check className="w-3.5 h-3.5 flex-shrink-0" />
             <span>APIA Eligibil</span>
+          </div>
+        )}
+        {/* APIA section */}
+        {hasApia && (
+          <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
+            <div className="text-[10px] font-semibold text-green-700 uppercase tracking-wide mb-1.5">Date APIA</div>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-xs">
+              {parcel.apia_farm_id && (
+                <><span className="text-gray-400">Farm ID</span><span className="font-mono text-gray-700 truncate">{parcel.apia_farm_id}</span></>
+              )}
+              {parcel.apia_year && (
+                <><span className="text-gray-400">Campanie</span><span className="font-semibold text-gray-700">{parcel.apia_year}</span></>
+              )}
+              {parcel.siruta && (
+                <><span className="text-gray-400">SIRUTA</span><span className="font-mono text-gray-700">{parcel.siruta}</span></>
+              )}
+              {parcel.crop_code != null && (
+                <><span className="text-gray-400">Cod cultură</span><span className="font-mono text-gray-700">{parcel.crop_code}</span></>
+              )}
+              {parcel.agro_env != null && (
+                <><span className="text-gray-400">Agro-mediu</span><span className="text-gray-700">{parcel.agro_env ? 'Da' : 'Nu'}</span></>
+              )}
+              {parcel.full_bloc != null && (
+                <><span className="text-gray-400">Parcele bloc</span><span className="text-gray-700">{parcel.full_bloc}</span></>
+              )}
+            </div>
+            {(parcel.apia_inserted || parcel.apia_updated) && (
+              <div className="text-[10px] text-gray-400 mt-1">
+                {parcel.apia_inserted && <>APIA: {parcel.apia_inserted}</>}
+                {parcel.apia_updated && parcel.apia_updated !== parcel.apia_inserted && <> · upd. {parcel.apia_updated}</>}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -536,36 +587,28 @@ function QuickActivityModal({ parcelId, parcelName, parcelSurface, onClose }: Qu
     }).select('id').single()
     if (error || !wo) { toast.error(error?.message ?? 'Eroare la salvare.'); setSaving(false); return }
 
-    if (materials.length > 0) {
-      // Batch insert all work_order_inputs in a single call (PERF-10)
-      const { data: woInputs, error: inputErr } = await db.from('work_order_inputs').insert(
-        materials.map(mat => ({
+    for (const mat of materials) {
+      const { error: iErr } = await db.from('work_order_inputs').insert({
+        user_id: user.id,
+        work_order_id: wo.id,
+        input_type: mat.input_type,
+        product_name: mat.product_name.trim(),
+        quantity: parseFloat(mat.quantity),
+        unit: mat.unit,
+        cost_per_unit: mat.cost_per_unit ? parseFloat(mat.cost_per_unit) : null,
+        lot_id: mat.lot_id || null,
+      })
+      if (!iErr && mat.lot_id) {
+        await db.from('input_stock_mvt').insert({
           user_id: user.id,
+          lot_id: mat.lot_id,
           work_order_id: wo.id,
-          input_type: mat.input_type,
-          product_name: mat.product_name.trim(),
+          campaign_id: campaign.id,
+          mvt_type: 'OUT',
           quantity: parseFloat(mat.quantity),
-          unit: mat.unit,
-          cost_per_unit: mat.cost_per_unit ? parseFloat(mat.cost_per_unit) : null,
-          lot_id: mat.lot_id || null,
-        }))
-      ).select('id, lot_id, quantity, product_name')
-      if (!inputErr && woInputs) {
-        const stockMvts = woInputs
-          .filter(row => row.lot_id)
-          .map(row => ({
-            user_id: user.id,
-            lot_id: row.lot_id,
-            work_order_id: wo.id,
-            campaign_id: campaign.id,
-            mvt_type: 'OUT' as const,
-            quantity: row.quantity,
-            mvt_date: today,
-            notes: `Consum campanie: ${row.product_name}`,
-          }))
-        if (stockMvts.length > 0) {
-          await db.from('input_stock_mvt').insert(stockMvts)
-        }
+          mvt_date: today,
+          notes: `Consum campanie: ${mat.product_name.trim()}`,
+        })
       }
     }
     setSaving(false)
@@ -1076,7 +1119,6 @@ export default function MapParcelSelector({
       .from('parcele_fitosanitar')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(300)
     if (error) toast.error('Eroare la incarcare: ' + error.message)
     else setParcels((data ?? []) as ParceleFitosanitar[])
     setLoading(false)
@@ -1089,10 +1131,9 @@ export default function MapParcelSelector({
     const db = createClient()
     const { data } = await db
       .from('parcels')
-      .select('id, bloc_fizic, tarla_nr, parcel_nr, county, locality, surface, status, culture, apia_eligible, lat, lng, contract_id, lessors(first_name, last_name, company_name, type), contracts(contract_number, end_date)')
+      .select('id, bloc_fizic, tarla_nr, parcel_nr, county, locality, surface, status, culture, apia_eligible, lat, lng, contract_id, apia_farm_id, apia_year, siruta, crop_nr, crop_code, agro_env, full_bloc, apia_inserted, apia_updated, lessors(first_name, last_name, company_name, type), contracts(contract_number, end_date)')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
-      .limit(500)
     if (data) {
       setRegistryParcels((data as any[]).map(p => {
         const lessor = p.lessors
@@ -1107,6 +1148,10 @@ export default function MapParcelSelector({
           contract_id: p.contract_id, lessor_name: lessor,
           contract_number: (p.contracts as any)?.contract_number ?? null,
           contract_end_date: (p.contracts as any)?.end_date ?? null,
+          // APIA fields
+          apia_farm_id: p.apia_farm_id, apia_year: p.apia_year, siruta: p.siruta,
+          crop_nr: p.crop_nr, crop_code: p.crop_code, agro_env: p.agro_env,
+          full_bloc: p.full_bloc, apia_inserted: p.apia_inserted, apia_updated: p.apia_updated,
         } as RegistryParcel
       }))
     }
@@ -1224,11 +1269,25 @@ export default function MapParcelSelector({
       if (!geom) return
       const attrs = (feature.properties ?? {}) as Record<string, unknown>
       const parsed = features[idx]
-      const name = String(attrs['BLOC_FIZIC'] ?? attrs['NR_PARCEL'] ?? attrs['COD_UNIC'] ?? `Parcelă ${idx + 1}`)
+      // Prefer APIA fields if present, fall back to generic names
+      const rawName = attrs['bloc_nr'] ?? attrs['BLOC_FIZIC'] ?? attrs['NR_PARCEL'] ?? attrs['COD_UNIC'] ?? `Parcelă ${idx + 1}`
+      const parcelNr = attrs['parcel_nr'] ?? attrs['NR_PARCEL']
+      const name = parcelNr ? `Bloc ${rawName}/P${parcelNr}` : String(rawName)
+      const cropName = String(attrs['crop_name'] ?? attrs['CULTURA'] ?? '')
+      const cropCode = attrs['crop_code'] != null ? ` [${attrs['crop_code']}]` : ''
+      const commune = attrs['commune'] ?? attrs['LOCALITATE'] ?? ''
+      const siruta = attrs['siruta'] ?? ''
       const areaHa = parsed ? parsed.areaHa.toFixed(2) + ' ha' : '—'
-      const tooltipHtml = `<strong>${name}</strong><br/>Suprafață: ${areaHa}` +
-        (parsed?.isValid === false ? `<br/><span style="color:#ef4444">⚠ ${parsed.validationMsg}</span>` : '')
-      const style = { color: '#f97316', fillColor: '#f97316', fillOpacity: 0.15, weight: 2.5, dashArray: '6 4' }
+      const cropColor = apiaColorForCulture(cropName) ?? '#f97316'
+      const tooltipHtml = `<strong>${name}</strong>`
+        + (cropName ? `<br/><span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:${cropColor};display:inline-block"></span>${cropName}${cropCode}</span>` : '')
+        + `<br/>Suprafață: ${areaHa}`
+        + (commune ? `<br/>${commune}${siruta ? ` (${siruta})` : ''}` : '')
+        + (parsed?.isValid === false ? `<br/><span style="color:#ef4444">⚠ ${parsed.validationMsg}</span>` : '')
+      const style = {
+        color: cropColor, fillColor: cropColor,
+        fillOpacity: 0.18, weight: 2.5, dashArray: '6 4',
+      }
 
       let poly: L.Polygon | null = null
       if (geom.type === 'Polygon') {
@@ -1945,6 +2004,55 @@ export default function MapParcelSelector({
               </div>
             )}
           </div>
+
+          {/* ── APIA Culturi Legend (auto-computed from loaded parcels) ── */}
+          {(() => {
+            // Build stats: cultura_label → { color, count, totalHa }
+            const statsMap = new Map<string, { color: string; count: number; totalHa: number }>()
+            for (const p of parcels) {
+              const name = p.cultura_label
+              if (!name) continue
+              const color = p.cultura_color ?? apiaColorForCulture(name) ?? '#94a3b8'
+              const existing = statsMap.get(name)
+              if (existing) {
+                existing.count++
+                existing.totalHa += p.suprafata_ha ?? 0
+              } else {
+                statsMap.set(name, { color, count: 1, totalHa: p.suprafata_ha ?? 0 })
+              }
+            }
+            if (statsMap.size === 0) return null
+            const stats = Array.from(statsMap.entries())
+              .map(([name, s]) => ({ name, ...s }))
+              .sort((a, b) => b.totalHa - a.totalHa)
+            return (
+              <div className="border border-green-200 rounded-xl overflow-hidden shadow-sm bg-green-50">
+                <div className="px-3 py-2 bg-green-100 border-b border-green-200 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-green-800 uppercase tracking-wide">
+                    Culturi APIA ({stats.length})
+                  </span>
+                  <span className="text-xs text-green-600 font-medium">
+                    {stats.reduce((s, x) => s + x.totalHa, 0).toFixed(1)} ha total
+                  </span>
+                </div>
+                <div className="divide-y divide-green-100">
+                  {stats.map(s => (
+                    <div key={s.name} className="flex items-center gap-2.5 px-3 py-1.5">
+                      <span
+                        className="inline-block w-3 h-3 rounded-sm flex-shrink-0 border border-white/60 shadow-sm"
+                        style={{ backgroundColor: s.color }}
+                      />
+                      <span className="flex-1 text-xs text-gray-700 truncate" title={s.name}>{s.name}</span>
+                      <span className="text-[10px] text-gray-500 flex-shrink-0">{s.count}p</span>
+                      <span className="text-[10px] font-semibold text-green-700 flex-shrink-0 w-14 text-right">
+                        {s.totalHa.toFixed(2)} ha
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Parcel list header */}
           <div className="flex items-center justify-between">
