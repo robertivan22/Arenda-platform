@@ -277,7 +277,7 @@ export default function FermaPage() {
     const db = createClient()
     db.from('parcels')
       .select('id,bloc_fizic,tarla_nr,parcel_nr,culture,surface,lat,lng,status')
-      .eq('status', 'ACTIVE').limit(200)
+      .eq('status', 'ACTIVE').limit(500)
       .then(({ data, error }) => {
         if (error) { setError(error.message); setLoadingDb(false); return }
         const all = (data ?? []) as SupabaseParcel[]
@@ -286,7 +286,7 @@ export default function FermaPage() {
         const valid = parsed.filter(p => p.lat != null && p.lng != null && !isNaN(p.lat) && !isNaN(p.lng) && p.lat !== 0 && p.lng !== 0)
         const noGps = parsed.filter(p => !valid.some(v => v.id === p.id))
         setNoGpsParcels(noGps)
-        setParcelsDb(valid.slice(0, 100))
+        setParcelsDb(valid)
         setLoadingDb(false)
       })
   }, [])
