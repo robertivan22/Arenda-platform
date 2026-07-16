@@ -30,6 +30,7 @@ function MapWithParams() {
     ? [rawLat, rawLng]
     : [45.9432, 24.9668]
   const zoom = !isNaN(rawZoom) ? rawZoom : 7
+  const openImport = params.get('openImport') === '1'
   return (
     <MapParcelSelector
       mode="modal"
@@ -37,6 +38,7 @@ function MapWithParams() {
       showList={true}
       initialCenter={center}
       initialZoom={zoom}
+      initialOpenImport={openImport}
     />
   )
 }

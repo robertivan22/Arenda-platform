@@ -186,6 +186,7 @@ export interface MapParcelSelectorProps {
   allowDraw?: boolean
   initialCenter?: [number, number]  // WGS84 [lat, lng]
   initialZoom?: number
+  initialOpenImport?: boolean
 }
 
 // ─── Coordinate badge ─────────────────────────────────────────────────────────
@@ -795,6 +796,7 @@ export default function MapParcelSelector({
   allowDraw = true,
   initialCenter = [45.9432, 24.9668],
   initialZoom = 7,
+  initialOpenImport = false,
 }: MapParcelSelectorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -820,7 +822,7 @@ export default function MapParcelSelector({
   const [showActivityModal, setShowActivityModal] = useState(false)
 
   // Import wizard
-  const [showImportWizard, setShowImportWizard] = useState(false)
+  const [showImportWizard, setShowImportWizard] = useState(initialOpenImport)
   const [importPreviewFC, setImportPreviewFC] = useState<{ fc: GeoJSON.FeatureCollection; features: ParsedFeature[] } | null>(null)
   const [importEditMode, setImportEditMode] = useState(false)
 
@@ -1118,6 +1120,7 @@ export default function MapParcelSelector({
     const { data, error } = await db
       .from('parcele_fitosanitar')
       .select('*')
+      .not('parcela_id', 'is', null)
       .order('created_at', { ascending: false })
     if (error) toast.error('Eroare la incarcare: ' + error.message)
     else setParcels((data ?? []) as ParceleFitosanitar[])

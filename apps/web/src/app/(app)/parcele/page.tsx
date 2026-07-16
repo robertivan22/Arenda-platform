@@ -96,11 +96,14 @@ export default function ParceleListPage() {
   const [showColSelector, setShowColSelector] = useState(false)
   const colRef = useRef<HTMLDivElement>(null)
 
-  // Inline editing
+  // Inline editing — dropdowns
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'lessor' | 'contract' } | null>(null)
   const [savingCell, setSavingCell] = useState(false)
   const [lessors, setLessors] = useState<LessorOption[]>([])
   const [contracts, setContracts] = useState<ContractOption[]>([])
+  // Inline editing — text fields
+  const [editingText, setEditingText] = useState<{ id: string; field: 'tarla_nr' | 'parcel_nr'; value: string } | null>(null)
+  const [savingText, setSavingText] = useState(false)
 
   useEffect(() => {
     const db = createClient()
@@ -253,6 +256,21 @@ export default function ParceleListPage() {
     setDeleteId(null)
   }
 
+  async function saveInlineText() {
+    if (!editingText) return
+    setSavingText(true)
+    const db = createClient()
+    const { error } = await db.from('parcels')
+      .update({ [editingText.field]: editingText.value.trim() || null })
+      .eq('id', editingText.id)
+    if (error) { toast.error('Eroare: ' + error.message); setSavingText(false); return }
+    const { id, field, value } = editingText
+    setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value.trim() || null } : r))
+    setSavingText(false)
+    setEditingText(null)
+    toast.success('Câmp actualizat.')
+  }
+
   async function saveInlineEdit(id: string, field: 'lessor' | 'contract', value: string) {
     setSavingCell(true)
     const db = createClient()
@@ -399,7 +417,7 @@ export default function ParceleListPage() {
             </button>
 
             <a
-              href="/parcele/harta"
+              href="/parcele/harta?openImport=1"
               className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-orange-300 rounded hover:bg-orange-50 text-orange-700 font-medium"
               title="Import parcele din Shapefile APIA / GeoJSON"
             >
@@ -527,11 +545,43 @@ export default function ParceleListPage() {
                     <td className="px-3 py-2 font-mono text-xs font-semibold text-gray-700">{row.bloc_fizic ?? '—'}</td>
                   )}
                   {visibleCols.has('tarla_nr') && (
-                    <td className="px-3 py-2 text-gray-600">{row.tarla_nr ?? '—'}</td>
+                    <td className="px-3 py-2" onClick={e => { e.stopPropagation(); setEditingText({ id: row.id, field: 'tarla_nr', value: row.tarla_nr ?? '' }) }}>
+                      {editingText?.id === row.id && editingText.field === 'tarla_nr' ? (
+                        <input
+                          autoFocus
+                          value={editingText.value}
+                          onChange={e => setEditingText(p => p ? { ...p, value: e.target.value } : p)}
+                          onBlur={() => void saveInlineText()}
+                          onKeyDown={e => { if (e.key === 'Enter') void saveInlineText(); if (e.key === 'Escape') setEditingText(null) }}
+                          onClick={e => e.stopPropagation()}
+                          className="text-xs border border-brand-400 rounded px-1.5 py-1 w-20 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                      ) : (
+                        <span className="group flex items-center gap-1 text-gray-600 cursor-pointer">
+                          {row.tarla_nr ?? '—'}
+                          <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-40 flex-shrink-0" />
+                        </span>
+                      )}
+                    </td>
                   )}
                   {visibleCols.has('parcel_nr') && (
-                    <td className="px-3 py-2">
-                      <span className="text-brand-600 font-semibold">{row.parcel_nr ?? '—'}</span>
+                    <td className="px-3 py-2" onClick={e => { e.stopPropagation(); setEditingText({ id: row.id, field: 'parcel_nr', value: row.parcel_nr ?? '' }) }}>
+                      {editingText?.id === row.id && editingText.field === 'parcel_nr' ? (
+                        <input
+                          autoFocus
+                          value={editingText.value}
+                          onChange={e => setEditingText(p => p ? { ...p, value: e.target.value } : p)}
+                          onBlur={() => void saveInlineText()}
+                          onKeyDown={e => { if (e.key === 'Enter') void saveInlineText(); if (e.key === 'Escape') setEditingText(null) }}
+                          onClick={e => e.stopPropagation()}
+                          className="text-xs border border-brand-400 rounded px-1.5 py-1 w-20 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                      ) : (
+                        <span className="group flex items-center gap-1 text-brand-600 font-semibold cursor-pointer">
+                          {row.parcel_nr ?? '—'}
+                          <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-40 flex-shrink-0" />
+                        </span>
+                      )}
                     </td>
                   )}
                   {visibleCols.has('siruta_code') && (
