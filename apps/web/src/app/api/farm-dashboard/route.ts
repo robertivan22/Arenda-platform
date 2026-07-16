@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'parcels array required' }, { status: 400 })
     }
 
-    // Limit request size
-    const inputs = body.parcels.slice(0, 50)
+    // Limit per-call size — keeps wall-clock well under Cloudflare 30s limit
+    const inputs = body.parcels.slice(0, 25)
 
     const result = await computeFarmDashboard(inputs)
 
