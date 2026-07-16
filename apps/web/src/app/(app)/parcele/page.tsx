@@ -107,43 +107,51 @@ export default function ParceleListPage() {
 
   useEffect(() => {
     const db = createClient()
-    db.from('parcels')
-      .select('*, lessors(first_name, last_name, company_name, type), contracts(contract_number, end_date)')
-      .order('created_at', { ascending: false })
-      .limit(2000)
-      .then(({ data, error }) => {
-        if (error) { toast.error('Eroare la încărcarea parcelelor.'); return }
-        if (data) setRows((data as any[]).map(p => ({
-          ...p,
-          lessor_name: p.lessors
-            ? (p.lessors.type === 'LEGAL'
-                ? p.lessors.company_name
-                : `${p.lessors.last_name} ${p.lessors.first_name}`.trim())
-            : '—',
-          contract_number:  p.contracts?.contract_number ?? null,
-          contract_end_date: p.contracts?.end_date ?? null,
-        })))
-      })
-    // Load lessors + contracts for inline editing dropdowns
-    db.from('lessors')
-      .select('id, first_name, last_name, company_name, type')
-      .eq('status', 'ACTIVE')
-      .order('last_name')
-      .limit(500)
-      .then(({ data }) => {
-        if (data) setLessors((data as any[]).map(l => ({
-          id: l.id,
-          name: l.type === 'LEGAL'
-            ? l.company_name
-            : `${l.last_name} ${l.first_name}`.trim(),
-        })))
-      })
-    db.from('contracts')
-      .select('id, contract_number, lessor_id')
-      .eq('status', 'ACTIVE')
-      .order('contract_number')
-      .limit(500)
-      .then(({ data }) => { if (data) setContracts(data as ContractOption[]) })
+    // Always scope to the authenticated user (defense-in-depth on top of RLS)
+    db.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      const uid = user.id
+      db.from('parcels')
+        .select('*, lessors(first_name, last_name, company_name, type), contracts(contract_number, end_date)')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(2000)
+        .then(({ data, error }) => {
+          if (error) { toast.error('Eroare la încărcarea parcelelor.'); return }
+          if (data) setRows((data as any[]).map(p => ({
+            ...p,
+            lessor_name: p.lessors
+              ? (p.lessors.type === 'LEGAL'
+                  ? p.lessors.company_name
+                  : `${p.lessors.last_name} ${p.lessors.first_name}`.trim())
+              : '—',
+            contract_number:  p.contracts?.contract_number ?? null,
+            contract_end_date: p.contracts?.end_date ?? null,
+          })))
+        })
+      // Load lessors + contracts for inline editing dropdowns
+      db.from('lessors')
+        .select('id, first_name, last_name, company_name, type')
+        .eq('user_id', uid)
+        .eq('status', 'ACTIVE')
+        .order('last_name')
+        .limit(500)
+        .then(({ data }) => {
+          if (data) setLessors((data as any[]).map(l => ({
+            id: l.id,
+            name: l.type === 'LEGAL'
+              ? l.company_name
+              : `${l.last_name} ${l.first_name}`.trim(),
+          })))
+        })
+      db.from('contracts')
+        .select('id, contract_number, lessor_id')
+        .eq('user_id', uid)
+        .eq('status', 'ACTIVE')
+        .order('contract_number')
+        .limit(500)
+        .then(({ data }) => { if (data) setContracts(data as ContractOption[]) })
+    })
   }, [])
 
   useEffect(() => {

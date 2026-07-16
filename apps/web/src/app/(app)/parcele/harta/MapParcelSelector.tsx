@@ -1117,9 +1117,12 @@ export default function MapParcelSelector({
   const loadParcels = useCallback(async () => {
     setLoading(true)
     const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) { setLoading(false); return }
     const { data, error } = await db
       .from('parcele_fitosanitar')
       .select('*')
+      .eq('user_id', user.id)
       .not('parcela_id', 'is', null)
       .order('created_at', { ascending: false })
     if (error) toast.error('Eroare la incarcare: ' + error.message)
@@ -1132,9 +1135,12 @@ export default function MapParcelSelector({
   // ── Load registry parcels (parcels table with GPS coords) ───────────────
   const loadRegistryParcels = useCallback(async () => {
     const db = createClient()
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) return
     const { data } = await db
       .from('parcels')
       .select('id, bloc_fizic, tarla_nr, parcel_nr, county, locality, surface, status, culture, apia_eligible, lat, lng, contract_id, apia_farm_id, apia_year, siruta, crop_nr, crop_code, agro_env, full_bloc, apia_inserted, apia_updated, lessors(first_name, last_name, company_name, type), contracts(contract_number, end_date)')
+      .eq('user_id', user.id)
       .not('lat', 'is', null)
       .not('lng', 'is', null)
     if (data) {
