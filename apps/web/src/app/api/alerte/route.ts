@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/server'
 import type {
   DocStatus, AlertPaymentStatus, RiskTier, AlertPriority, StocStatus,
   ContractAlerta, FermaAlerta, StocAlerta, UtilajeAlerta, TranzactieAlerta,
-  AlertaInsight, SumarExecutiv, AlerteResponse, UitAlerta,
+  AlertaInsight, SumarExecutiv, AlerteResponse,
 } from '@/lib/alerte/types'
 
 // ─── Safe date helpers (no epoch, no 1970, no Invalid Date) ──────────────────
@@ -364,19 +364,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
       maintenanceRaw = mtRaw ?? []
     }
 
-    // ── 6. UIT expiry soon — activ rows expiring within 2 days ─────────────
-    let uitRaw: any[] = []
-    {
-      const { data: uitData, error: uitErr } = await db
-        .from('transporturi_uit')
-        .select('id, machine_id, cod_uit, tip_operatiune, valabil_pana, status, machines(name)')
-        .eq('status', 'activ')
-        .lte('valabil_pana', new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0])
-        .order('valabil_pana', { ascending: true })
-        .limit(50)
-      if (uitErr) errors.push(`UIT: ${uitErr.message}`)
-      uitRaw = uitData ?? []
-    }
+    // ── 7. Lessors for transactions (no ambiguous PostgREST join) ──────────────
     const lessorIds = [
       ...new Set((txRaw ?? []).map((t: any) => t.lessor_id).filter(Boolean)),
     ] as string[]
@@ -498,18 +486,6 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
       tasksByMachine[t.machine_id].push(t)
     }
 
-    // Nearest active UIT per machine (for alerte badge)
-    const uitByMachine: Record<string, { days: number; cod: string }> = {}
-    for (const u of uitRaw) {
-      const mid = u.machine_id as string | null
-      if (!mid) continue
-      const d = safeDate(u.valabil_pana)
-      const days = d ? daysDiff(today, d) : 0
-      if (!uitByMachine[mid] || days < uitByMachine[mid].days) {
-        uitByMachine[mid] = { days, cod: u.cod_uit as string }
-      }
-    }
-
     const utilaje: UtilajeAlerta[] = (machinesRaw ?? []).map((m: any) => {
       const rcaResult = computeDocStatus(m.rca_expiry_date, today)
       const tasks = tasksByMachine[m.id] ?? []
@@ -549,28 +525,10 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
         service_status:      serviceResult?.status ?? null,
         service_days:        serviceResult?.days   ?? null,
         overall_priority,
-        uit_expiry_days: uitByMachine[m.id]?.days ?? null,
-        uit_cod:         uitByMachine[m.id]?.cod  ?? null,
+        uit_expiry_days: null,
+        uit_cod: null,
       }
     })
-
-    // ── UIT alerta rows ───────────────────────────────────────────────────────
-    const uit: UitAlerta[] = uitRaw.map((u: any) => {
-      const d = safeDate(u.valabil_pana)
-      const days_remaining = d ? daysDiff(today, d) : 0
-      return {
-        id:             u.id,
-        machine_id:     u.machine_id ?? null,
-        machine_name:   (u.machines as any)?.name ?? null,
-        cod_uit:        u.cod_uit,
-        tip_operatiune: u.tip_operatiune,
-        valabil_pana:   u.valabil_pana,
-        days_remaining,
-        status:         u.status,
-      }
-    })
-
-    // Add UIT expiry insight after insights array is populated (see below)
 
     // ── Tranzactii ────────────────────────────────────────────────────────────
     const tranzactii: TranzactieAlerta[] = (txRaw ?? []).map((t: any) => {
@@ -604,15 +562,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
 
     // ── Insights ──────────────────────────────────────────────────────────────
     const insights = computeInsights(contracte, tranzactii, utilaje, stocuri, ferma)
-    // Add UIT expiry insight if any UITs expiring within 2 days
-    if (uit.length > 0) {
-      insights.push({
-        impact: uit.some(u => u.days_remaining <= 0) ? 'mare' : 'mediu',
-        categorie: 'Transport UIT',
-        titlu: `${uit.length} cod${uit.length > 1 ? 'uri' : ''} UIT expir${uit.length > 1 ? 'ă' : 'ă'} în ${uit[0].days_remaining <= 0 ? 'azi/depășit' : `${uit[0].days_remaining} zile`}`,
-        descriere: `Coduri UIT cu valabilitate critică: ${uit.slice(0, 3).map(u => u.cod_uit.slice(0, 8) + '…').join(', ')}. Generați coduri noi în SPV ANAF înainte de expirare pentru a evita amenzi RO e-Transport.`,
-      })
-    }
+
     // ── Sumar executiv ────────────────────────────────────────────────────────
     const unpaidTx = tranzactii.filter(t => !t.is_paid)
     const arendasiSet = new Set(unpaidTx.map(t => t.lessor_id).filter(Boolean))
@@ -637,7 +587,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
       activitati_restante:      ferma.filter(f => f.is_overdue).length,
       activitati_azi:           ferma.filter(f => f.planned_date === todayStr).length,
       arendasi_afectati:        arendasiSet.size,
-      uit_expira_curand:        uit.length,
+      uit_expira_curand:        0,
     }
 
     // ── Risk score ────────────────────────────────────────────────────────────
@@ -657,7 +607,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
         stocuri,
         utilaje,
         tranzactii,
-        uit,
+        uit: [],
         insights,
         sumar,
         sumar_text,
