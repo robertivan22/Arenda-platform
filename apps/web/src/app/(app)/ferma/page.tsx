@@ -266,9 +266,10 @@ export default function FermaPage() {
   const [loadingApi, setLoadingApi] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [now, setNow] = useState(new Date())
+  const [now, setNow] = useState<Date | null>(null)
 
   useEffect(() => {
+    setNow(new Date())
     const id = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(id)
   }, [])
@@ -354,8 +355,8 @@ export default function FermaPage() {
   const lastUpdate = data?.fetched_at
     ? new Date(data.fetched_at).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })
     : null
-  const dateStr = now.toLocaleDateString('ro-RO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-  const timeStr = now.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })
+  const dateStr = now?.toLocaleDateString('ro-RO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) ?? ''
+  const timeStr = now?.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }) ?? ''
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-5">
