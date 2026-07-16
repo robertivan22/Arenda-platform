@@ -72,11 +72,12 @@ function findTarget(step: TourStep): HTMLElement | null {
 }
 
 export function GuidedTour() {
-  // DISABLED — kept for future re-activation
+  // DISABLED — full implementation preserved below in comments; re-enable when needed
   return null
+}
 
-  // eslint-disable-next-line no-unreachable
-  const [active, setActive] = useState(false)
+/*
+export function GuidedTourImpl() {
   const [stepIdx, setStepIdx] = useState(0)
   const [spotlight, setSpotlight] = useState<SpotlightRect | null>(null)
   const [winSize, setWinSize] = useState({ w: 0, h: 0 })
@@ -247,3 +248,4 @@ export function GuidedTour() {
     </>
   )
 }
+*/
