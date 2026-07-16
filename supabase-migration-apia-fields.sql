@@ -36,13 +36,16 @@ CREATE INDEX IF NOT EXISTS parcels_siruta_idx
 CREATE INDEX IF NOT EXISTS parcels_geom_gin_idx
   ON parcels USING GIN(geom_geojson) WHERE geom_geojson IS NOT NULL;
 
--- 4. Constrângere unicitate APIA — previne duplicate la re-import
---    O parcelă APIA e unică prin (user_id, farm_id, year, bloc_nr, parcel_nr, crop_nr)
+-- 4. Unicitate APIA — previne duplicate la re-import
+--    Partial index: activ DOAR pe rândurile care au apia_farm_id setat.
+--    Parcelele non-APIA (apia_farm_id IS NULL) nu sunt afectate.
 ALTER TABLE parcels
   DROP CONSTRAINT IF EXISTS uq_apia_parcel_identity;
-ALTER TABLE parcels
-  ADD CONSTRAINT uq_apia_parcel_identity
-  UNIQUE NULLS NOT DISTINCT (user_id, apia_farm_id, apia_year, bloc_fizic, parcel_nr, crop_nr);
+
+DROP INDEX IF EXISTS uq_apia_parcel_identity;
+CREATE UNIQUE INDEX uq_apia_parcel_identity
+  ON parcels (user_id, apia_farm_id, apia_year, bloc_fizic, parcel_nr, crop_nr)
+  WHERE apia_farm_id IS NOT NULL;
 
 -- 5. Comentarii
 COMMENT ON COLUMN parcels.apia_farm_id   IS 'Cod fermă APIA (ex: RO002272619)';
