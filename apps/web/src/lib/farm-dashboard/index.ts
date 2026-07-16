@@ -47,6 +47,7 @@ function validCoords(lat: unknown, lng: unknown): boolean {
 }
 
 async function processParcel(input: ParcelInput): Promise<ParcelResult> {
+  console.log(`[Dashboard] parcel ${input.id} lat=${input.lat}(${typeof input.lat}) lng=${input.lng}(${typeof input.lng})`)
   if (!validCoords(input.lat, input.lng)) {
     console.warn('[Dashboard] Invalid coords for parcel', input.id, { lat: input.lat, lng: input.lng })
     return nullParcel(input)
@@ -72,6 +73,7 @@ async function processParcel(input: ParcelInput): Promise<ParcelResult> {
   }
 
   const rawWeather = weatherSettled.status === 'fulfilled' ? weatherSettled.value : null
+  console.log(`[Dashboard] parcel ${input.id} weather:`, rawWeather ? `temp=${rawWeather.current?.temperature_2m}` : 'NULL')
   const weather = normalizeWeather(rawWeather)
   const soil = normalizeSoil(rawWeather)
 

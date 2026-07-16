@@ -299,6 +299,7 @@ export default function FermaPage() {
         bbch_stage: null, area_ha: p.surface != null ? Number(p.surface) : null,
         lat: Number(p.lat), lng: Number(p.lng),
       }))
+      console.log('[Monitoring] Sending to API:', inputs.map(i => ({ id: i.id, lat: i.lat, lng: i.lng, latType: typeof i.lat })))
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
@@ -312,8 +313,16 @@ export default function FermaPage() {
         },
         body: JSON.stringify({ parcels: inputs }),
       })
-      if (!res.ok) throw new Error(`API error ${res.status}`)
-      setData(await res.json())
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        console.error('[Monitoring] API error:', res.status, errText)
+        throw new Error(`API error ${res.status}: ${errText}`)
+      }
+      const result = await res.json()
+      console.log('[Monitoring] API result:', result.parcels?.map((p: {id: string; no_data: boolean; weather: {temp_current: number|null}}) => ({
+        id: p.id, no_data: p.no_data, temp: p.weather?.temp_current
+      })))
+      setData(result)
     } catch (e) { setError(String(e)) }
     finally { setLoadingApi(false) }
   }, [])
