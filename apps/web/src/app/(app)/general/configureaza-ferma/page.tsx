@@ -11,63 +11,12 @@ import {
   CheckCircle2, SkipForward, Loader2, Search, Check,
   AlertTriangle, X, Plus, Trash2,
 } from 'lucide-react'
+import { PREDEFINED_PRODUCTS, PRODUCT_CATEGORIES, productCategory } from '@/lib/predefined-products'
 
 const ImportWizardModal = dynamic(
   () => import('@/app/(app)/parcele/harta/ImportWizardModal'),
   { ssr: false },
 )
-
-// ─── Produse predefinite (culturi APIA + comune românești) ──────────────────
-
-interface PredefinedProduct { name: string; cat: string }
-
-const PREDEFINED_PRODUCTS: PredefinedProduct[] = [
-  // Cereale păioase
-  { name: 'GRÂU COMUN de toamnă',    cat: 'Cereale' },
-  { name: 'GRÂU dur de toamnă',      cat: 'Cereale' },
-  { name: 'GRÂU de primăvară',       cat: 'Cereale' },
-  { name: 'ORZ de toamnă',           cat: 'Cereale' },
-  { name: 'ORZ de primăvară',        cat: 'Cereale' },
-  { name: 'ORZOAICĂ de toamnă',      cat: 'Cereale' },
-  { name: 'ORZOAICĂ de primăvară',   cat: 'Cereale' },
-  { name: 'TRITICALE de toamnă',     cat: 'Cereale' },
-  { name: 'SECARĂ de toamnă',        cat: 'Cereale' },
-  { name: 'OVĂZ',                    cat: 'Cereale' },
-  { name: 'OREZ',                    cat: 'Cereale' },
-  // Prășitoare
-  { name: 'PORUMB',                  cat: 'Prășitoare' },
-  { name: 'SFECLĂ DE ZAHĂR',         cat: 'Prășitoare' },
-  { name: 'CARTOF',                  cat: 'Prășitoare' },
-  { name: 'FLOAREA SOARELUI',        cat: 'Oleaginoase' },
-  { name: 'RAPIȚĂ de toamnă',        cat: 'Oleaginoase' },
-  { name: 'SOIA',                    cat: 'Oleaginoase' },
-  { name: 'IN pentru semințe',       cat: 'Oleaginoase' },
-  { name: 'CÂNEPĂ',                  cat: 'Oleaginoase' },
-  // Leguminoase
-  { name: 'MAZĂRE de câmp',          cat: 'Leguminoase' },
-  { name: 'FASOLE',                  cat: 'Leguminoase' },
-  { name: 'BOB de câmp',             cat: 'Leguminoase' },
-  // Furaje
-  { name: 'LUCERNĂ',                 cat: 'Furaje' },
-  { name: 'LUCERNĂ AMESTEC',         cat: 'Furaje' },
-  { name: 'PLANTE DE NUTREȚ',        cat: 'Furaje' },
-  { name: 'TRIFOI',                  cat: 'Furaje' },
-  { name: 'IARBĂ',                   cat: 'Furaje' },
-  // Alte / APIA speciale
-  { name: 'LEGUME diverse',          cat: 'Alte culturi' },
-  { name: 'LIVADĂ / POMI FRUCTIFERI',cat: 'Alte culturi' },
-  { name: 'VIE',                     cat: 'Alte culturi' },
-  { name: 'TEREN NECULTIVAT',        cat: 'Alte culturi' },
-  { name: 'ZONE TAMPON',             cat: 'Alte culturi' },
-  { name: 'PĂȘUNE',                  cat: 'Alte culturi' },
-  { name: 'FÂNEAȚĂ',                 cat: 'Alte culturi' },
-  // Monetar
-  { name: 'RON',                     cat: 'Monetar' },
-  { name: 'EUR',                     cat: 'Monetar' },
-]
-
-// Grupate pentru <optgroup>
-const PRODUCT_CATEGORIES = Array.from(new Set(PREDEFINED_PRODUCTS.map(p => p.cat)))
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

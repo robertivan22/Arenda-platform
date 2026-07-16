@@ -9,46 +9,7 @@ import {
   ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp,
   Search, CheckCircle2, X, Loader2,
 } from 'lucide-react'
-
-// ─── Predefined products ───────────────────────────────────────────────────────
-const PREDEFINED: { name: string; cat: string }[] = [
-  { name: 'GRÂU COMUN de toamnă',     cat: 'Cereale' },
-  { name: 'GRÂU dur de toamnă',       cat: 'Cereale' },
-  { name: 'GRÂU de primăvară',        cat: 'Cereale' },
-  { name: 'ORZ de toamnă',            cat: 'Cereale' },
-  { name: 'ORZ de primăvară',         cat: 'Cereale' },
-  { name: 'ORZOAICĂ de toamnă',       cat: 'Cereale' },
-  { name: 'ORZOAICĂ de primăvară',    cat: 'Cereale' },
-  { name: 'TRITICALE de toamnă',      cat: 'Cereale' },
-  { name: 'SECARĂ de toamnă',         cat: 'Cereale' },
-  { name: 'OVĂZ',                     cat: 'Cereale' },
-  { name: 'OREZ',                     cat: 'Cereale' },
-  { name: 'PORUMB',                   cat: 'Prășitoare' },
-  { name: 'SFECLĂ DE ZAHĂR',          cat: 'Prășitoare' },
-  { name: 'CARTOF',                   cat: 'Prășitoare' },
-  { name: 'FLOAREA SOARELUI',         cat: 'Oleaginoase' },
-  { name: 'RAPIȚĂ de toamnă',         cat: 'Oleaginoase' },
-  { name: 'SOIA',                     cat: 'Oleaginoase' },
-  { name: 'IN pentru semințe',        cat: 'Oleaginoase' },
-  { name: 'CÂNEPĂ',                   cat: 'Oleaginoase' },
-  { name: 'MAZĂRE de câmp',           cat: 'Leguminoase' },
-  { name: 'FASOLE',                   cat: 'Leguminoase' },
-  { name: 'LUCERNĂ',                  cat: 'Furaje' },
-  { name: 'LUCERNĂ AMESTEC',          cat: 'Furaje' },
-  { name: 'PLANTE DE NUTREȚ',         cat: 'Furaje' },
-  { name: 'TRIFOI',                   cat: 'Furaje' },
-  { name: 'IARBĂ',                    cat: 'Furaje' },
-  { name: 'LEGUME diverse',           cat: 'Alte culturi' },
-  { name: 'LIVADĂ / POMI FRUCTIFERI', cat: 'Alte culturi' },
-  { name: 'VIE',                      cat: 'Alte culturi' },
-  { name: 'TEREN NECULTIVAT',         cat: 'Alte culturi' },
-  { name: 'ZONE TAMPON',              cat: 'Alte culturi' },
-  { name: 'PĂȘUNE',                   cat: 'Alte culturi' },
-  { name: 'FÂNEAȚĂ',                  cat: 'Alte culturi' },
-  { name: 'RON',                      cat: 'Monetar' },
-  { name: 'EUR',                      cat: 'Monetar' },
-]
-const PRED_CATS = Array.from(new Set(PREDEFINED.map(p => p.cat)))
+import { PREDEFINED_PRODUCTS, PRODUCT_CATEGORIES, productCategory } from '@/lib/predefined-products'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -339,11 +300,15 @@ export default function NewLessorPage() {
                           <label className={LBL}>Cultură / produs</label>
                           <select value={l.product_name} onChange={e => updRL(l.tid, 'product_name', e.target.value)} className={INP}>
                             <option value="">— Selectează —</option>
-                            {PRED_CATS.map(cat => (
-                              <optgroup key={cat} label={cat}>
-                                {PREDEFINED.filter(p => p.cat === cat).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                              </optgroup>
-                            ))}
+                            {PRODUCT_CATEGORIES.map(cat => {
+                              const items = PREDEFINED_PRODUCTS.filter(p => p.cat === cat)
+                              if (items.length === 0) return null
+                              return (
+                                <optgroup key={cat} label={cat}>
+                                  {items.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+                                </optgroup>
+                              )
+                            })}
                           </select>
                         </div>
                         <div><label className={LBL}>Cant./ha</label><input type="number" className={INP} value={l.level_per_ha} onChange={e => updRL(l.tid, 'level_per_ha', e.target.value)} placeholder="0.00" /></div>

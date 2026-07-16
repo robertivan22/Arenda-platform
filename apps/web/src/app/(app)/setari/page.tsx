@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Plus, Trash2, Building2, Package, Upload, X, FileSpreadsheet, Shield, Wheat, Tractor } from 'lucide-react'
 import { VALID_CASA_ANG } from '@/lib/d112Validator'
 import type { Campaign } from '@/lib/campaign-types'
+import { PREDEFINED_PRODUCTS } from '@/lib/predefined-products'
 
 interface CompanySettings {
   name: string; cif: string; reg_com: string
@@ -193,7 +194,27 @@ export default function SetariPage() {
   async function loadProducts(db = createClient()) {
     const { data, error } = await db.from('products').select('*').order('sort_order').order('name')
     if (error) { toast.error('Eroare la încărcarea produselor.'); return }
-    if (data) setProducts(data as Product[])
+    if (data && data.length === 0) {
+      // Auto-seed with predefined list on first use
+      await seedDefaultProducts(db)
+    } else if (data) {
+      setProducts(data as Product[])
+    }
+  }
+
+  async function seedDefaultProducts(db = createClient()) {
+    const { data: { user } } = await db.auth.getUser()
+    if (!user) return
+    const { error } = await db.from('products').insert(
+      PREDEFINED_PRODUCTS.map((p, i) => ({
+        user_id: user.id, name: p.name, unit: p.unit, is_active: true, sort_order: i,
+      }))
+    )
+    if (!error) {
+      const { data } = await db.from('products').select('*').order('sort_order')
+      if (data) setProducts(data as Product[])
+      toast.success(`${PREDEFINED_PRODUCTS.length} produse implicite adăugate.`)
+    }
   }
 
   async function loadCampaigns(db = createClient()) {
@@ -424,8 +445,12 @@ export default function SetariPage() {
       {tab === 'products' && (
         <div className="space-y-4">
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-              Produse definite
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Produse definite</span>
+              <button type="button" onClick={() => void seedDefaultProducts()}
+                className="text-xs px-3 py-1 border border-brand-300 text-brand-600 rounded-lg hover:bg-brand-50 transition-colors">
+                Populează lista implicită
+              </button>
             </div>
             {products.length === 0 && (
               <p className="px-4 py-6 text-sm text-gray-400 text-center">Niciun produs definit.</p>
