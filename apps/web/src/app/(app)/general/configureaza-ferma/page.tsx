@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
-  Upload, Building2, Layers, FileText, ClipboardCheck,
+  Upload, Building2, FileText, ClipboardCheck, CalendarDays,
   ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
   CheckCircle2, SkipForward, Loader2, Search, Check,
   AlertTriangle, X, Plus, Trash2,
@@ -17,23 +17,64 @@ const ImportWizardModal = dynamic(
   { ssr: false },
 )
 
+// ─── Produse predefinite (culturi APIA + comune românești) ──────────────────
+
+interface PredefinedProduct { name: string; cat: string }
+
+const PREDEFINED_PRODUCTS: PredefinedProduct[] = [
+  // Cereale păioase
+  { name: 'GRÂU COMUN de toamnă',    cat: 'Cereale' },
+  { name: 'GRÂU dur de toamnă',      cat: 'Cereale' },
+  { name: 'GRÂU de primăvară',       cat: 'Cereale' },
+  { name: 'ORZ de toamnă',           cat: 'Cereale' },
+  { name: 'ORZ de primăvară',        cat: 'Cereale' },
+  { name: 'ORZOAICĂ de toamnă',      cat: 'Cereale' },
+  { name: 'ORZOAICĂ de primăvară',   cat: 'Cereale' },
+  { name: 'TRITICALE de toamnă',     cat: 'Cereale' },
+  { name: 'SECARĂ de toamnă',        cat: 'Cereale' },
+  { name: 'OVĂZ',                    cat: 'Cereale' },
+  { name: 'OREZ',                    cat: 'Cereale' },
+  // Prășitoare
+  { name: 'PORUMB',                  cat: 'Prășitoare' },
+  { name: 'SFECLĂ DE ZAHĂR',         cat: 'Prășitoare' },
+  { name: 'CARTOF',                  cat: 'Prășitoare' },
+  { name: 'FLOAREA SOARELUI',        cat: 'Oleaginoase' },
+  { name: 'RAPIȚĂ de toamnă',        cat: 'Oleaginoase' },
+  { name: 'SOIA',                    cat: 'Oleaginoase' },
+  { name: 'IN pentru semințe',       cat: 'Oleaginoase' },
+  { name: 'CÂNEPĂ',                  cat: 'Oleaginoase' },
+  // Leguminoase
+  { name: 'MAZĂRE de câmp',          cat: 'Leguminoase' },
+  { name: 'FASOLE',                  cat: 'Leguminoase' },
+  { name: 'BOB de câmp',             cat: 'Leguminoase' },
+  // Furaje
+  { name: 'LUCERNĂ',                 cat: 'Furaje' },
+  { name: 'LUCERNĂ AMESTEC',         cat: 'Furaje' },
+  { name: 'PLANTE DE NUTREȚ',        cat: 'Furaje' },
+  { name: 'TRIFOI',                  cat: 'Furaje' },
+  { name: 'IARBĂ',                   cat: 'Furaje' },
+  // Alte / APIA speciale
+  { name: 'LEGUME diverse',          cat: 'Alte culturi' },
+  { name: 'LIVADĂ / POMI FRUCTIFERI',cat: 'Alte culturi' },
+  { name: 'VIE',                     cat: 'Alte culturi' },
+  { name: 'TEREN NECULTIVAT',        cat: 'Alte culturi' },
+  { name: 'ZONE TAMPON',             cat: 'Alte culturi' },
+  { name: 'PĂȘUNE',                  cat: 'Alte culturi' },
+  { name: 'FÂNEAȚĂ',                 cat: 'Alte culturi' },
+  // Monetar
+  { name: 'RON',                     cat: 'Monetar' },
+  { name: 'EUR',                     cat: 'Monetar' },
+]
+
+// Grupate pentru <optgroup>
+const PRODUCT_CATEGORIES = Array.from(new Set(PREDEFINED_PRODUCTS.map(p => p.cat)))
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FarmForm {
   name: string; cif: string; reg_com: string; address: string
   county: string; locality: string; phone: string; email: string
   iban: string; bank_name: string
-}
-
-interface ProductOption { id: string; name: string; unit: string }
-
-interface RentLevelTemplate {
-  tid: string
-  product_id: string
-  product_name: string
-  level_per_ha: string
-  level_type: 'BRUT' | 'NET'
-  tax_rate: string
 }
 
 type LessorType = 'NATURAL' | 'LEGAL' | 'PFA'
@@ -48,9 +89,16 @@ interface LessorOption { id: string; label: string }
 interface ParcelRow {
   id: string; bloc_fizic: string | null; tarla_nr: string | null
   parcel_nr: string | null; county: string | null; locality: string | null
-  surface: number; culture: string | null; siruta: string | null
-  land_use_category: string | null; cadastral_nr: string | null
+  surface: number; culture: string | null
   lessor_id: string | null; contract_id: string | null
+}
+
+interface RentLevel {
+  tid: string
+  product_name: string
+  level_per_ha: string
+  level_type: 'BRUT' | 'NET'
+  tax_rate: string
 }
 
 interface ContractFields {
@@ -62,11 +110,10 @@ interface ContractFields {
 
 interface ContractDraft {
   tid: string
-  savedId: string | null
   isExpanded: boolean
   openSection: 'details' | 'lessor' | 'parcels' | null
   fields: ContractFields
-  rentLevels: RentLevelTemplate[]
+  rentLevels: RentLevel[]
   lessorMode: 'existing' | 'new'
   existingLessorId: string
   existingLessorName: string
@@ -74,73 +121,34 @@ interface ContractDraft {
   selectedParcelIds: string[]
 }
 
-// ─── Defaults ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function emptyContractFields(): ContractFields {
+function tid() { return `${Date.now()}-${Math.random().toString(36).slice(2)}` }
+
+function emptyContractFields(year: string): ContractFields {
   return {
     contract_number: '', contract_type: 'ARENDA', zone: '',
-    sign_date: '', start_date: '', end_date: '',
-    primarie_nr: '', primarie_date: '',
-    tax_method: 'COTA_FORFETARA', localities: '', status: 'ACTIVE',
+    sign_date: '', start_date: year ? `${year}-01-01` : '', end_date: year ? `${year}-12-31` : '',
+    primarie_nr: '', primarie_date: '', tax_method: 'COTA_FORFETARA', localities: '', status: 'ACTIVE',
   }
 }
 
 function emptyNewLessor(): NewLessorData {
-  return {
-    type: 'NATURAL', first_name: '', last_name: '', company_name: '',
-    cnp: '', county: '', locality: '', phone: '', email: '',
-  }
+  return { type: 'NATURAL', first_name: '', last_name: '', company_name: '', cnp: '', county: '', locality: '', phone: '', email: '' }
 }
 
-function tid() { return `${Date.now()}-${Math.random().toString(36).slice(2)}` }
-
-function newContract(templates: RentLevelTemplate[]): ContractDraft {
+function newContract(year: string): ContractDraft {
   return {
-    tid: tid(), savedId: null, isExpanded: true, openSection: 'details',
-    fields: emptyContractFields(),
-    rentLevels: templates.map(t => ({ ...t, tid: tid() })),
+    tid: tid(), isExpanded: true, openSection: 'details',
+    fields: emptyContractFields(year),
+    rentLevels: [],
     lessorMode: 'existing', existingLessorId: '', existingLessorName: '',
     newLessorData: emptyNewLessor(), selectedParcelIds: [],
   }
 }
 
-// ─── Wizard steps ─────────────────────────────────────────────────────────────
-
-const STEPS = [
-  { num: 1, label: 'Import APIA',       icon: Upload },
-  { num: 2, label: 'Date Fermă',        icon: Building2 },
-  { num: 3, label: 'Niveluri Arendă',   icon: Layers },
-  { num: 4, label: 'Contracte',         icon: FileText },
-  { num: 5, label: 'Rezumat & Salvare', icon: ClipboardCheck },
-]
-
-// ─── Small helpers ────────────────────────────────────────────────────────────
-
 const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
 const LBL = 'block text-xs font-medium text-gray-700 mb-1'
-
-function field(label: string, value: string, onChange: (v: string) => void,
-  opts?: { req?: boolean; type?: string; ph?: string }) {
-  return (
-    <div>
-      <label className={LBL}>{label}{opts?.req && <span className="text-red-500 ml-0.5">*</span>}</label>
-      <input type={opts?.type ?? 'text'} value={value} placeholder={opts?.ph}
-        onChange={e => onChange(e.target.value)} className={INP} />
-    </div>
-  )
-}
-
-function sel(label: string, value: string, onChange: (v: string) => void,
-  opts: { v: string; l: string }[], req?: boolean) {
-  return (
-    <div>
-      <label className={LBL}>{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
-      <select value={value} onChange={e => onChange(e.target.value)} className={INP}>
-        {opts.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-      </select>
-    </div>
-  )
-}
 
 function secHdr(label: string, open: boolean, toggle: () => void, sub?: string) {
   return (
@@ -164,6 +172,19 @@ function parcelLabel(p: ParcelRow) {
   return parts.join(' | ')
 }
 
+// ─── Wizard steps ─────────────────────────────────────────────────────────────
+
+const STEPS = [
+  { num: 1, label: 'Campanie',        icon: CalendarDays },
+  { num: 2, label: 'Import APIA',     icon: Upload },
+  { num: 3, label: 'Date Fermă',      icon: Building2 },
+  { num: 4, label: 'Contracte',       icon: FileText },
+  { num: 5, label: 'Rezumat',         icon: ClipboardCheck },
+]
+
+const CURRENT_YEAR = new Date().getFullYear()
+const CAMPAIGN_YEARS = [CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1].map(String)
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ConfigureazaFermaPage() {
@@ -171,23 +192,22 @@ export default function ConfigureazaFermaPage() {
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
 
-  // Step 1
+  // Step 1 — Campanie
+  const [campaignYear, setCampaignYear] = useState(String(CURRENT_YEAR))
+
+  // Step 2 — Import APIA
   const [showImport, setShowImport] = useState(false)
   const [importDone, setImportDone] = useState(false)
   const [importedCount, setImportedCount] = useState(0)
   const [importStartTs, setImportStartTs] = useState<string | null>(null)
 
-  // Step 2
+  // Step 3 — Fermă
   const [farm, setFarm] = useState<FarmForm>({
     name: '', cif: '', reg_com: '', address: '', county: '',
     locality: '', phone: '', email: '', iban: '', bank_name: '',
   })
 
-  // Step 3
-  const [products, setProducts] = useState<ProductOption[]>([])
-  const [templates, setTemplates] = useState<RentLevelTemplate[]>([])
-
-  // Step 4
+  // Step 4 — Contracte
   const [contracts, setContracts] = useState<ContractDraft[]>([])
   const [lessors, setLessors] = useState<LessorOption[]>([])
   const [parcels, setParcels] = useState<ParcelRow[]>([])
@@ -196,8 +216,7 @@ export default function ConfigureazaFermaPage() {
   // ── Data loaders ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (step === 2) loadFarm()
-    if (step === 3) loadProducts()
+    if (step === 3) loadFarm()
     if (step === 4) { loadLessors(); loadParcels() }
   }, [step])
 
@@ -211,14 +230,6 @@ export default function ConfigureazaFermaPage() {
       address: data.address ?? '', county: data.county ?? '', locality: data.locality ?? '',
       phone: data.phone ?? '', email: data.email ?? '', iban: data.iban ?? '', bank_name: data.bank_name ?? '',
     })
-  }
-
-  async function loadProducts() {
-    const db = createClient()
-    const { data: { user } } = await db.auth.getUser()
-    if (!user) return
-    const { data } = await db.from('products').select('id, name, unit').eq('user_id', user.id).eq('is_active', true).order('sort_order')
-    setProducts(data ?? [])
   }
 
   async function loadLessors() {
@@ -240,8 +251,8 @@ export default function ConfigureazaFermaPage() {
     const { data: { user } } = await db.auth.getUser()
     if (!user) return
     const { data } = await db.from('parcels')
-      .select('id,bloc_fizic,tarla_nr,parcel_nr,county,locality,surface,culture,siruta,land_use_category,cadastral_nr,lessor_id,contract_id')
-      .eq('user_id', user.id).order('created_at', { ascending: false }).limit(1000)
+      .select('id,bloc_fizic,tarla_nr,parcel_nr,county,locality,surface,culture,lessor_id,contract_id')
+      .eq('user_id', user.id).order('created_at', { ascending: false }).limit(2000)
     setParcels(data ?? [])
   }, [])
 
@@ -261,55 +272,17 @@ export default function ConfigureazaFermaPage() {
     setImportDone(true)
   }
 
-  // ── Template rent levels CRUD ─────────────────────────────────────────────────
-
-  function addTemplate() {
-    const prod = products[0]
-    setTemplates(prev => [...prev, {
-      tid: tid(), product_id: prod?.id ?? '', product_name: prod?.name ?? '',
-      level_per_ha: '', level_type: 'NET', tax_rate: '10',
-    }])
-  }
-
-  function updTemplate(id: string, f: keyof RentLevelTemplate, v: string) {
-    setTemplates(prev => prev.map(t => {
-      if (t.tid !== id) return t
-      if (f === 'product_id') { const p = products.find(x => x.id === v); return { ...t, product_id: v, product_name: p?.name ?? '' } }
-      return { ...t, [f]: v }
-    }))
-  }
-
   // ── Contract CRUD ─────────────────────────────────────────────────────────────
 
   function addContract() {
     setContracts(prev => [
       ...prev.map(c => ({ ...c, isExpanded: false })),
-      newContract(templates),
+      newContract(campaignYear),
     ])
   }
 
   function updContract(id: string, fn: (c: ContractDraft) => ContractDraft) {
     setContracts(prev => prev.map(c => c.tid === id ? fn(c) : c))
-  }
-
-  function addCRL(cid: string) {
-    const prod = products[0]
-    updContract(cid, c => ({
-      ...c, rentLevels: [...c.rentLevels, {
-        tid: tid(), product_id: prod?.id ?? '', product_name: prod?.name ?? '',
-        level_per_ha: '', level_type: 'NET', tax_rate: '10',
-      }],
-    }))
-  }
-
-  function updCRL(cid: string, lid: string, f: keyof RentLevelTemplate, v: string) {
-    updContract(cid, c => ({
-      ...c, rentLevels: c.rentLevels.map(l => {
-        if (l.tid !== lid) return l
-        if (f === 'product_id') { const p = products.find(x => x.id === v); return { ...l, product_id: v, product_name: p?.name ?? '' } }
-        return { ...l, [f]: v }
-      }),
-    }))
   }
 
   function toggleParcel(cid: string, pid: string) {
@@ -338,7 +311,8 @@ export default function ConfigureazaFermaPage() {
       const { error } = await db.from('company_settings').upsert({ ...farm, user_id: user.id }, { onConflict: 'user_id' })
       if (error) throw new Error(error.message)
       toast.success('Date fermă salvate')
-      setStep(3)
+      if (contracts.length === 0) addContract()
+      setStep(4)
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Eroare') } finally { setSaving(false) }
   }
 
@@ -352,7 +326,6 @@ export default function ConfigureazaFermaPage() {
       const { data: { user } } = await db.auth.getUser()
       if (!user) throw new Error('Neautentificat')
 
-      // 1. Farm
       await db.from('company_settings').upsert({ ...farm, user_id: user.id }, { onConflict: 'user_id' })
 
       const savedIds: string[] = []
@@ -399,7 +372,7 @@ export default function ConfigureazaFermaPage() {
             await db.from('contract_rent_levels').insert(
               validLvl.map((l, i) => ({
                 user_id: user.id, contract_id: cr.id,
-                product_id: l.product_id || null, product_name: l.product_name,
+                product_id: null, product_name: l.product_name,
                 level_per_ha: parseFloat(l.level_per_ha) || 0, level_type: l.level_type,
                 tax_rate: parseFloat(l.tax_rate) || 10, sort_order: i,
               }))
@@ -420,7 +393,7 @@ export default function ConfigureazaFermaPage() {
       if (errors.length > 0) {
         errors.forEach(msg => toast.error(msg, { duration: 7000 }))
       } else {
-        toast.success(`${savedIds.length} contract(e) salvat(e) cu succes!`)
+        toast.success(`${savedIds.length} contract(e) salvat(e)!`)
         router.push(savedIds.length === 1 ? `/contracte/${savedIds[0]}` : '/contracte')
       }
     } catch (e) {
@@ -460,19 +433,60 @@ export default function ConfigureazaFermaPage() {
         })}
       </div>
 
-      {/* ── STEP 1 ── */}
+      {/* ── STEP 1 — Campanie ── */}
       {step === 1 && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-6">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Selectează campania agricolă</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Campania agricolă stabilește contextul pentru acest wizard. Datele de valabilitate ale contractelor vor fi precompletate automat.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {CAMPAIGN_YEARS.map(y => (
+              <button key={y} onClick={() => setCampaignYear(y)}
+                className={`flex flex-col items-center gap-2 p-5 rounded-2xl border-2 transition-colors ${campaignYear === y ? 'border-brand-600 bg-brand-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
+                <CalendarDays className={`w-8 h-8 ${campaignYear === y ? 'text-brand-600' : 'text-gray-400'}`} />
+                <span className={`text-lg font-bold ${campaignYear === y ? 'text-brand-700' : 'text-gray-700'}`}>{y}</span>
+                <span className="text-xs text-gray-400">Campania {y}</span>
+                {campaignYear === y && <Check className="w-4 h-4 text-brand-600" />}
+              </button>
+            ))}
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <p className="text-xs font-medium text-gray-600 mb-2">Sau introdu manual:</p>
+            <div className="flex items-center gap-3">
+              <input type="number" min="2000" max="2099" value={campaignYear}
+                onChange={e => setCampaignYear(e.target.value)}
+                className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-center focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              <span className="text-sm text-gray-500">→ contracte 01.01.{campaignYear} — 31.12.{campaignYear}</span>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button onClick={() => setStep(2)} disabled={!campaignYear}
+              className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white rounded-xl font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors">
+              Continuă <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 2 — Import APIA ── */}
+      {step === 2 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-5">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Import Parcele APIA</h2>
-            <p className="text-sm text-gray-500 mt-1">Importă shapefile-ul APIA pentru a popula parcelele. Poți sări peste dacă nu ai fișier acum.</p>
+            <h2 className="text-lg font-semibold text-gray-900">Import Parcele APIA — Campania {campaignYear}</h2>
+            <p className="text-sm text-gray-500 mt-1">Importă shapefile-ul APIA pentru a popula parcelele. Poți sări dacă nu ai fișierul acum.</p>
           </div>
           {importDone ? (
             <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
               <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
               <div className="flex-1">
                 <div className="font-medium text-green-800">Import finalizat</div>
-                {importedCount > 0 && <div className="text-sm text-green-700">{importedCount} parcele noi importate în această sesiune.</div>}
+                {importedCount > 0 && <div className="text-sm text-green-700">{importedCount} parcele noi importate.</div>}
               </div>
               <button onClick={() => setImportDone(false)} className="text-xs text-gray-400 hover:text-gray-600">Import nou</button>
             </div>
@@ -486,7 +500,7 @@ export default function ConfigureazaFermaPage() {
                   <div className="text-xs text-gray-500 mt-1">Fișier .zip, .shp sau .geojson</div>
                 </div>
               </button>
-              <button onClick={() => setStep(2)}
+              <button onClick={() => setStep(3)}
                 className="flex flex-col items-center gap-3 p-6 border-2 border-gray-200 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-colors">
                 <SkipForward className="w-10 h-10 text-gray-400" />
                 <div className="text-center">
@@ -496,37 +510,40 @@ export default function ConfigureazaFermaPage() {
               </button>
             </div>
           )}
-          {importDone && (
-            <div className="flex justify-end">
-              <button onClick={() => setStep(2)} className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white rounded-xl font-medium hover:bg-brand-700 transition-colors">
+          <div className="flex justify-between pt-1">
+            <button onClick={() => setStep(1)} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+              <ChevronLeft className="w-4 h-4" /> Înapoi
+            </button>
+            {importDone && (
+              <button onClick={() => setStep(3)} className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white rounded-xl font-medium hover:bg-brand-700 transition-colors">
                 Continuă <ChevronRight className="w-4 h-4" />
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
-      {/* ── STEP 2 ── */}
-      {step === 2 && (
+      {/* ── STEP 3 — Date Fermă ── */}
+      {step === 3 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-5">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Date despre Fermă</h2>
             <p className="text-sm text-gray-500 mt-1">Datele fermei sunt utilizate pe facturi și documente fiscale.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {field('Denumire fermă / societate', farm.name, v => setFarm(f => ({ ...f, name: v })), { req: true })}
-            {field('CUI / CIF', farm.cif, v => setFarm(f => ({ ...f, cif: v })))}
-            {field('Nr. Registru Comerțului', farm.reg_com, v => setFarm(f => ({ ...f, reg_com: v })))}
-            {field('Adresă', farm.address, v => setFarm(f => ({ ...f, address: v })))}
-            {field('Județ', farm.county, v => setFarm(f => ({ ...f, county: v })))}
-            {field('Localitate', farm.locality, v => setFarm(f => ({ ...f, locality: v })))}
-            {field('Telefon', farm.phone, v => setFarm(f => ({ ...f, phone: v })))}
-            {field('Email', farm.email, v => setFarm(f => ({ ...f, email: v })), { type: 'email' })}
-            {field('IBAN', farm.iban, v => setFarm(f => ({ ...f, iban: v })), { ph: 'RO49AAAA...' })}
-            {field('Bancă', farm.bank_name, v => setFarm(f => ({ ...f, bank_name: v })))}
+            <FieldInput label="Denumire fermă / societate" value={farm.name} onChange={v => setFarm(f => ({ ...f, name: v }))} req />
+            <FieldInput label="CUI / CIF" value={farm.cif} onChange={v => setFarm(f => ({ ...f, cif: v }))} />
+            <FieldInput label="Nr. Registru Comerțului" value={farm.reg_com} onChange={v => setFarm(f => ({ ...f, reg_com: v }))} />
+            <FieldInput label="Adresă" value={farm.address} onChange={v => setFarm(f => ({ ...f, address: v }))} />
+            <FieldInput label="Județ" value={farm.county} onChange={v => setFarm(f => ({ ...f, county: v }))} />
+            <FieldInput label="Localitate" value={farm.locality} onChange={v => setFarm(f => ({ ...f, locality: v }))} />
+            <FieldInput label="Telefon" value={farm.phone} onChange={v => setFarm(f => ({ ...f, phone: v }))} />
+            <FieldInput label="Email" value={farm.email} onChange={v => setFarm(f => ({ ...f, email: v }))} type="email" />
+            <FieldInput label="IBAN" value={farm.iban} onChange={v => setFarm(f => ({ ...f, iban: v }))} ph="RO49AAAA..." />
+            <FieldInput label="Bancă" value={farm.bank_name} onChange={v => setFarm(f => ({ ...f, bank_name: v }))} />
           </div>
           <div className="flex justify-between pt-2">
-            <button onClick={() => setStep(1)} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+            <button onClick={() => setStep(2)} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
               <ChevronLeft className="w-4 h-4" /> Înapoi
             </button>
             <button onClick={() => void saveFarm()} disabled={saving || !farm.name.trim()}
@@ -538,81 +555,12 @@ export default function ConfigureazaFermaPage() {
         </div>
       )}
 
-      {/* ── STEP 3 ── */}
-      {step === 3 && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900">Niveluri de arendă</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Definește nivelurile de bază (produs, cantitate/ha, tip). Acestea vor fi precompletate în fiecare contract — le poți modifica individual.
-            </p>
-          </div>
-
-          {products.length === 0 && (
-            <div className="mx-6 mb-4 flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              Nu există produse configurate. Mergi la <strong className="mx-1">Setări → Produse</strong> pentru a adăuga (Grâu, Porumb, RON etc.).
-            </div>
-          )}
-
-          <div className="px-6 pb-4 space-y-3">
-            {templates.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-4">Niciun nivel definit. Apasă „Adaugă nivel" pentru a crea primul nivel de arendă.</p>
-            )}
-            {templates.map((t, i) => (
-              <div key={t.tid} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nivel {i + 1}</span>
-                  <button onClick={() => setTemplates(prev => prev.filter(x => x.tid !== t.tid))} className="p-1 text-red-400 hover:text-red-600">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className={LBL}>Produs</label>
-                    <select value={t.product_id} onChange={e => updTemplate(t.tid, 'product_id', e.target.value)} className={INP}>
-                      <option value="">— Selectează —</option>
-                      {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>)}
-                    </select>
-                  </div>
-                  {field('Cant./ha', t.level_per_ha, v => updTemplate(t.tid, 'level_per_ha', v), { type: 'number', ph: '0.00' })}
-                  <div>
-                    <label className={LBL}>Tip</label>
-                    <select value={t.level_type} onChange={e => updTemplate(t.tid, 'level_type', e.target.value)} className={INP}>
-                      <option value="NET">NET</option>
-                      <option value="BRUT">BRUT</option>
-                    </select>
-                  </div>
-                  {field('Impozit %', t.tax_rate, v => updTemplate(t.tid, 'tax_rate', v), { type: 'number', ph: '10' })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="px-6 pb-5">
-            <button onClick={addTemplate} className="flex items-center gap-2 px-4 py-2 text-sm border border-dashed border-brand-300 text-brand-600 rounded-lg hover:bg-brand-50 transition-colors">
-              <Plus className="w-4 h-4" /> Adaugă nivel arendă
-            </button>
-          </div>
-
-          <div className="border-t border-gray-100 p-4 flex justify-between">
-            <button onClick={() => setStep(2)} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
-              <ChevronLeft className="w-4 h-4" /> Înapoi
-            </button>
-            <button onClick={() => { if (contracts.length === 0) addContract(); setStep(4) }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white rounded-xl font-medium hover:bg-brand-700 transition-colors">
-              Continuă la contracte <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── STEP 4 ── */}
+      {/* ── STEP 4 — Contracte ── */}
       {step === 4 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Contracte</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Contracte — Campania {campaignYear}</h2>
               <p className="text-sm text-gray-500 mt-0.5">{contracts.length} contract(e) adăugate</p>
             </div>
             <button onClick={addContract} className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors">
@@ -621,16 +569,16 @@ export default function ConfigureazaFermaPage() {
           </div>
 
           {contracts.length === 0 && (
-            <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-10 text-center text-gray-500">
+            <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-10 text-center">
               <FileText className="w-10 h-10 mx-auto mb-3 text-gray-300" />
-              <p className="font-medium">Niciun contract</p>
-              <p className="text-sm mt-1">Apasă „Contract nou" pentru a crea primul contract.</p>
+              <p className="font-medium text-gray-600">Niciun contract</p>
+              <p className="text-sm mt-1 text-gray-500">Apasă „Contract nou" pentru a crea primul contract.</p>
             </div>
           )}
 
           {contracts.map(c => (
             <ContractCard key={c.tid}
-              c={c} lessors={lessors} products={products} parcels={parcels}
+              c={c} lessors={lessors} parcels={parcels}
               search={pSearch[c.tid] ?? ''}
               onSearch={v => setPSearch(s => ({ ...s, [c.tid]: v }))}
               onToggle={() => updContract(c.tid, d => ({ ...d, isExpanded: !d.isExpanded }))}
@@ -642,9 +590,9 @@ export default function ConfigureazaFermaPage() {
               onNewLessor={(f, v) => updContract(c.tid, d => ({ ...d, newLessorData: { ...d.newLessorData, [f]: v } }))}
               onToggleParcel={pid => toggleParcel(c.tid, pid)}
               conflict={pid => parcelConflict(pid, c.tid)}
-              onAddCRL={() => addCRL(c.tid)}
-              onUpdCRL={(lid, f, v) => updCRL(c.tid, lid, f, v)}
-              onRemCRL={lid => updContract(c.tid, d => ({ ...d, rentLevels: d.rentLevels.filter(l => l.tid !== lid) }))}
+              onAddRL={() => updContract(c.tid, d => ({ ...d, rentLevels: [...d.rentLevels, { tid: tid(), product_name: '', level_per_ha: '', level_type: 'NET', tax_rate: '10' }] }))}
+              onUpdRL={(lid, f, v) => updContract(c.tid, d => ({ ...d, rentLevels: d.rentLevels.map(l => l.tid === lid ? { ...l, [f]: v } : l) }))}
+              onRemRL={lid => updContract(c.tid, d => ({ ...d, rentLevels: d.rentLevels.filter(l => l.tid !== lid) }))}
             />
           ))}
 
@@ -660,15 +608,14 @@ export default function ConfigureazaFermaPage() {
         </div>
       )}
 
-      {/* ── STEP 5 ── */}
+      {/* ── STEP 5 — Rezumat ── */}
       {step === 5 && (
         <div className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Rezumat final</h2>
-            <p className="text-sm text-gray-500 mt-1">Verifică datele înainte de salvare. Poți reveni și edita orice pas.</p>
+            <h2 className="text-lg font-semibold text-gray-900">Rezumat final — Campania {campaignYear}</h2>
+            <p className="text-sm text-gray-500 mt-1">Verifică datele înainte de salvare.</p>
           </div>
 
-          {/* Fermă */}
           <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-1">
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"><Building2 className="w-4 h-4" /> Date fermă</div>
             {farm.name && <p className="text-sm text-gray-700"><strong>Denumire:</strong> {farm.name}</p>}
@@ -676,7 +623,6 @@ export default function ConfigureazaFermaPage() {
             {farm.locality && <p className="text-sm text-gray-600"><strong>Locație:</strong> {[farm.locality, farm.county].filter(Boolean).join(', ')}</p>}
           </div>
 
-          {/* Import */}
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"><Upload className="w-4 h-4" /> Import APIA</div>
             {importDone
@@ -684,17 +630,6 @@ export default function ConfigureazaFermaPage() {
               : <p className="text-sm text-gray-500">Sărit</p>}
           </div>
 
-          {/* Niveluri */}
-          {templates.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2"><Layers className="w-4 h-4" /> Niveluri arendă</div>
-              {templates.map(t => (
-                <p key={t.tid} className="text-sm text-gray-600">{t.product_name || '—'} — {t.level_per_ha}/ha ({t.level_type}) · {t.tax_rate}% impozit</p>
-              ))}
-            </div>
-          )}
-
-          {/* Contracte */}
           {contracts.map((c, i) => {
             const lessorName = c.lessorMode === 'existing' ? c.existingLessorName :
               c.newLessorData.type === 'LEGAL' ? c.newLessorData.company_name : `${c.newLessorData.last_name} ${c.newLessorData.first_name}`.trim()
@@ -703,20 +638,20 @@ export default function ConfigureazaFermaPage() {
             const incomplete = !c.fields.start_date || !c.fields.end_date
             return (
               <div key={c.tid} className={`bg-white rounded-xl border p-4 space-y-2 ${incomplete ? 'border-amber-300' : 'border-gray-200'}`}>
-                <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                  <FileText className="w-4 h-4" />
-                  Contract {i + 1}{c.fields.contract_number ? ` — ${c.fields.contract_number}` : ''}
-                  {lessorName && <span className="font-normal text-gray-500 ml-1">· {lessorName}</span>}
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 flex-wrap">
+                  <FileText className="w-4 h-4 flex-shrink-0" />
+                  <span>Contract {i + 1}{c.fields.contract_number ? ` — ${c.fields.contract_number}` : ''}</span>
+                  {lessorName && <span className="font-normal text-gray-500">· {lessorName}</span>}
                   <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold ${incomplete ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>
                     {incomplete ? 'Incomplet' : 'Complet'}
                   </span>
                 </div>
                 {c.fields.start_date && <p className="text-sm text-gray-600"><strong>Perioadă:</strong> {c.fields.start_date} → {c.fields.end_date}</p>}
-                <p className="text-sm text-gray-600"><strong>Tip:</strong> {c.fields.contract_type} · Impozit: {c.fields.tax_method.replace('_', ' ')}</p>
-                {c.rentLevels.filter(l => l.level_per_ha).map(l => (
-                  <p key={l.tid} className="text-sm text-gray-600 ml-2">· {l.product_name} {l.level_per_ha}/ha ({l.level_type})</p>
+                <p className="text-sm text-gray-600"><strong>Tip:</strong> {c.fields.contract_type}</p>
+                {c.rentLevels.filter(l => l.level_per_ha && l.product_name).map(l => (
+                  <p key={l.tid} className="text-sm text-gray-600 ml-2">· {l.product_name} — {l.level_per_ha}/ha ({l.level_type}) · {l.tax_rate}% imp.</p>
                 ))}
-                <p className="text-sm text-gray-600"><strong>Parcele:</strong> {c.selectedParcelIds.length} parcele · {totalHa.toFixed(2)} ha</p>
+                <p className="text-sm text-gray-600"><strong>Parcele:</strong> {c.selectedParcelIds.length} · {totalHa.toFixed(2)} ha</p>
                 {selParcels.slice(0, 3).map(p => <p key={p.id} className="text-xs text-gray-400 ml-4 truncate">{parcelLabel(p)}</p>)}
                 {selParcels.length > 3 && <p className="text-xs text-gray-400 ml-4">…și {selParcels.length - 3} altele</p>}
                 {incomplete && <p className="text-sm text-amber-600 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Lipsesc dată început / sfârșit!</p>}
@@ -731,7 +666,7 @@ export default function ConfigureazaFermaPage() {
             <button onClick={() => void finalSave()} disabled={saving || contracts.length === 0}
               className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors">
               {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-              Finalizează configurarea ({contracts.length} contract{contracts.length !== 1 ? 'e' : ''})
+              Finalizează ({contracts.length} contract{contracts.length !== 1 ? 'e' : ''})
             </button>
           </div>
         </div>
@@ -750,12 +685,26 @@ export default function ConfigureazaFermaPage() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ContractCard
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Reusable field ───────────────────────────────────────────────────────────
+
+function FieldInput({ label, value, onChange, req, type, ph }: {
+  label: string; value: string; onChange: (v: string) => void
+  req?: boolean; type?: string; ph?: string
+}) {
+  return (
+    <div>
+      <label className={LBL}>{label}{req && <span className="text-red-500 ml-0.5">*</span>}</label>
+      <input type={type ?? 'text'} value={value} placeholder={ph}
+        onChange={e => onChange(e.target.value)}
+        className={INP} />
+    </div>
+  )
+}
+
+// ─── ContractCard ─────────────────────────────────────────────────────────────
 
 interface CCProps {
-  c: ContractDraft; lessors: LessorOption[]; products: ProductOption[]; parcels: ParcelRow[]
+  c: ContractDraft; lessors: LessorOption[]; parcels: ParcelRow[]
   search: string; onSearch: (v: string) => void
   onToggle: () => void; onToggleSec: (s: ContractDraft['openSection']) => void
   onRemove: () => void; onField: (f: keyof ContractFields, v: string) => void
@@ -763,10 +712,10 @@ interface CCProps {
   onSelectLessor: (id: string, name: string) => void
   onNewLessor: (f: keyof NewLessorData, v: string) => void
   onToggleParcel: (pid: string) => void; conflict: (pid: string) => string | null
-  onAddCRL: () => void; onUpdCRL: (lid: string, f: keyof RentLevelTemplate, v: string) => void; onRemCRL: (lid: string) => void
+  onAddRL: () => void; onUpdRL: (lid: string, f: keyof RentLevel, v: string) => void; onRemRL: (lid: string) => void
 }
 
-function ContractCard({ c, lessors, products, parcels, search, onSearch, onToggle, onToggleSec, onRemove, onField, onLessorMode, onSelectLessor, onNewLessor, onToggleParcel, conflict, onAddCRL, onUpdCRL, onRemCRL }: CCProps) {
+function ContractCard({ c, lessors, parcels, search, onSearch, onToggle, onToggleSec, onRemove, onField, onLessorMode, onSelectLessor, onNewLessor, onToggleParcel, conflict, onAddRL, onUpdRL, onRemRL }: CCProps) {
   const lessorName = c.lessorMode === 'existing' ? c.existingLessorName :
     c.newLessorData.type === 'LEGAL' ? c.newLessorData.company_name : `${c.newLessorData.last_name} ${c.newLessorData.first_name}`.trim()
   const selParcels = parcels.filter(p => c.selectedParcelIds.includes(p.id))
@@ -824,7 +773,7 @@ function ContractCard({ c, lessors, products, parcels, search, onSearch, onToggl
                   <div>
                     <label className={LBL}>Tip contract</label>
                     <select className={INP} value={c.fields.contract_type} onChange={e => onField('contract_type', e.target.value)}>
-                      {[['ARENDA','Arendă'],['CONCESIUNE','Concesiune'],['COMODAT','Comodat'],['ASOCIERE','Asociere în participațiune']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                      {[['ARENDA','Arendă'],['CONCESIUNE','Concesiune'],['COMODAT','Comodat'],['ASOCIERE','Asociere']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
                     </select>
                   </div>
                   <div>
@@ -848,7 +797,7 @@ function ContractCard({ c, lessors, products, parcels, search, onSearch, onToggl
                 </div>
               </div>
 
-              {/* Plată / impozit */}
+              {/* Impozit */}
               <div>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Plată / impozit</p>
                 <div className="max-w-xs">
@@ -859,37 +808,57 @@ function ContractCard({ c, lessors, products, parcels, search, onSearch, onToggl
                 </div>
               </div>
 
-              {/* Niveluri arendă per contract */}
+              {/* ── Niveluri arendă ── */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Niveluri arendă</p>
-                  {products.length > 0 && (
-                    <button onClick={onAddCRL} className="flex items-center gap-1 text-xs px-2.5 py-1 text-brand-600 border border-brand-300 rounded-lg hover:bg-brand-50">
-                      <Plus className="w-3 h-3" /> Adaugă
-                    </button>
-                  )}
+                  <button onClick={onAddRL} className="flex items-center gap-1 text-xs px-2.5 py-1 text-brand-600 border border-brand-300 rounded-lg hover:bg-brand-50 transition-colors">
+                    <Plus className="w-3 h-3" /> Adaugă nivel
+                  </button>
                 </div>
-                {c.rentLevels.length === 0 && <p className="text-xs text-gray-400">Niciun nivel pentru acest contract.</p>}
+
+                {c.rentLevels.length === 0 && (
+                  <p className="text-xs text-gray-400 italic">Niciun nivel definit. Apasă „Adaugă nivel" pentru a specifica arenda (ex: 500 kg Grâu/ha).</p>
+                )}
+
                 {c.rentLevels.map(l => (
-                  <div key={l.tid} className="flex items-end gap-2 mb-2">
+                  <div key={l.tid} className="flex items-end gap-2 mb-3 bg-gray-50 border border-gray-200 rounded-xl p-3">
                     <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      <div>
-                        <label className={LBL}>Produs</label>
-                        <select value={l.product_id} onChange={e => onUpdCRL(l.tid, 'product_id', e.target.value)} className={INP}>
-                          <option value="">—</option>
-                          {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {/* Produs — dropdown din lista predefinită */}
+                      <div className="col-span-2 sm:col-span-1">
+                        <label className={LBL}>Cultură / produs</label>
+                        <select value={l.product_name} onChange={e => onUpdRL(l.tid, 'product_name', e.target.value)} className={INP}>
+                          <option value="">— Selectează —</option>
+                          {PRODUCT_CATEGORIES.map(cat => (
+                            <optgroup key={cat} label={cat}>
+                              {PREDEFINED_PRODUCTS.filter(p => p.cat === cat).map(p => (
+                                <option key={p.name} value={p.name}>{p.name}</option>
+                              ))}
+                            </optgroup>
+                          ))}
                         </select>
                       </div>
-                      <div><label className={LBL}>Cant./ha</label><input type="number" className={INP} value={l.level_per_ha} onChange={e => onUpdCRL(l.tid, 'level_per_ha', e.target.value)} /></div>
+                      <div>
+                        <label className={LBL}>Cant./ha</label>
+                        <input type="number" className={INP} value={l.level_per_ha}
+                          onChange={e => onUpdRL(l.tid, 'level_per_ha', e.target.value)} placeholder="0.00" />
+                      </div>
                       <div>
                         <label className={LBL}>Tip</label>
-                        <select value={l.level_type} onChange={e => onUpdCRL(l.tid, 'level_type', e.target.value)} className={INP}>
-                          <option value="NET">NET</option><option value="BRUT">BRUT</option>
+                        <select value={l.level_type} onChange={e => onUpdRL(l.tid, 'level_type', e.target.value)} className={INP}>
+                          <option value="NET">NET</option>
+                          <option value="BRUT">BRUT</option>
                         </select>
                       </div>
-                      <div><label className={LBL}>Impozit %</label><input type="number" className={INP} value={l.tax_rate} onChange={e => onUpdCRL(l.tid, 'tax_rate', e.target.value)} /></div>
+                      <div>
+                        <label className={LBL}>Impozit %</label>
+                        <input type="number" className={INP} value={l.tax_rate}
+                          onChange={e => onUpdRL(l.tid, 'tax_rate', e.target.value)} placeholder="10" />
+                      </div>
                     </div>
-                    <button onClick={() => onRemCRL(l.tid)} className="p-2 text-red-400 hover:text-red-600 mb-0.5"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => onRemRL(l.tid)} className="p-2 text-red-400 hover:text-red-600 flex-shrink-0 mb-0.5">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -910,7 +879,7 @@ function ContractCard({ c, lessors, products, parcels, search, onSearch, onToggl
               </div>
               {c.lessorMode === 'existing' && (
                 lessors.length === 0
-                  ? <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">Nu există arendatori. Selectează „Arendator nou".</p>
+                  ? <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">Nu există arendatori activi. Selectează „Arendator nou".</p>
                   : <div>
                     <label className={LBL}>Arendator</label>
                     <select className={INP} value={c.existingLessorId}
@@ -962,7 +931,8 @@ function ContractCard({ c, lessors, products, parcels, search, onSearch, onToggl
                 <div className="flex items-center gap-3 text-sm text-brand-700 bg-brand-50 border border-brand-200 rounded-lg px-3 py-2">
                   <CheckCircle2 className="w-4 h-4" />
                   <span><strong>{c.selectedParcelIds.length}</strong> parcele · <strong>{totalHa.toFixed(2)} ha</strong></span>
-                  <button onClick={() => c.selectedParcelIds.forEach(pid => onToggleParcel(pid))} className="ml-auto text-xs text-brand-500 hover:text-brand-700 flex items-center gap-0.5">
+                  <button onClick={() => c.selectedParcelIds.forEach(pid => onToggleParcel(pid))}
+                    className="ml-auto text-xs text-brand-500 hover:text-brand-700 flex items-center gap-0.5">
                     <X className="w-3.5 h-3.5" /> Deselectează
                   </button>
                 </div>
