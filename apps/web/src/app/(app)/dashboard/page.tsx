@@ -293,14 +293,9 @@ export default function DashboardPage() {
       )}
 
       {/* Hero banner */}
-      <div className="rounded-2xl mb-6 overflow-hidden relative" style={{ minHeight: '200px' }}>
-        {/* Animated SVG landscape */}
-        <div className="absolute inset-0">
-          <AgriLandscape />
-        </div>
-        {/* Dark gradient overlay — text readable on left, fades right */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(100deg, rgba(10,16,10,0.88) 0%, rgba(15,25,15,0.65) 50%, transparent 100%)' }} />
-        <div className="px-8 py-7 flex items-center relative z-10">
+      <div className="rounded-2xl mb-6 overflow-hidden grid grid-cols-1 lg:grid-cols-2" style={{ background: 'linear-gradient(135deg,#0f1e10 0%,#1a3012 100%)', minHeight: '200px' }}>
+        {/* Left — text */}
+        <div className="flex items-center px-8 py-8">
           <div>
             <p className="text-amber-400 text-xs font-semibold uppercase tracking-wider mb-2">Bun venit înapoi</p>
             <h2 className="text-2xl font-bold text-white mb-2">Platforma ta agricolă</h2>
@@ -315,6 +310,10 @@ export default function DashboardPage() {
               Adaugă arendator
             </button>
           </div>
+        </div>
+        {/* Right — animated SVG landscape */}
+        <div className="hidden lg:block relative" style={{ minHeight: '200px' }}>
+          <AgriLandscape />
         </div>
       </div>
 
