@@ -178,14 +178,14 @@ interface StatCardProps {
 
 function StatCard({ label, value, icon: Icon, sub, iconBg, iconColor }: StatCardProps) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 flex items-start gap-4 shadow-sm">
-      <div className={`p-2.5 rounded-xl flex-shrink-0 ${iconBg}`}>
+    <div className="rounded-2xl p-5 flex items-start gap-4 relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#ffffff 0%,#f8fafb 100%)', border: '1px solid rgba(0,0,0,.06)', boxShadow: '0 2px 12px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04)' }}>
+      <div className={`p-2.5 rounded-xl flex-shrink-0 ${iconBg}`} style={{ boxShadow: '0 2px 8px rgba(0,0,0,.08)' }}>
         <Icon className={`w-5 h-5 ${iconColor}`} />
       </div>
-      <div className="min-w-0">
-        <div className="text-2xl font-bold text-gray-900 leading-none mb-1">{value}</div>
-        <div className="text-sm text-gray-500">{label}</div>
-        {sub && <div className="text-xs mt-0.5" style={{ color: '#2d6a4f' }}>{sub}</div>}
+      <div className="min-w-0 flex-1">
+        <div className="text-2xl font-extrabold text-gray-900 leading-none mb-1 tracking-tight">{value}</div>
+        <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</div>
+        {sub && <div className="text-xs mt-1.5 font-semibold" style={{ color: '#16a34a' }}>{sub}</div>}
       </div>
     </div>
   )
@@ -293,27 +293,69 @@ export default function DashboardPage() {
       )}
 
       {/* Hero banner */}
-      <div className="rounded-2xl mb-6 overflow-hidden grid grid-cols-1 lg:grid-cols-2" style={{ background: 'linear-gradient(135deg,#0f1e10 0%,#1a3012 100%)', minHeight: '200px' }}>
-        {/* Left — text */}
-        <div className="flex items-center px-8 py-8">
-          <div>
-            <p className="text-amber-400 text-xs font-semibold uppercase tracking-wider mb-2">Bun venit înapoi</p>
-            <h2 className="text-2xl font-bold text-white mb-2">Platforma ta agricolă</h2>
-            <p className="text-[#74c69d] text-sm mb-5 max-w-xs">
+      <div className="rounded-2xl mb-8 relative overflow-visible" style={{ background: 'linear-gradient(155deg,#160d04 0%,#241508 45%,#1c1309 100%)' }}>
+        {/* Ambient amber orb */}
+        <div style={{ position: 'absolute', width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle,rgba(217,119,6,.14) 0%,transparent 70%)', top: '50%', left: '32%', transform: 'translate(-50%,-50%)', pointerEvents: 'none', zIndex: 0 }} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 items-center relative" style={{ zIndex: 1 }}>
+          {/* Left — text */}
+          <div className="px-8 py-9">
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 100, background: 'rgba(217,119,6,.15)', border: '1px solid rgba(217,119,6,.32)', marginBottom: 18 }}>
+              <span style={{ fontSize: 14 }}>🌾</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', letterSpacing: '.05em', textTransform: 'uppercase' }}>Bun venit înapoi</span>
+            </div>
+            <h2 style={{ fontSize: 34, fontWeight: 900, lineHeight: 1.1, letterSpacing: '-.04em', color: '#ffffff', marginBottom: 12 }}>
+              Platforma ta{' '}
+              <span style={{ background: 'linear-gradient(135deg,#fde68a,#f59e0b,#d97706)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                agricolă
+              </span>
+            </h2>
+            <p style={{ fontSize: 14, lineHeight: 1.65, color: 'rgba(255,245,235,.58)', marginBottom: 26, maxWidth: 340 }}>
               Gestionează arendatorii, contractele, parcelele dintr-un singur loc.
             </p>
             <button
               onClick={() => router.push('/arendatori/nou')}
-              className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold rounded-xl transition-colors"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#d97706)', cursor: 'pointer', fontSize: 13, fontWeight: 800, color: '#fff', boxShadow: '0 4px 20px rgba(217,119,6,.5), inset 0 1px 0 rgba(255,255,255,.15)' }}
             >
               <Plus className="w-3.5 h-3.5" />
               Adaugă arendator
             </button>
           </div>
-        </div>
-        {/* Right — animated SVG landscape */}
-        <div className="hidden lg:block relative" style={{ minHeight: '200px' }}>
-          <AgriLandscape />
+
+          {/* Right — SVG animation + floating cards */}
+          <div className="hidden lg:block relative" style={{ padding: '28px 36px 36px 16px' }}>
+            {/* SVG container */}
+            <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)', boxShadow: '0 24px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04)', background: '#0a1510' }}>
+              <AgriLandscape />
+            </div>
+
+            {/* Floating stats card — bottom left */}
+            <div style={{ position: 'absolute', bottom: 12, left: -8, background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(20px)', borderRadius: 16, padding: '13px 18px', boxShadow: '0 10px 40px rgba(0,0,0,.28)', border: '1px solid rgba(255,255,255,.6)', minWidth: 175 }}>
+              <div style={{ fontSize: 9, color: '#a8998e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Total hectare gestionate</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                <span style={{ fontSize: 26, fontWeight: 900, color: '#1c1008', letterSpacing: '-.04em' }}>{s.surfaceTotal}</span>
+                <span style={{ fontSize: 11, color: '#6b5d52', fontWeight: 500 }}>ha</span>
+              </div>
+              <div style={{ fontSize: 10, color: '#a8998e', marginTop: 2 }}>{s.lessorsTotal} arendatori activi</div>
+            </div>
+
+            {/* Floating alert card — top right */}
+            <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(20,14,8,.94)', backdropFilter: 'blur(16px)', borderRadius: 14, padding: '10px 14px', boxShadow: '0 10px 36px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.07)', display: 'flex', alignItems: 'center', gap: 10, minWidth: 185 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(217,119,6,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Clock className="w-4 h-4" style={{ color: '#fbbf24' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', marginBottom: 1 }}>{s.contractsExpiring > 0 ? `${s.contractsExpiring} contract${s.contractsExpiring > 1 ? 'e' : ''} expiră` : `${s.contractsActive} contracte active`}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,245,235,.42)' }}>în următoarele 30 de zile</div>
+              </div>
+            </div>
+
+            {/* Floating green chip — bottom right */}
+            <div style={{ position: 'absolute', bottom: 52, right: 8, background: 'rgba(22,163,74,.95)', borderRadius: 11, padding: '8px 13px', boxShadow: '0 6px 24px rgba(22,163,74,.35)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <FileText className="w-3.5 h-3.5 text-white" />
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#ffffff' }}>{s.contractsActive} contracte active</span>
+            </div>
+          </div>
         </div>
       </div>
 
