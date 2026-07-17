@@ -96,6 +96,24 @@ function isApiaShapefile(cols: string[]): boolean {
   return hits.length >= 4
 }
 
+/** Common column names for tarla in Romanian shapefiles (APIA + generic) */
+const TARLA_CANDIDATE_COLS = ['tarla', 'tarlaua', 'nr_tarla', 'tarla_nr', 't', 'TARLA', 'TARLAUA', 'NR_TARLA', 'T']
+
+/**
+ * Returns the first column name from `cols` that looks like a tarla field,
+ * or '' if none found.
+ */
+function detectTarlaColumn(cols: string[]): string {
+  for (const candidate of TARLA_CANDIDATE_COLS) {
+    if (cols.includes(candidate)) return candidate
+  }
+  // Case-insensitive fallback
+  const lower = cols.map(c => c.toLowerCase())
+  const lowerCandidates = TARLA_CANDIDATE_COLS.map(c => c.toLowerCase())
+  const idx = lower.findIndex(c => lowerCandidates.includes(c))
+  return idx >= 0 ? cols[idx] : ''
+}
+
 function loadMapping(): FieldMapping {
   try {
     const raw = localStorage.getItem(MAPPING_KEY)
@@ -254,8 +272,10 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
 
       // Auto-apply APIA mapping if this looks like an APIA shapefile
       if (isApiaShapefile(detectedCols)) {
-        setFieldMapping(APIA_AUTO_MAPPING)
-        saveMapping(APIA_AUTO_MAPPING)
+        const tarlaCol = detectTarlaColumn(detectedCols)
+        const mapping: FieldMapping = { ...APIA_AUTO_MAPPING, tarla_nr: tarlaCol }
+        setFieldMapping(mapping)
+        saveMapping(mapping)
       }
 
       // Parse each GeoJSON.Feature
@@ -476,8 +496,8 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
           user_id: user.id,
           bloc_fizic,
           parcel_nr: parcelNrStr ?? null,
-          // APIA has no tarla; for generic shapefiles read from mapping
-          tarla_nr: isApia ? null : (getStr(fieldMapping.tarla_nr) ?? null),
+          // Read tarla from detected column (works for both APIA and generic shapefiles)
+          tarla_nr: getStr(fieldMapping.tarla_nr) ?? null,
           county: judet ?? null,
           locality: localitate ?? null,
           land_use_category: getStr(fieldMapping.cat_use) ?? null,
