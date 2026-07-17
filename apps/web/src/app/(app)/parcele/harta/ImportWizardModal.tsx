@@ -34,6 +34,7 @@ export interface FieldMapping {
   judet: string         // → parcels.county
   localitate: string    // → parcels.locality
   cod_parcela: string   // → parcels.parcel_nr (legacy)
+  tarla_nr: string      // → parcels.tarla_nr (non-APIA only)
   // APIA 1:1 fields
   farm_id: string       // → parcels.apia_farm_id
   year: string          // → parcels.apia_year
@@ -67,6 +68,7 @@ const MAPPING_KEY = 'arenda_import_field_mapping_v3'
 const DEFAULT_MAPPING: FieldMapping = {
   bloc_fizic: 'BLOC_FIZIC', suprafata_ha: 'SUPRAFATA',
   cultura: 'CULTURA', judet: 'JUDET', localitate: 'LOCALITATE', cod_parcela: 'NR_PARCEL',
+  tarla_nr: 'TARLA',
   // APIA fields — empty until auto-detected
   farm_id: '', year: '', siruta: '', commune: '', bloc_nr: '', parcel_nr: '',
   crop_nr: '', cat_use: '', crop_code: '', crop_name: '', area_dec: '',
@@ -77,6 +79,7 @@ const DEFAULT_MAPPING: FieldMapping = {
 const APIA_AUTO_MAPPING: FieldMapping = {
   bloc_fizic: 'bloc_nr', suprafata_ha: 'area_dec',
   cultura: 'crop_name', judet: 'judet', localitate: 'commune', cod_parcela: 'parcel_nr',
+  tarla_nr: '',  // APIA has no tarla concept
   farm_id: 'farm_id', year: 'year', siruta: 'siruta', commune: 'commune',
   bloc_nr: 'bloc_nr', parcel_nr: 'parcel_nr', crop_nr: 'crop_nr',
   cat_use: 'cat_use', crop_code: 'crop_code', crop_name: 'crop_name',
@@ -473,8 +476,8 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
           user_id: user.id,
           bloc_fizic,
           parcel_nr: parcelNrStr ?? null,
-          // APIA files have no "tarla" concept — tarla_nr stays null
-          tarla_nr: null,
+          // APIA has no tarla; for generic shapefiles read from mapping
+          tarla_nr: isApia ? null : (getStr(fieldMapping.tarla_nr) ?? null),
           county: judet ?? null,
           locality: localitate ?? null,
           land_use_category: getStr(fieldMapping.cat_use) ?? null,
@@ -576,6 +579,7 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
     { key: 'judet',        label: 'Județ' },
     { key: 'localitate',   label: 'Localitate' },
     { key: 'cod_parcela',  label: 'Cod parcelă (legacy)' },
+    { key: 'tarla_nr',     label: 'Tarla' },
     // APIA 1:1
     { key: 'farm_id',   label: 'farm_id → apia_farm_id',  group: 'APIA' },
     { key: 'year',      label: 'year → apia_year',         group: 'APIA' },
