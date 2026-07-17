@@ -404,14 +404,14 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
         }
 
         // ── Resolved values ───────────────────────────────────────────────
-        // For APIA files: bloc_nr + parcel_nr form the display name
         const blocNr = getStr(fieldMapping.bloc_nr)
         const parcelNrStr = getStr(fieldMapping.parcel_nr) ?? getStr(fieldMapping.cod_parcela)
         const cropName = getStr(fieldMapping.crop_name) ?? getStr(fieldMapping.cultura)
         const cropNr = getStr(fieldMapping.crop_nr)
 
+        // For APIA: bloc_fizic = raw bloc_nr (e.g. "AG001"), NOT a formatted string
         const bloc_fizic = isApia
-          ? (blocNr ? `Bloc ${blocNr}` + (parcelNrStr ? ` / P${parcelNrStr}` : '') + (cropNr ? cropNr : '') : `Parcelă import ${i + 1}`)
+          ? (blocNr ?? `Parcelă import ${i + 1}`)
           : (getStr(fieldMapping.bloc_fizic) || `Parcelă import ${i + 1}`)
 
         const judet     = getStr(fieldMapping.judet)
@@ -473,7 +473,8 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
           user_id: user.id,
           bloc_fizic,
           parcel_nr: parcelNrStr ?? null,
-          tarla_nr: isApia ? (blocNr ?? null) : null,
+          // APIA files have no "tarla" concept — tarla_nr stays null
+          tarla_nr: null,
           county: judet ?? null,
           locality: localitate ?? null,
           land_use_category: getStr(fieldMapping.cat_use) ?? null,
@@ -482,6 +483,8 @@ export default function ImportWizardModal({ open, onClose, onPreview, currentFC,
           status: isApia ? getStatus(fieldMapping.status) : 'ACTIVE',
           lat: centruLat,
           lng: centruLng,
+          // Save siruta to the standard column (siruta_code) so parcel list shows it
+          siruta_code: isApia ? (getStr(fieldMapping.siruta) ?? null) : null,
         }
         // APIA extras: only available after supabase-migration-apia-fields.sql
         const apiaPayload = isApia ? {
