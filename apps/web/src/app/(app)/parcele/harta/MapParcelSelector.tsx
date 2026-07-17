@@ -429,7 +429,7 @@ function ParcelMapPopup({ parcel, onClose, onRegisterActivity, onEditGeometry }:
 
 // ─── Parcel list item ─────────────────────────────────────────────────────────
 function ParcelItem({
-  parcel, isSelected, onView, onDelete, onEdit, onEditGeometry, onSelect, onActivity, legendLabel, legendColor,
+  parcel, isSelected, onView, onDelete, onEdit, onEditGeometry, onSelect, onActivity, legendLabel, legendColor, parcelNr,
 }: {
   parcel: ParceleFitosanitar
   isSelected: boolean
@@ -441,6 +441,7 @@ function ParcelItem({
   onActivity?: () => void
   legendLabel?: string
   legendColor?: string
+  parcelNr?: string | null
 }) {
   const ring = parcel.geometry_geojson?.coordinates?.[0] ?? []
   const isStereo = ring.length > 0 && isLikelyStereo70(ring[0])
@@ -451,7 +452,7 @@ function ParcelItem({
       {/* Card header */}
       <div className="px-3 pt-3 pb-2 flex-1">
         <div className="flex items-start justify-between gap-2 mb-0.5">
-          <div className="font-semibold text-sm text-gray-900 leading-tight truncate">{parcel.nume_parcela}</div>
+          <div className="font-semibold text-sm text-gray-900 leading-tight truncate">{parcel.nume_parcela}{parcelNr ? ` / ${parcelNr}` : ''}</div>
           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border flex-shrink-0 ${
             isStereo ? 'text-blue-600 bg-blue-50 border-blue-200' : 'text-orange-600 bg-orange-50 border-orange-200'
           }`}>
@@ -878,6 +879,10 @@ export default function MapParcelSelector({
   const [searchResults, setSearchResults] = useState<MapSearchResult[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
 
+  // Parcel search + culture filter
+  const [parcelSearch, setParcelSearch] = useState('')
+  const [culturaFilter, setCulturaFilter] = useState('')
+
   // Cursor coordinates
   const [cursorWgs84, setCursorWgs84] = useState<{ lat: number; lng: number } | null>(null)
   const [cursorStereo, setCursorStereo] = useState<{ x: number; y: number } | null>(null)
@@ -1187,6 +1192,9 @@ export default function MapParcelSelector({
     parcels.forEach(parcel => {
       const ring = parcel.geometry_geojson?.coordinates?.[0]
       if (!ring || ring.length < 3) return
+      // Apply search/culture filter
+      if (parcelSearch && !(parcel.nume_parcela ?? '').toLowerCase().includes(parcelSearch.toLowerCase())) return
+      if (culturaFilter && (parcel.cultura_label ?? '') !== culturaFilter) return
       const ringWgs84 = isLikelyStereo70(ring[0]) ? ringStereo70ToWgs84(ring) : ring
       const ringStereo = isLikelyStereo70(ring[0]) ? ring : ringWgs84ToStereo70(ring)
       const isSelected = parcel.id === selectedId
@@ -1236,7 +1244,7 @@ export default function MapParcelSelector({
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parcels, selectedId, parcelLegendMap, legendItems, apiaColorOverrides, registryParcels])
+  }, [parcels, selectedId, parcelLegendMap, legendItems, apiaColorOverrides, registryParcels, parcelSearch, culturaFilter])
 
   // ── Render registry-parcel markers (parcels with coords but no polygon) ─
   const hasFitToMarkers = useRef(false)
@@ -1250,6 +1258,8 @@ export default function MapParcelSelector({
     registryParcels.forEach(rp => {
       if (!rp.lat || !rp.lng) return
       if (linkedIds.has(rp.id)) return  // polygon centre marker already covers this
+      if (parcelSearch && !(rp.bloc_fizic ?? '').toLowerCase().includes(parcelSearch.toLowerCase())) return
+      if (culturaFilter && (rp.culture ?? '') !== culturaFilter) return
       const marker = L.marker([rp.lat, rp.lng], { icon: makeRegistryIcon('#16a34a') })
       marker.bindTooltip(rp.bloc_fizic ?? rp.id.slice(0, 8), { sticky: true })
       marker.on('click', () => { setPopupParcel(rp); setPopupRegistryParcelId(rp.id) })
@@ -1264,7 +1274,7 @@ export default function MapParcelSelector({
       } catch { /* ignore */ }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registryParcels, parcels])
+  }, [registryParcels, parcels, parcelSearch, culturaFilter])
 
   // ── Import preview layer ────────────────────────────────────────────────
   useEffect(() => {
@@ -1379,8 +1389,8 @@ export default function MapParcelSelector({
 
   function focusParcel(parcel: ParceleFitosanitar) {
     onParcelSelected?.(parcel)
-    // On mobile: scroll the map into view first
-    if (mapWrapperRef.current && window.innerWidth < 768) {
+    // Scroll map into view (layout is vertical, map may be above the card list)
+    if (mapWrapperRef.current) {
       mapWrapperRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
     const layer = parcelLayersRef.current.get(parcel.id)
@@ -2094,40 +2104,94 @@ export default function MapParcelSelector({
             </div>
           )}
 
-          {/* Parcel list */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {loading ? (
-              <div className="text-center py-10">
-                <div className="inline-block w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-gray-500 mt-2">Se incarca...</p>
-              </div>
-            ) : parcels.length === 0 ? (
-              <div className="text-center py-10 text-gray-400">
-                <MapPin className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                <p className="text-sm">Nu ai parcele salvate.</p>
-                {allowDraw && <p className="text-xs mt-1">Foloseste butonul ✏️ de pe harta pentru a desena.</p>}
-              </div>
-            ) : (
-              parcels.map(parcel => {
-                const legend = getLegendForParcel(parcel.id)
-                return (
-                  <ParcelItem
-                    key={parcel.id}
-                    parcel={parcel}
-                    isSelected={selectedId === parcel.id}
-                    onView={() => focusParcel(parcel)}
-                    onDelete={() => setDeleteId(parcel.id)}
-                    onEdit={() => openEditModal(parcel)}
-                    onEditGeometry={() => startGeometryEdit(parcel)}
-                    onSelect={onParcelSelected ? () => focusParcel(parcel) : undefined}
-                    onActivity={() => setCardActivity({ parcelId: parcel.parcela_id ?? null, name: parcel.nume_parcela, surface: parcel.suprafata_ha ?? null })}
-                    legendLabel={legend?.label}
-                    legendColor={legend?.color}
+          {/* Parcel search + culture filter */}
+          {parcels.length > 0 && (() => {
+            const allCultures = Array.from(new Set([
+              ...parcels.map(p => p.cultura_label).filter((c): c is string => !!c),
+              ...registryParcels.map(rp => rp.culture).filter((c): c is string => !!c),
+            ])).sort()
+            return (
+              <div className="flex gap-2 flex-wrap">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={parcelSearch}
+                    onChange={e => setParcelSearch(e.target.value)}
+                    placeholder="Caută bloc fizic / parcelă..."
+                    className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                   />
-                )
-              })
-            )}
-          </div>
+                  {parcelSearch && (
+                    <button onClick={() => setParcelSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                {allCultures.length > 0 && (
+                  <select
+                    value={culturaFilter}
+                    onChange={e => setCulturaFilter(e.target.value)}
+                    className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-700"
+                  >
+                    <option value="">Toate culturile</option>
+                    {allCultures.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Parcel list */}
+          {(() => {
+            const displayParcels = (parcelSearch || culturaFilter)
+              ? parcels.filter(p => {
+                  const matchSearch = !parcelSearch || (p.nume_parcela ?? '').toLowerCase().includes(parcelSearch.toLowerCase())
+                  const matchCultura = !culturaFilter || (p.cultura_label ?? '') === culturaFilter
+                  return matchSearch && matchCultura
+                })
+              : parcels
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {loading ? (
+                  <div className="text-center py-10">
+                    <div className="inline-block w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-gray-500 mt-2">Se incarca...</p>
+                  </div>
+                ) : parcels.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400">
+                    <MapPin className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                    <p className="text-sm">Nu ai parcele salvate.</p>
+                    {allowDraw && <p className="text-xs mt-1">Foloseste butonul ✏️ de pe harta pentru a desena.</p>}
+                  </div>
+                ) : displayParcels.length === 0 ? (
+                  <div className="col-span-full text-center py-6 text-gray-400 text-sm">
+                    Nicio parcelă corespunde filtrului.
+                  </div>
+                ) : (
+                  displayParcels.map(parcel => {
+                    const legend = getLegendForParcel(parcel.id)
+                    const linkedRp = registryParcels.find(rp => rp.id === parcel.parcela_id)
+                    return (
+                      <ParcelItem
+                        key={parcel.id}
+                        parcel={parcel}
+                        parcelNr={linkedRp?.parcel_nr ?? null}
+                        isSelected={selectedId === parcel.id}
+                        onView={() => focusParcel(parcel)}
+                        onDelete={() => setDeleteId(parcel.id)}
+                        onEdit={() => openEditModal(parcel)}
+                        onEditGeometry={() => startGeometryEdit(parcel)}
+                        onSelect={onParcelSelected ? () => focusParcel(parcel) : undefined}
+                        onActivity={() => setCardActivity({ parcelId: parcel.parcela_id ?? null, name: parcel.nume_parcela, surface: parcel.suprafata_ha ?? null })}
+                        legendLabel={legend?.label}
+                        legendColor={legend?.color}
+                      />
+                    )
+                  })
+                )}
+              </div>
+            )
+          })()}
 
           {allowDraw && parcels.length > 0 && (
             <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">

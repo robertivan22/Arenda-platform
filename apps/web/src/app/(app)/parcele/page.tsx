@@ -454,7 +454,7 @@ export default function ParceleListPage() {
               <div key={row.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div>
-                    <p className="font-bold text-gray-800 text-sm">{row.bloc_fizic ?? '—'}</p>
+                    <p className="font-bold text-gray-800 text-sm">{row.bloc_fizic ?? '—'}{row.parcel_nr ? ` / ${row.parcel_nr}` : ''}</p>
                     {(row.locality || row.county) && (
                       <p className="text-xs text-gray-500 mt-0.5">{[row.locality, row.county].filter(Boolean).join(', ')}</p>
                     )}
