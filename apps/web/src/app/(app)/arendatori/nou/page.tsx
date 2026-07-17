@@ -74,6 +74,9 @@ export default function NewLessorPage() {
   const [parcels, setParcels] = useState<ParcelRow[]>([])
   const [selectedParcelIds, setSelectedParcelIds] = useState<string[]>([])
   const [parcelSearch, setParcelSearch] = useState('')
+  const [showAddParcel, setShowAddParcel] = useState(false)
+  const [addingParcel, setAddingParcel] = useState(false)
+  const [newParcel, setNewParcel] = useState({ bloc_fizic: '', tarla_nr: '', parcel_nr: '', county: '', locality: '', surface: '', culture: '', land_use_category: 'Arabil' })
 
   const loadParcels = useCallback(async () => {
     const db = createClient()
@@ -95,6 +98,36 @@ export default function NewLessorPage() {
 
   const selParcels = parcels.filter(p => selectedParcelIds.includes(p.id))
   const totalHa = selParcels.reduce((s, p) => s + (p.surface ?? 0), 0)
+
+  async function handleAddNewParcel() {
+    if (!newParcel.surface || parseFloat(newParcel.surface) <= 0) { toast.error('Completează suprafața parcelei'); return }
+    setAddingParcel(true)
+    try {
+      const db = createClient()
+      const { data: { user } } = await db.auth.getUser()
+      if (!user) throw new Error('Neautentificat')
+      const { data, error } = await db.from('parcels').insert({
+        user_id: user.id,
+        bloc_fizic: newParcel.bloc_fizic || null,
+        tarla_nr: newParcel.tarla_nr || null,
+        parcel_nr: newParcel.parcel_nr || null,
+        county: newParcel.county || null,
+        locality: newParcel.locality || null,
+        surface: parseFloat(newParcel.surface) || 0,
+        culture: newParcel.culture || null,
+        land_use_category: newParcel.land_use_category || 'Arabil',
+        status: 'ACTIVE',
+      }).select('id,bloc_fizic,tarla_nr,parcel_nr,county,locality,surface,culture').single()
+      if (error || !data) throw new Error(error?.message ?? 'Eroare la adăugare')
+      const row = data as ParcelRow
+      setParcels(prev => [row, ...prev])
+      setSelectedParcelIds(prev => [...prev, row.id])
+      setNewParcel({ bloc_fizic: '', tarla_nr: '', parcel_nr: '', county: '', locality: '', surface: '', culture: '', land_use_category: 'Arabil' })
+      setShowAddParcel(false)
+      toast.success('Parcela a fost adăugată și selectată.')
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Eroare') }
+    finally { setAddingParcel(false) }
+  }
 
   function toggleParcel(pid: string) { setSelectedParcelIds(prev => prev.includes(pid) ? prev.filter(x => x !== pid) : [...prev, pid]) }
   function setL(f: string, v: string) { setLessor(d => ({ ...d, [f]: v })) }
@@ -338,12 +371,47 @@ export default function NewLessorPage() {
           sub={selectedParcelIds.length > 0 ? `${selectedParcelIds.length} sel. · ${totalHa.toFixed(2)} ha` : undefined} />
         {openParcels && (
           <div className="p-5 space-y-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input value={parcelSearch} onChange={e => setParcelSearch(e.target.value)}
-                placeholder="Caută bloc, tarla, parcelă, cultură, localitate..."
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input value={parcelSearch} onChange={e => setParcelSearch(e.target.value)}
+                  placeholder="Caută bloc, tarla, parcelă, cultură, localitate..."
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              </div>
+              <button type="button" onClick={() => setShowAddParcel(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border transition-colors flex-shrink-0 ${showAddParcel ? 'bg-brand-50 border-brand-300 text-brand-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                <Plus className="w-3.5 h-3.5" /> Parcelă nouă
+              </button>
             </div>
+
+            {/* ── Inline add-parcel form ── */}
+            {showAddParcel && (
+              <div className="border border-brand-200 bg-brand-50/40 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">Parcelă nouă</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div><label className={LBL}>Bloc fizic</label><input className={INP} value={newParcel.bloc_fizic} onChange={e => setNewParcel(p => ({ ...p, bloc_fizic: e.target.value }))} placeholder="ex: 502" /></div>
+                  <div><label className={LBL}>Tarla</label><input className={INP} value={newParcel.tarla_nr} onChange={e => setNewParcel(p => ({ ...p, tarla_nr: e.target.value }))} /></div>
+                  <div><label className={LBL}>Nr. parcelă</label><input className={INP} value={newParcel.parcel_nr} onChange={e => setNewParcel(p => ({ ...p, parcel_nr: e.target.value }))} /></div>
+                  <div><label className={LBL}>Județ</label><input className={INP} value={newParcel.county} onChange={e => setNewParcel(p => ({ ...p, county: e.target.value }))} /></div>
+                  <div><label className={LBL}>Localitate</label><input className={INP} value={newParcel.locality} onChange={e => setNewParcel(p => ({ ...p, locality: e.target.value }))} /></div>
+                  <div><label className={LBL}>Suprafață (ha) <span className="text-red-500">*</span></label><input type="number" step="0.01" className={INP} value={newParcel.surface} onChange={e => setNewParcel(p => ({ ...p, surface: e.target.value }))} placeholder="0.00" /></div>
+                  <div><label className={LBL}>Cultură</label><input className={INP} value={newParcel.culture} onChange={e => setNewParcel(p => ({ ...p, culture: e.target.value }))} placeholder="ex: PORUMB" /></div>
+                  <div><label className={LBL}>Categorie folosință</label>
+                    <select className={INP} value={newParcel.land_use_category} onChange={e => setNewParcel(p => ({ ...p, land_use_category: e.target.value }))}>
+                      {['Arabil','Pasune','Fanete','Vie','Livada','Padure','Curti-constructii','Ape','Drumuri','Neproductiv'].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => void handleAddNewParcel()} disabled={addingParcel}
+                    className="flex items-center gap-1.5 px-4 py-1.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                    {addingParcel ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    Adaugă și selectează
+                  </button>
+                  <button type="button" onClick={() => setShowAddParcel(false)} className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg">Anulează</button>
+                </div>
+              </div>
+            )}
             {selectedParcelIds.length > 0 && (
               <div className="flex items-center gap-3 text-sm text-brand-700 bg-brand-50 border border-brand-200 rounded-lg px-3 py-2">
                 <CheckCircle2 className="w-4 h-4" />
