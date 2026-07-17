@@ -307,32 +307,32 @@ export default function FermaPage() {
       const token = session?.access_token
       if (!token) throw new Error('Sesiune expirată. Reautentificați-vă.')
 
-      // Chunk into groups of 25 — each call stays well under Cloudflare 30s limit
+      // Split into chunks of 25 and fire ALL in parallel — each stays under CF 30s limit
       const CHUNK = 25
-      const allParcels: ParcelResult[] = []
-      let fetchedAt = new Date().toISOString()
-      for (let i = 0; i < inputs.length; i += CHUNK) {
-        const chunk = inputs.slice(i, i + CHUNK)
-        const res = await fetch('/api/farm-dashboard', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ parcels: chunk }),
-        })
-        if (!res.ok) {
-          const errText = await res.text().catch(() => '')
-          throw new Error(`API error ${res.status}: ${errText}`)
-        }
-        const result: FarmDashboardResult = await res.json()
-        if (i === 0) fetchedAt = result.fetched_at
-        allParcels.push(...result.parcels)
-      }
+      const chunks: typeof inputs[] = []
+      for (let i = 0; i < inputs.length; i += CHUNK) chunks.push(inputs.slice(i, i + CHUNK))
 
-      const merged: FarmDashboardResult = {
-        fetched_at: fetchedAt,
+      const results = await Promise.all(
+        chunks.map(async (chunk) => {
+          const res = await fetch('/api/farm-dashboard', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ parcels: chunk }),
+          })
+          if (!res.ok) {
+            const errText = await res.text().catch(() => '')
+            throw new Error(`API error ${res.status}: ${errText}`)
+          }
+          return res.json() as Promise<FarmDashboardResult>
+        })
+      )
+
+      const allParcels = results.flatMap(r => r.parcels)
+      setData({
+        fetched_at: results[0]?.fetched_at ?? new Date().toISOString(),
         parcels: allParcels,
         summary: computeSummary(allParcels),
-      }
-      setData(merged)
+      })
     } catch (e) { setError(String(e)) }
     finally { setLoadingApi(false) }
   }, [])
