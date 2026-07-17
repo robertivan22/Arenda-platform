@@ -11,6 +11,60 @@ import { useState, useEffect } from 'react'
 import { useSidebarStore } from '@/store/sidebar.store'
 import { createClient } from '@/lib/supabase/client'
 
+// ─── Sidebar themes ───────────────────────────────────────────────────────────
+type SidebarTheme = 'green' | 'amber' | 'light'
+
+const THEMES: Record<SidebarTheme, {
+  bg: string; activeItem: string; inactiveItem: string
+  activeBar: string; activeIcon: string; inactiveIcon: string
+  childActive: string; childInactive: string; childDotActive: string; childDotInactive: string
+  sectionLabel: string; chevron: string
+  adminActive: string; adminInactive: string
+  avatarBg: string; avatarDot: string; avatarRing: string
+  userText: string; userSubText: string; divider: string
+  logoText: string; logoSub: string; closeBtnText: string
+}> = {
+  green: {
+    bg: 'linear-gradient(180deg, #162a16 0%, #1a3320 60%, #1f3d24 100%)',
+    activeItem: 'bg-white/10 text-white font-medium',
+    inactiveItem: 'text-white/55 hover:text-white/90 hover:bg-white/5',
+    activeBar: 'bg-emerald-400', activeIcon: 'text-emerald-400', inactiveIcon: 'text-white/40',
+    childActive: 'text-emerald-300 font-medium', childInactive: 'text-white/40 hover:text-white/75',
+    childDotActive: 'bg-emerald-400', childDotInactive: 'bg-white/30',
+    sectionLabel: 'text-white/25', chevron: 'text-white/30',
+    adminActive: 'bg-amber-500/20 text-amber-300 font-medium', adminInactive: 'text-white/40 hover:text-white/70 hover:bg-white/5',
+    avatarBg: 'bg-emerald-700', avatarDot: 'bg-emerald-400', avatarRing: 'ring-[#1a3320]',
+    userText: 'text-white/80', userSubText: 'text-white/35', divider: 'bg-white/[0.08]',
+    logoText: 'text-white', logoSub: 'text-white/35', closeBtnText: 'text-white/40 hover:text-white',
+  },
+  amber: {
+    bg: 'linear-gradient(180deg, #1c1200 0%, #2c1d04 60%, #3a2808 100%)',
+    activeItem: 'bg-white/10 text-white font-medium',
+    inactiveItem: 'text-white/55 hover:text-white/90 hover:bg-white/5',
+    activeBar: 'bg-amber-400', activeIcon: 'text-amber-400', inactiveIcon: 'text-white/40',
+    childActive: 'text-amber-300 font-medium', childInactive: 'text-white/40 hover:text-white/75',
+    childDotActive: 'bg-amber-400', childDotInactive: 'bg-white/30',
+    sectionLabel: 'text-white/25', chevron: 'text-white/30',
+    adminActive: 'bg-amber-500/20 text-amber-300 font-medium', adminInactive: 'text-white/40 hover:text-white/70 hover:bg-white/5',
+    avatarBg: 'bg-amber-800', avatarDot: 'bg-amber-400', avatarRing: 'ring-[#2c1d04]',
+    userText: 'text-white/80', userSubText: 'text-white/35', divider: 'bg-white/[0.08]',
+    logoText: 'text-white', logoSub: 'text-white/35', closeBtnText: 'text-white/40 hover:text-white',
+  },
+  light: {
+    bg: 'linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%)',
+    activeItem: 'bg-green-50 text-green-800 font-medium',
+    inactiveItem: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
+    activeBar: 'bg-green-600', activeIcon: 'text-green-600', inactiveIcon: 'text-gray-400',
+    childActive: 'text-green-700 font-medium', childInactive: 'text-gray-500 hover:text-gray-800 hover:bg-gray-50',
+    childDotActive: 'bg-green-500', childDotInactive: 'bg-gray-300',
+    sectionLabel: 'text-gray-400', chevron: 'text-gray-400',
+    adminActive: 'bg-amber-50 text-amber-700 font-medium', adminInactive: 'text-gray-500 hover:text-gray-800 hover:bg-gray-100',
+    avatarBg: 'bg-green-600', avatarDot: 'bg-green-400', avatarRing: 'ring-gray-100',
+    userText: 'text-gray-800', userSubText: 'text-gray-400', divider: 'bg-gray-200',
+    logoText: 'text-gray-900', logoSub: 'text-gray-400', closeBtnText: 'text-gray-400 hover:text-gray-700',
+  },
+}
+
 interface NavItem {
   label: string
   href?: string
@@ -132,6 +186,17 @@ export function AppSidebar() {
   const [perms, setPerms] = useState<Record<string, boolean> | null>(null)
   const [userEmail, setUserEmail] = useState<string>('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [theme, setTheme] = useState<SidebarTheme>('green')
+
+  useEffect(() => {
+    const saved = localStorage.getItem('sidebar-theme') as SidebarTheme | null
+    if (saved && saved in THEMES) setTheme(saved)
+  }, [])
+
+  function changeTheme(t: SidebarTheme) {
+    setTheme(t)
+    localStorage.setItem('sidebar-theme', t)
+  }
 
   useEffect(() => {
     const db = createClient()
@@ -163,6 +228,7 @@ export function AppSidebar() {
 
   function renderItem(item: NavItem) {
     if (!canShow(item)) return null
+    const t = THEMES[theme]
 
     if (!item.children) {
       const active = pathname === item.href || (!!item.href && item.href !== '/' && pathname.startsWith(item.href + '/'))
@@ -174,15 +240,13 @@ export function AppSidebar() {
           data-tour={item.tourKey}
           className={clsx(
             'relative flex items-center gap-3 mx-2 px-3 py-2 rounded-lg text-sm transition-all duration-150',
-            active
-              ? 'bg-white/10 text-white font-medium'
-              : 'text-white/55 hover:text-white/90 hover:bg-white/5',
+            active ? t.activeItem : t.inactiveItem,
           )}
         >
           {active && (
-            <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-emerald-400" />
+            <span className={clsx('absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full', t.activeBar)} />
           )}
-          <item.icon className={clsx('w-4 h-4 flex-shrink-0', active ? 'text-emerald-400' : 'text-white/40')} />
+          <item.icon className={clsx('w-4 h-4 flex-shrink-0', active ? t.activeIcon : t.inactiveIcon)} />
           <span>{item.label}</span>
         </Link>
       )
@@ -200,18 +264,16 @@ export function AppSidebar() {
           data-tour={item.tourKey}
           className={clsx(
             'relative w-full flex items-center gap-3 mx-2 px-3 py-2 rounded-lg text-sm transition-all duration-150',
-            groupActive
-              ? 'bg-white/10 text-white font-medium'
-              : 'text-white/55 hover:text-white/90 hover:bg-white/5',
+            groupActive ? t.activeItem : t.inactiveItem,
           )}
           style={{ width: 'calc(100% - 1rem)' }}
         >
           {groupActive && (
-            <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-emerald-400" />
+            <span className={clsx('absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full', t.activeBar)} />
           )}
-          <item.icon className={clsx('w-4 h-4 flex-shrink-0', groupActive ? 'text-emerald-400' : 'text-white/40')} />
+          <item.icon className={clsx('w-4 h-4 flex-shrink-0', groupActive ? t.activeIcon : t.inactiveIcon)} />
           <span className="flex-1 text-left">{item.label}</span>
-          <ChevronDown className={clsx('w-3 h-3 transition-transform text-white/30', isOpen && 'rotate-180')} />
+          <ChevronDown className={clsx('w-3 h-3 transition-transform', t.chevron, isOpen && 'rotate-180')} />
         </button>
 
         {isOpen && (
@@ -226,10 +288,10 @@ export function AppSidebar() {
                   data-tour={child.tourKey}
                   className={clsx(
                     'flex items-center gap-2 pl-11 pr-4 py-1.5 text-xs transition-colors',
-                    childActive ? 'text-emerald-300 font-medium' : 'text-white/40 hover:text-white/75',
+                    childActive ? t.childActive : t.childInactive,
                   )}
                 >
-                  <span className={clsx('w-1 h-1 rounded-full flex-shrink-0', childActive ? 'bg-emerald-400' : 'bg-white/30')} />
+                  <span className={clsx('w-1 h-1 rounded-full flex-shrink-0', childActive ? t.childDotActive : t.childDotInactive)} />
                   {child.label}
                 </Link>
               )
@@ -241,6 +303,7 @@ export function AppSidebar() {
   }
 
   const settingsActive = pathname.startsWith('/setari')
+  const t = THEMES[theme]
 
   return (
     <nav
@@ -249,7 +312,7 @@ export function AppSidebar() {
         'fixed md:relative inset-y-0 left-0 transition-transform duration-200',
         open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       )}
-      style={{ background: 'linear-gradient(180deg, #162a16 0%, #1a3320 60%, #1f3d24 100%)' }}
+      style={{ background: t.bg }}
     >
       {/* ── Logo ─────────────────────────── */}
       <div className="px-4 py-4 flex items-center justify-between flex-shrink-0">
@@ -259,11 +322,11 @@ export function AppSidebar() {
             <Leaf className="relative z-10 w-4 h-4 text-white" />
           </div>
           <div className="flex flex-col leading-none">
-            <span className="font-bold text-sm text-white tracking-wide">Arenda<span className="text-amber-400">Pro</span></span>
-            <span className="text-[9px] text-white/35 tracking-wider mt-0.5">Platformă agricolă</span>
+            <span className={clsx('font-bold text-sm tracking-wide', t.logoText)}>Arenda<span className="text-amber-400">Pro</span></span>
+            <span className={clsx('text-[9px] tracking-wider mt-0.5', t.logoSub)}>Platformă agricolă</span>
           </div>
         </div>
-        <button onClick={close} className="md:hidden p-1 rounded text-white/40 hover:text-white transition-colors">
+        <button onClick={close} className={clsx('md:hidden p-1 rounded transition-colors', t.closeBtnText)}>
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -275,7 +338,7 @@ export function AppSidebar() {
           if (visibleItems.length === 0) return null
           return (
             <div key={section.label} className="mb-1">
-              <p className="px-5 py-1.5 text-[9px] font-semibold tracking-widest text-white/25 uppercase">
+              <p className={clsx('px-5 py-1.5 text-[9px] font-semibold tracking-widest uppercase', t.sectionLabel)}>
                 {section.label}
               </p>
               {visibleItems.map(renderItem)}
@@ -423,9 +486,7 @@ export function AppSidebar() {
             onClick={close}
             className={clsx(
               'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150',
-              pathname.startsWith('/admin-cp')
-                ? 'bg-amber-500/20 text-amber-300 font-medium'
-                : 'text-white/40 hover:text-white/70 hover:bg-white/5',
+              pathname.startsWith('/admin-cp') ? t.adminActive : t.adminInactive,
             )}
           >
             <Shield className="w-4 h-4 flex-shrink-0" />
@@ -441,26 +502,47 @@ export function AppSidebar() {
           onClick={close}
           className={clsx(
             'relative flex items-center gap-3 mx-2 my-1 px-3 py-2 rounded-lg text-sm transition-all duration-150',
-            settingsActive ? 'bg-white/10 text-white font-medium' : 'text-white/55 hover:text-white/90 hover:bg-white/5',
+            settingsActive ? t.activeItem : t.inactiveItem,
           )}
         >
           {settingsActive && (
-            <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-emerald-400" />
+            <span className={clsx('absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full', t.activeBar)} />
           )}
-          <Settings className={clsx('w-4 h-4 flex-shrink-0', settingsActive ? 'text-emerald-400' : 'text-white/40')} />
+          <Settings className={clsx('w-4 h-4 flex-shrink-0', settingsActive ? t.activeIcon : t.inactiveIcon)} />
           <span>Setări</span>
         </Link>
-        <div className="mx-4 h-px bg-white/8" />
-        <div className="flex items-center gap-2.5 px-4 py-3">
+        <div className={clsx('mx-4 h-px', t.divider)} />
+        <div className="flex items-center gap-2 px-3 py-2.5">
           <div className="relative flex-shrink-0">
-            <div className="w-7 h-7 rounded-full bg-emerald-700 flex items-center justify-center text-[11px] font-bold text-white">
+            <div className={clsx('w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white', t.avatarBg)}>
               AP
             </div>
-            <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 ring-1 ring-[#1a3320]" />
+            <span className={clsx('absolute bottom-0 right-0 w-2 h-2 rounded-full ring-1', t.avatarDot, t.avatarRing)} />
           </div>
-          <div className="flex flex-col leading-none min-w-0">
-            <span className="text-[11px] font-medium text-white/80 truncate">{userEmail || 'admin@arenda.ro'}</span>
-            <span className="text-[9px] text-white/35 mt-0.5">Administrator</span>
+          <div className="flex flex-col leading-none min-w-0 flex-1">
+            <span className={clsx('text-[11px] font-medium truncate', t.userText)}>{userEmail || 'admin@arenda.ro'}</span>
+            <span className={clsx('text-[9px] mt-0.5', t.userSubText)}>Administrator</span>
+          </div>
+          {/* ── Theme switcher ── */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={() => changeTheme('green')}
+              title="Temă verde"
+              className={clsx('w-4 h-4 rounded-full transition-all border-2', theme === 'green' ? 'border-white/60 scale-110' : 'border-transparent opacity-60 hover:opacity-90')}
+              style={{ background: 'linear-gradient(135deg, #22c55e, #15803d)' }}
+            />
+            <button
+              onClick={() => changeTheme('amber')}
+              title="Temă chihlimbar"
+              className={clsx('w-4 h-4 rounded-full transition-all border-2', theme === 'amber' ? 'border-white/60 scale-110' : 'border-transparent opacity-60 hover:opacity-90')}
+              style={{ background: 'linear-gradient(135deg, #f59e0b, #b45309)' }}
+            />
+            <button
+              onClick={() => changeTheme('light')}
+              title="Temă deschisă"
+              className={clsx('w-4 h-4 rounded-full transition-all border-2', theme === 'light' ? 'border-gray-500 scale-110' : 'border-transparent opacity-60 hover:opacity-90')}
+              style={{ background: 'linear-gradient(135deg, #f8fafc, #cbd5e1)' }}
+            />
           </div>
         </div>
       </div>
