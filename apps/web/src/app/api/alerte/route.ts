@@ -311,6 +311,16 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
   try {
     const db = await createClient()
 
+    // ── Verify authenticated user — mandatory for all queries ─────────────────
+    const { data: { user }, error: userError } = await db.auth.getUser()
+    if (!user || userError) {
+      return NextResponse.json(
+        { contracte: [], ferma: [], stocuri: [], utilaje: [], tranzactii: [], sumar: EMPTY_SUMAR, errors: ['Neautorizat'] },
+        { status: 401 },
+      ) as NextResponse<AlerteResponse>
+    }
+    const uid = user.id
+
     // ── Queries 1–4 run in parallel (independent) ─────────────────────────────
     const [
       { data: contractsRaw, error: cErr },
@@ -321,24 +331,29 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
     ] = await Promise.all([
       db.from('contracts')
         .select('id, contract_number, status, end_date, annual_rent, lessor_id, lessors(first_name, last_name, company_name, type)')
+        .eq('user_id', uid)
         .neq('status', 'DRAFT')
         .limit(100),
       db.from('work_orders')
         .select('id, operation_type, status, planned_date, parcels(bloc_fizic, parcel_nr)')
+        .eq('user_id', uid)
         .gte('planned_date', yearStart)
         .order('planned_date', { ascending: true })
         .limit(80),
       db.from('input_lots')
         .select('id, product_name, category, quantity, quantity_available, unit, expiry_date')
+        .eq('user_id', uid)
         .order('category')
         .limit(100),
       db.from('machines')
         .select('id, name, type, brand, model, year, plate, is_active, rca_expiry_date')
+        .eq('user_id', uid)
         .eq('is_active', true)
         .order('name')
         .limit(50),
       db.from('transactions')
         .select('id, lessor_id, contract_id, ron_net, is_paid, campaign_year, transaction_date, product_name, is_previzionata')
+        .eq('user_id', uid)
         .eq('is_previzionata', false)
         .order('transaction_date', { ascending: false })
         .limit(200),
@@ -356,6 +371,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
       const { data: mtRaw, error: mtErr } = await db
         .from('maintenance_tasks')
         .select('id, machine_id, title, type, due_date, status')
+        .eq('user_id', uid)
         .in('machine_id', machineIds)
         .in('status', ['PLANIFICAT', 'IN_EXECUTIE'])
         .order('due_date', { ascending: true })
@@ -373,6 +389,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
       const { data: lData, error: lErr } = await db
         .from('lessors')
         .select('id, type, first_name, last_name, company_name')
+        .eq('user_id', uid)
         .in('id', lessorIds)
       if (lErr) errors.push(`Arendatori (tx): ${lErr.message}`)
       lessorMap = Object.fromEntries((lData ?? []).map((l: any) => [l.id, l]))
@@ -387,6 +404,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
       const { data: cData, error: cErr2 } = await db
         .from('contracts')
         .select('id, contract_number')
+        .eq('user_id', uid)
         .in('id', contractIdsFromTx)
       if (cErr2) errors.push(`Contracte (tx): ${cErr2.message}`)
       txContractMap = Object.fromEntries((cData ?? []).map((c: any) => [c.id, c]))
