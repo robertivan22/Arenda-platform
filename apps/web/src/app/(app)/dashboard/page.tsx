@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Users, FileText, MapPin, CreditCard, AlertTriangle, Clock, Plus, BarChart3, MessageSquare, Wheat, Tractor, ArrowRight } from 'lucide-react'
+import { Users, FileText, MapPin, CreditCard, AlertTriangle, Clock, Plus, BarChart3, MessageSquare, Wheat, Tractor, ArrowRight, Settings2 } from 'lucide-react'
 import { GuidedTour } from '@/components/onboarding/GuidedTour'
 
 export const runtime = 'edge'
@@ -198,6 +198,7 @@ export default function DashboardPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [campaignWidget, setCampaignWidget] = useState<CampaignWidget | null>(null)
+  const [nextExpiring, setNextExpiring] = useState<{ days: number; label: string } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -222,6 +223,25 @@ export default function DashboardPage() {
       const paymentsOverdue = (overdueData ?? []).length
       const paymentsOverdueAmount = ((overdueData ?? []) as any[]).reduce((acc, p) => acc + Number(p.ron_net ?? 0), 0).toFixed(2)
       setS({ lessorsTotal: lessorsTotal ?? 0, contractsActive: contractsActive ?? 0, contractsExpiring: contractsExpiring ?? 0, parcelsTotal: (parcelsData ?? []).length, surfaceTotal, paymentsOverdue, paymentsOverdueAmount })
+
+      // Fetch the soonest expiring contract for the hero floating card
+      try {
+        const { data: soonest } = await db
+          .from('contracts')
+          .select('contract_number, end_date, lessors(first_name, last_name, company_name, type)')
+          .eq('status', 'ACTIVE')
+          .gte('end_date', today)
+          .order('end_date', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+        if (soonest) {
+          const daysLeft = Math.round((new Date(soonest.end_date).getTime() - now.getTime()) / 86400000)
+          const l = soonest.lessors as any
+          const name = l ? (l.type === 'LEGAL' ? (l.company_name ?? '') : `${l.last_name ?? ''} ${l.first_name ?? ''}`.trim()) : soonest.contract_number
+          setNextExpiring({ days: daysLeft, label: name || soonest.contract_number })
+        }
+      } catch { /* ignore */ }
+
       setLoading(false)
 
       // Campaign progress widget
@@ -304,21 +324,22 @@ export default function DashboardPage() {
               <span style={{ fontSize: 14 }}>🌾</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', letterSpacing: '.05em', textTransform: 'uppercase' }}>Bun venit înapoi</span>
             </div>
-            <h2 style={{ fontSize: 34, fontWeight: 900, lineHeight: 1.1, letterSpacing: '-.04em', color: '#ffffff', marginBottom: 12 }}>
-              Platforma ta{' '}
+            <h2 style={{ fontSize: 30, fontWeight: 900, lineHeight: 1.12, letterSpacing: '-.04em', color: '#ffffff', marginBottom: 12 }}>
+              Gestionează{' '}
               <span style={{ background: 'linear-gradient(135deg,#fde68a,#f59e0b,#d97706)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                agricolă
+                arenda agricolă
               </span>
+              {' '}fără bătăi de cap
             </h2>
             <p style={{ fontSize: 14, lineHeight: 1.65, color: 'rgba(255,245,235,.58)', marginBottom: 26, maxWidth: 340 }}>
-              Gestionează arendatorii, contractele, parcelele dintr-un singur loc.
+              Contracte, arendatori, parcele și plăți — totul centralizat într-un singur loc.
             </p>
             <button
-              onClick={() => router.push('/arendatori/nou')}
+              onClick={() => router.push('/general/configureaza-ferma')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#d97706)', cursor: 'pointer', fontSize: 13, fontWeight: 800, color: '#fff', boxShadow: '0 4px 20px rgba(217,119,6,.5), inset 0 1px 0 rgba(255,255,255,.15)' }}
             >
-              <Plus className="w-3.5 h-3.5" />
-              Adaugă arendator
+              <Settings2 className="w-3.5 h-3.5" />
+              Configurează Ferma
             </button>
           </div>
 
@@ -340,15 +361,17 @@ export default function DashboardPage() {
             </div>
 
             {/* Floating alert card — top right */}
-            <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(20,14,8,.94)', backdropFilter: 'blur(16px)', borderRadius: 14, padding: '10px 14px', boxShadow: '0 10px 36px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.07)', display: 'flex', alignItems: 'center', gap: 10, minWidth: 185 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(217,119,6,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Clock className="w-4 h-4" style={{ color: '#fbbf24' }} />
+            {nextExpiring && (
+              <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(20,14,8,.94)', backdropFilter: 'blur(16px)', borderRadius: 14, padding: '10px 14px', boxShadow: '0 10px 36px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.07)', display: 'flex', alignItems: 'center', gap: 10, minWidth: 185 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(217,119,6,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Clock className="w-4 h-4" style={{ color: '#fbbf24' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', marginBottom: 1 }}>Contract expiră în {nextExpiring.days} {nextExpiring.days === 1 ? 'zi' : 'zile'}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,245,235,.42)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nextExpiring.label}</div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', marginBottom: 1 }}>{s.contractsExpiring > 0 ? `${s.contractsExpiring} contract${s.contractsExpiring > 1 ? 'e' : ''} expiră` : `${s.contractsActive} contracte active`}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,245,235,.42)' }}>în următoarele 30 de zile</div>
-              </div>
-            </div>
+            )}
 
             {/* Floating green chip — bottom right */}
             <div style={{ position: 'absolute', bottom: 52, right: 8, background: 'rgba(22,163,74,.95)', borderRadius: 11, padding: '8px 13px', boxShadow: '0 6px 24px rgba(22,163,74,.35)', display: 'flex', alignItems: 'center', gap: 6 }}>
