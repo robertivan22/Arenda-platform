@@ -315,7 +315,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse<AlerteRespons
     const { data: { user }, error: userError } = await db.auth.getUser()
     if (!user || userError) {
       return NextResponse.json(
-        { ok: false, generat_la: new Date().toISOString(), contracte: [], ferma: [], stocuri: [], utilaje: [], tranzactii: [], uit: [], insights: [], sumar: EMPTY_SUMAR, sumar_text: '', scor_risc: 0, scor_tier: 'verde' as const, errors: ['Neautorizat'] },
+        { ok: false, generat_la: new Date().toISOString(), contracte: [], ferma: [], stocuri: [], utilaje: [], tranzactii: [], uit: [], insights: [], sumar: EMPTY_SUMAR, sumar_text: '', scor_risc: 0, scor_tier: 'scazut' as const, errors: ['Neautorizat'] },
         { status: 401 },
       )
     }
