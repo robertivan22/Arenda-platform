@@ -575,6 +575,8 @@ export function AppSidebar() {
 
       {/* ── Settings + Profile ────────────── */}
       <div className="flex-shrink-0">
+        {/* Hide Settings for users with can_setari explicitly set to false */}
+        {perms?.can_setari !== false && (
         <Link
           href="/setari"
           onClick={close}
@@ -589,6 +591,7 @@ export function AppSidebar() {
           <Settings className={clsx('w-4 h-4 flex-shrink-0', settingsActive ? t.activeIcon : t.inactiveIcon)} />
           <span>Setări</span>
         </Link>
+        )}
         <div className={clsx('mx-4 h-px', t.divider)} />
         <div className="flex items-center gap-2 px-3 py-2.5">
           <div className="relative flex-shrink-0">

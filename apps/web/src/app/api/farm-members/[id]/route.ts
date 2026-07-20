@@ -100,10 +100,11 @@ export async function PATCH(
   // Sync updated permissions to user_permissions if member_id is set
   if (member.member_id && body.sectionPermissions) {
     const perms = body.sectionPermissions as Record<string, boolean>
+    // can_setari is always false for invited members
     await db
       .from('user_permissions')
       .upsert(
-        { user_id: member.member_id, ...perms, updated_at: new Date().toISOString() },
+        { user_id: member.member_id, ...perms, can_setari: false, updated_at: new Date().toISOString() },
         { onConflict: 'user_id' }
       )
   }

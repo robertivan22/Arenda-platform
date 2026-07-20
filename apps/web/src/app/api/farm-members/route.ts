@@ -288,10 +288,11 @@ async function syncMemberPermissions(
   _supabaseUrl: string,
   _serviceKey: string
 ) {
+  // can_setari is always false for invited members — they never get Settings access
   await db
     .from('user_permissions')
     .upsert(
-      { user_id: memberId, ...perms, updated_at: new Date().toISOString() },
+      { user_id: memberId, ...perms, can_setari: false, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' }
     )
 }
