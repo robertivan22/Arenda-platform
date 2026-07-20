@@ -46,19 +46,13 @@ CREATE POLICY "farm_members_owner"
   USING  (farm_owner_id = auth.uid())
   WITH CHECK (farm_owner_id = auth.uid());
 
--- Admins on a farm can see members (but not delete them without checking role)
+-- Admins on a farm can see members.
+-- Uses SECURITY DEFINER function to avoid infinite recursion
+-- (inline subquery on farm_members would re-trigger this policy).
 DROP POLICY IF EXISTS "farm_members_admin_see" ON farm_members;
 CREATE POLICY "farm_members_admin_see"
   ON farm_members FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM farm_members fm2
-      WHERE fm2.farm_owner_id = farm_members.farm_owner_id
-        AND fm2.member_id = auth.uid()
-        AND fm2.status = 'active'
-        AND fm2.role = 'administrator'
-    )
-  );
+  USING (public.can_member_admin(farm_owner_id));
 
 -- Member can see their own membership row
 DROP POLICY IF EXISTS "farm_members_own_row" ON farm_members;
