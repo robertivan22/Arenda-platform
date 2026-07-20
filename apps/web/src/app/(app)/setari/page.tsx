@@ -239,7 +239,8 @@ export default function SetariPage() {
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? 'Eroare'); return }
-      toast.success(addMode === 'invite' ? 'Invitație trimisă!' : 'Utilizator creat!')
+      const successMsg = data.message ?? (addMode === 'invite' ? 'Invitație trimisă!' : 'Utilizator creat!')
+      toast.success(successMsg)
       setAddEmail(''); setAddPassword(''); setAddDisplayName('')
       setAddPerms({ ...DEFAULT_PERMS })
       await loadMembers()

@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 export const runtime = 'edge'
 
@@ -138,32 +139,49 @@ export async function POST(req: NextRequest) {
 
   if (mode === 'invite') {
     // ── Invite via email ──────────────────────────────────────
-    // Trigger Supabase invite email — user sets their own password
-    const inviteRes = await fetch(`${supabaseUrl}/auth/v1/admin/invite`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-      },
-      body: JSON.stringify({
-        email: emailNorm,
-        data: {
-          invited_by_farm: user.id,
-          farm_name: '', // filled in by the trigger
-        },
-      }),
-    })
+    // Use Supabase JS Admin SDK — properly sets redirect_to so the
+    // invite link in the email points to /auth/callback?next=/set-password
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://arendapro.com'
+    const adminClient = createServiceClient(supabaseUrl, serviceKey)
 
     let newUserId: string | null = null
-    if (inviteRes.ok) {
-      const inviteData = await inviteRes.json() as { id?: string }
-      newUserId = inviteData.id ?? null
-    }
-    // If invite fails it may be because user already exists — that's OK,
-    // the trigger will link them anyway.
+    let emailSent = false
 
-    // Insert pending farm_members row
+    const { data: inviteData, error: inviteError } =
+      await adminClient.auth.admin.inviteUserByEmail(emailNorm, {
+        redirectTo: `${siteUrl}/auth/callback?next=/set-password`,
+        data: { invited_by_farm: user.id },
+      })
+
+    if (inviteError) {
+      // 422 = user already registered — look them up and add directly
+      const isAlreadyRegistered =
+        inviteError.message?.toLowerCase().includes('already been registered') ||
+        inviteError.message?.toLowerCase().includes('already registered') ||
+        (inviteError as { status?: number }).status === 422
+
+      if (!isAlreadyRegistered) {
+        // Genuine delivery failure
+        return NextResponse.json(
+          { error: `Eroare la trimiterea invitației: ${inviteError.message}` },
+          { status: 500 },
+        )
+      }
+
+      // User exists — find by email in profiles table (bypass RLS with adminClient)
+      const { data: profile } = await adminClient
+        .from('profiles')
+        .select('id')
+        .ilike('email', emailNorm)
+        .maybeSingle()
+      newUserId = profile?.id ?? null
+    } else {
+      newUserId = inviteData.user?.id ?? null
+      emailSent = true
+    }
+
+    // Insert farm_members row (active if user existed, pending if truly new)
+    const memberStatus = newUserId ? 'active' : 'pending'
     const { data: inserted, error: insertErr } = await db
       .from('farm_members')
       .insert({
@@ -172,7 +190,7 @@ export async function POST(req: NextRequest) {
         role,
         invited_email: emailNorm,
         invited_by: user.id,
-        status: newUserId ? 'active' : 'pending',
+        status: memberStatus,
         section_permissions: perms,
       })
       .select()
@@ -182,13 +200,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: insertErr.message }, { status: 500 })
     }
 
-    // If the user already existed (newUserId != null from invite endpoint), also sync
-    // their user_permissions so the sidebar works correctly
     if (newUserId) {
       await syncMemberPermissions(db, newUserId, perms, supabaseUrl, serviceKey)
     }
 
-    return NextResponse.json({ ok: true, member: inserted })
+    const message = emailSent
+      ? 'Invitație trimisă pe email.'
+      : newUserId
+        ? 'Utilizatorul exista deja și a fost adăugat direct ca activ (nu s-a trimis email).'
+        : 'Invitație creată în stare pending.'
+
+    return NextResponse.json({ ok: true, member: inserted, emailSent, message })
   }
 
   if (mode === 'create') {
