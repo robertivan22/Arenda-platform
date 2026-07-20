@@ -103,162 +103,9 @@ AS $$
   WHERE member_id = auth.uid() AND status = 'active';
 $$;
 
--- ── 3. ADD MEMBER SELECT POLICIES (additive — keeps existing owner policies) ─
+-- ── 3 & 4. SELECT + WRITE POLICIES (safe — skips tables that don't exist yet) ─
 
--- Helper macro: for each table with user_id, we add a "member_select" policy.
--- Pattern: SELECT USING (public.can_access_farm(user_id))
-
-DROP POLICY IF EXISTS "lessors_member_select"   ON lessors;
-CREATE POLICY "lessors_member_select"   ON lessors   FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "contracts_member_select" ON contracts;
-CREATE POLICY "contracts_member_select" ON contracts FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "parcels_member_select"   ON parcels;
-CREATE POLICY "parcels_member_select"   ON parcels   FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "payments_member_select"  ON payments;
-CREATE POLICY "payments_member_select"  ON payments  FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "cs_member_select" ON company_settings;
-CREATE POLICY "cs_member_select" ON company_settings FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "prod_member_select" ON products;
-CREATE POLICY "prod_member_select" ON products FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "crl_member_select" ON contract_rent_levels;
-CREATE POLICY "crl_member_select" ON contract_rent_levels FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "txn_member_select" ON transactions;
-CREATE POLICY "txn_member_select" ON transactions FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "inv_member_select" ON invoices;
-CREATE POLICY "inv_member_select" ON invoices FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "amend_member_select" ON contract_amendments;
-CREATE POLICY "amend_member_select" ON contract_amendments FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "deed_member_select" ON property_deeds;
-CREATE POLICY "deed_member_select" ON property_deeds FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "campaigns_member_select" ON campaigns;
-CREATE POLICY "campaigns_member_select" ON campaigns FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "crop_plans_member_select" ON crop_plans;
-CREATE POLICY "crop_plans_member_select" ON crop_plans FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "machines_member_select" ON machines;
-CREATE POLICY "machines_member_select" ON machines FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "work_orders_member_select" ON work_orders;
-CREATE POLICY "work_orders_member_select" ON work_orders FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "work_order_inputs_member_select" ON work_order_inputs;
-CREATE POLICY "work_order_inputs_member_select" ON work_order_inputs FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "fuel_logs_member_select" ON fuel_logs;
-CREATE POLICY "fuel_logs_member_select" ON fuel_logs FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "maintenance_member_select" ON maintenance_tasks;
-CREATE POLICY "maintenance_member_select" ON maintenance_tasks FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "implements_member_select" ON implements;
-CREATE POLICY "implements_member_select" ON implements FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "operators_member_select" ON operators;
-CREATE POLICY "operators_member_select" ON operators FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "harvest_lots_member_select" ON harvest_lots;
-CREATE POLICY "harvest_lots_member_select" ON harvest_lots FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "parcel_transactions_member_select" ON parcel_transactions;
-CREATE POLICY "parcel_transactions_member_select" ON parcel_transactions FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "arenda_conv_member_select" ON arenda_conversions;
-CREATE POLICY "arenda_conv_member_select" ON arenda_conversions FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "txn_dist_member_select" ON transaction_distributions;
-CREATE POLICY "txn_dist_member_select" ON transaction_distributions FOR SELECT
-  USING (public.can_access_farm(user_id));
-
--- contract_files uses tenant_id (not user_id)
-DROP POLICY IF EXISTS "contract_files_member_select" ON contract_files;
-CREATE POLICY "contract_files_member_select" ON contract_files FOR SELECT
-  USING (public.can_access_farm(tenant_id));
-
-DROP POLICY IF EXISTS "iiv_imports_member_select" ON input_invoice_imports;
-CREATE POLICY "iiv_imports_member_select" ON input_invoice_imports FOR SELECT
-  USING (public.can_access_farm(user_id));
-
--- input_invoice_import_items has no direct user_id — access via parent import
-DROP POLICY IF EXISTS "iiv_items_member_select" ON input_invoice_import_items;
-CREATE POLICY "iiv_items_member_select" ON input_invoice_import_items FOR SELECT
-  USING (
-    import_id IN (
-      SELECT id FROM input_invoice_imports
-      WHERE public.can_access_farm(user_id)
-    )
-  );
-
-DROP POLICY IF EXISTS "purchase_invoices_member_select" ON purchase_invoices;
-CREATE POLICY "purchase_invoices_member_select" ON purchase_invoices FOR SELECT
-  USING (public.can_access_farm(user_id));
-
--- purchase_invoice_items has no direct user_id — access via parent invoice
-DROP POLICY IF EXISTS "purchase_invoice_items_member_select" ON purchase_invoice_items;
-CREATE POLICY "purchase_invoice_items_member_select" ON purchase_invoice_items FOR SELECT
-  USING (
-    invoice_id IN (
-      SELECT id FROM purchase_invoices
-      WHERE public.can_access_farm(user_id)
-    )
-  );
-
-DROP POLICY IF EXISTS "stock_movements_member_select" ON stock_movements;
-CREATE POLICY "stock_movements_member_select" ON stock_movements FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "efactura_member_select" ON efactura_submissions;
-CREATE POLICY "efactura_member_select" ON efactura_submissions FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "machine_work_logs_member_select" ON machine_work_logs;
-CREATE POLICY "machine_work_logs_member_select" ON machine_work_logs FOR SELECT
-  USING (public.can_access_farm(user_id));
-
-DROP POLICY IF EXISTS "parcele_fitosanitar_member_select" ON parcele_fitosanitar;
-CREATE POLICY "parcele_fitosanitar_member_select" ON parcele_fitosanitar FOR SELECT
-  USING (public.can_access_farm(user_id));
-
--- ── 4. WRITE POLICIES FOR MEMBERS ────────────────────────────
--- Members with write roles (administrator, operator, contabil) can insert/update.
--- They MUST set user_id = farm_owner_id in their INSERT.
--- Admins can also delete; read-only (vizualizare) cannot write at all.
-
--- Helper: is current user a write-access member for this farm owner?
+-- Write-permission helper functions (used inside the DO block below)
 CREATE OR REPLACE FUNCTION public.can_member_write(p_owner_id uuid)
 RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
   SELECT EXISTS (
@@ -281,7 +128,7 @@ RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS
   );
 $$;
 
--- For INSERT: user_id must equal one of the farms the member has write access to
+-- Returns all farm owner UUIDs the current member has write access to (used in INSERT WITH CHECK)
 CREATE OR REPLACE FUNCTION public.member_writable_farm_ids()
 RETURNS SETOF uuid LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
   SELECT farm_owner_id FROM farm_members
@@ -290,123 +137,185 @@ RETURNS SETOF uuid LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public
     AND role IN ('administrator','operator','contabil');
 $$;
 
--- Apply write policies to the most critical tables.
--- Pattern: INSERT (user_id must be a farm the member can write to)
---          UPDATE/DELETE (must be active write member for that row's farm)
-
 DO $$
 DECLARE
-  tbl text;
-  -- Tables with direct user_id column only.
-  -- contract_files uses tenant_id (handled separately below).
-  -- input_invoice_import_items and purchase_invoice_items use parent FK (no direct user_id).
+  tbl       text;
+  col       text;
+  pol_sel   text;
+  -- (table_name, user_id_column)
+  sel_tables text[][] := ARRAY[
+    ARRAY['lessors',                    'user_id'],
+    ARRAY['contracts',                  'user_id'],
+    ARRAY['parcels',                    'user_id'],
+    ARRAY['payments',                   'user_id'],
+    ARRAY['company_settings',           'user_id'],
+    ARRAY['products',                   'user_id'],
+    ARRAY['contract_rent_levels',       'user_id'],
+    ARRAY['transactions',               'user_id'],
+    ARRAY['invoices',                   'user_id'],
+    ARRAY['contract_amendments',        'user_id'],
+    ARRAY['property_deeds',             'user_id'],
+    ARRAY['campaigns',                  'user_id'],
+    ARRAY['crop_plans',                 'user_id'],
+    ARRAY['machines',                   'user_id'],
+    ARRAY['work_orders',                'user_id'],
+    ARRAY['work_order_inputs',          'user_id'],
+    ARRAY['fuel_logs',                  'user_id'],
+    ARRAY['maintenance_tasks',          'user_id'],
+    ARRAY['implements',                 'user_id'],
+    ARRAY['operators',                  'user_id'],
+    ARRAY['harvest_lots',               'user_id'],
+    ARRAY['parcel_transactions',        'user_id'],
+    ARRAY['arenda_conversions',         'user_id'],
+    ARRAY['transaction_distributions',  'user_id'],
+    ARRAY['input_invoice_imports',      'user_id'],
+    ARRAY['purchase_invoices',          'user_id'],
+    ARRAY['stock_movements',            'user_id'],
+    ARRAY['efactura_submissions',       'user_id'],
+    ARRAY['machine_work_logs',          'user_id'],
+    ARRAY['parcele_fitosanitar',        'user_id'],
+    ARRAY['contract_files',             'tenant_id']   -- uses tenant_id, not user_id
+  ];
+
+  -- Tables with direct user_id for write policies
   write_tables text[] := ARRAY[
     'lessors','contracts','parcels','payments','transactions','invoices',
     'contract_rent_levels','contract_amendments','property_deeds',
     'campaigns','crop_plans','machines','work_orders','work_order_inputs',
     'fuel_logs','maintenance_tasks','implements','operators','harvest_lots',
     'parcel_transactions','arenda_conversions','transaction_distributions',
-    'input_invoice_imports',
-    'purchase_invoices','stock_movements',
+    'input_invoice_imports','purchase_invoices','stock_movements',
     'efactura_submissions','machine_work_logs','parcele_fitosanitar'
   ];
+
+  -- contract_files uses tenant_id
+  contract_files_exists boolean;
+
+  -- item tables (no direct user_id — handled via subquery after main loop)
+  iiv_items_exists        boolean;
+  purchase_items_exists   boolean;
+
 BEGIN
-  FOREACH tbl IN ARRAY write_tables LOOP
-    -- INSERT: user_id must be a writable farm
-    EXECUTE format(
-      'DROP POLICY IF EXISTS "%s_member_insert" ON %I;
-       CREATE POLICY "%s_member_insert" ON %I FOR INSERT WITH CHECK (
-         user_id IN (SELECT public.member_writable_farm_ids())
-       );',
-      tbl, tbl, tbl, tbl
-    );
 
-    -- UPDATE: must be write member for that row's owner
-    EXECUTE format(
-      'DROP POLICY IF EXISTS "%s_member_update" ON %I;
-       CREATE POLICY "%s_member_update" ON %I FOR UPDATE
-         USING  (public.can_member_write(user_id))
-         WITH CHECK (public.can_member_write(user_id));',
-      tbl, tbl, tbl, tbl
-    );
+  -- ── SELECT policies ──────────────────────────────────────────────────────────
+  FOR i IN 1..array_length(sel_tables, 1) LOOP
+    tbl := sel_tables[i][1];
+    col := sel_tables[i][2];
+    pol_sel := tbl || '_member_select';
 
-    -- DELETE: only administrator role
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = tbl
+    ) THEN CONTINUE; END IF;
+
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', pol_sel, tbl);
     EXECUTE format(
-      'DROP POLICY IF EXISTS "%s_member_delete" ON %I;
-       CREATE POLICY "%s_member_delete" ON %I FOR DELETE
-         USING (public.can_member_admin(user_id));',
-      tbl, tbl, tbl, tbl
+      'CREATE POLICY %I ON %I FOR SELECT USING (public.can_access_farm(%I))',
+      pol_sel, tbl, col
     );
   END LOOP;
+
+  -- ── input_invoice_import_items SELECT (subquery via parent) ──────────────────
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='input_invoice_import_items') THEN
+    DROP POLICY IF EXISTS "iiv_items_member_select" ON input_invoice_import_items;
+    CREATE POLICY "iiv_items_member_select" ON input_invoice_import_items FOR SELECT
+      USING (
+        import_id IN (
+          SELECT id FROM input_invoice_imports WHERE public.can_access_farm(user_id)
+        )
+      );
+  END IF;
+
+  -- ── purchase_invoice_items SELECT (subquery via parent) ──────────────────────
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='purchase_invoice_items') THEN
+    DROP POLICY IF EXISTS "purchase_invoice_items_member_select" ON purchase_invoice_items;
+    CREATE POLICY "purchase_invoice_items_member_select" ON purchase_invoice_items FOR SELECT
+      USING (
+        invoice_id IN (
+          SELECT id FROM purchase_invoices WHERE public.can_access_farm(user_id)
+        )
+      );
+  END IF;
+
+  -- ── WRITE policies (user_id tables) ─────────────────────────────────────────
+  FOREACH tbl IN ARRAY write_tables LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = tbl
+    ) THEN CONTINUE; END IF;
+
+    -- INSERT
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I;
+       CREATE POLICY %I ON %I FOR INSERT WITH CHECK (
+         user_id IN (SELECT public.member_writable_farm_ids())
+       );',
+      tbl || '_member_insert', tbl,
+      tbl || '_member_insert', tbl
+    );
+    -- UPDATE
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I;
+       CREATE POLICY %I ON %I FOR UPDATE
+         USING (public.can_member_write(user_id))
+         WITH CHECK (public.can_member_write(user_id));',
+      tbl || '_member_update', tbl,
+      tbl || '_member_update', tbl
+    );
+    -- DELETE (admin only)
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I;
+       CREATE POLICY %I ON %I FOR DELETE
+         USING (public.can_member_admin(user_id));',
+      tbl || '_member_delete', tbl,
+      tbl || '_member_delete', tbl
+    );
+  END LOOP;
+
+  -- ── contract_files write (tenant_id) ────────────────────────────────────────
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='contract_files') THEN
+    DROP POLICY IF EXISTS "contract_files_member_insert" ON contract_files;
+    CREATE POLICY "contract_files_member_insert" ON contract_files FOR INSERT WITH CHECK (
+      tenant_id IN (SELECT public.member_writable_farm_ids())
+    );
+    DROP POLICY IF EXISTS "contract_files_member_update" ON contract_files;
+    CREATE POLICY "contract_files_member_update" ON contract_files FOR UPDATE
+      USING (public.can_member_write(tenant_id))
+      WITH CHECK (public.can_member_write(tenant_id));
+    DROP POLICY IF EXISTS "contract_files_member_delete" ON contract_files;
+    CREATE POLICY "contract_files_member_delete" ON contract_files FOR DELETE
+      USING (public.can_member_admin(tenant_id));
+  END IF;
+
+  -- ── input_invoice_import_items write (subquery via parent) ──────────────────
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='input_invoice_import_items') THEN
+    DROP POLICY IF EXISTS "iiv_items_member_insert" ON input_invoice_import_items;
+    CREATE POLICY "iiv_items_member_insert" ON input_invoice_import_items FOR INSERT WITH CHECK (
+      import_id IN (SELECT id FROM input_invoice_imports WHERE user_id IN (SELECT public.member_writable_farm_ids()))
+    );
+    DROP POLICY IF EXISTS "iiv_items_member_update" ON input_invoice_import_items;
+    CREATE POLICY "iiv_items_member_update" ON input_invoice_import_items FOR UPDATE
+      USING  (import_id IN (SELECT id FROM input_invoice_imports WHERE public.can_member_write(user_id)))
+      WITH CHECK (import_id IN (SELECT id FROM input_invoice_imports WHERE public.can_member_write(user_id)));
+  END IF;
+
+  -- ── purchase_invoice_items write (subquery via parent) ───────────────────────
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='purchase_invoice_items') THEN
+    DROP POLICY IF EXISTS "purchase_invoice_items_member_insert" ON purchase_invoice_items;
+    CREATE POLICY "purchase_invoice_items_member_insert" ON purchase_invoice_items FOR INSERT WITH CHECK (
+      invoice_id IN (SELECT id FROM purchase_invoices WHERE user_id IN (SELECT public.member_writable_farm_ids()))
+    );
+    DROP POLICY IF EXISTS "purchase_invoice_items_member_update" ON purchase_invoice_items;
+    CREATE POLICY "purchase_invoice_items_member_update" ON purchase_invoice_items FOR UPDATE
+      USING  (invoice_id IN (SELECT id FROM purchase_invoices WHERE public.can_member_write(user_id)))
+      WITH CHECK (invoice_id IN (SELECT id FROM purchase_invoices WHERE public.can_member_write(user_id)));
+  END IF;
+
 END
 $$;
 
--- company_settings: members can read but NOT write (ownership change risk)
--- The owner-managed cs_user policy already handles owner writes.
--- Members should update settings only via the API (server-side validated).
-
--- ── contract_files write policies (uses tenant_id instead of user_id) ─────────
-DROP POLICY IF EXISTS "contract_files_member_insert" ON contract_files;
-CREATE POLICY "contract_files_member_insert" ON contract_files FOR INSERT WITH CHECK (
-  tenant_id IN (SELECT public.member_writable_farm_ids())
-);
-
-DROP POLICY IF EXISTS "contract_files_member_update" ON contract_files;
-CREATE POLICY "contract_files_member_update" ON contract_files FOR UPDATE
-  USING  (public.can_member_write(tenant_id))
-  WITH CHECK (public.can_member_write(tenant_id));
-
-DROP POLICY IF EXISTS "contract_files_member_delete" ON contract_files;
-CREATE POLICY "contract_files_member_delete" ON contract_files FOR DELETE
-  USING (public.can_member_admin(tenant_id));
-
--- ── input_invoice_import_items write policies (no direct user_id) ─────────────
-DROP POLICY IF EXISTS "iiv_items_member_insert" ON input_invoice_import_items;
-CREATE POLICY "iiv_items_member_insert" ON input_invoice_import_items FOR INSERT WITH CHECK (
-  import_id IN (
-    SELECT id FROM input_invoice_imports
-    WHERE user_id IN (SELECT public.member_writable_farm_ids())
-  )
-);
-
-DROP POLICY IF EXISTS "iiv_items_member_update" ON input_invoice_import_items;
-CREATE POLICY "iiv_items_member_update" ON input_invoice_import_items FOR UPDATE
-  USING (
-    import_id IN (
-      SELECT id FROM input_invoice_imports
-      WHERE public.can_member_write(user_id)
-    )
-  )
-  WITH CHECK (
-    import_id IN (
-      SELECT id FROM input_invoice_imports
-      WHERE public.can_member_write(user_id)
-    )
-  );
-
--- ── purchase_invoice_items write policies (no direct user_id) ─────────────────
-DROP POLICY IF EXISTS "purchase_invoice_items_member_insert" ON purchase_invoice_items;
-CREATE POLICY "purchase_invoice_items_member_insert" ON purchase_invoice_items FOR INSERT WITH CHECK (
-  invoice_id IN (
-    SELECT id FROM purchase_invoices
-    WHERE user_id IN (SELECT public.member_writable_farm_ids())
-  )
-);
-
-DROP POLICY IF EXISTS "purchase_invoice_items_member_update" ON purchase_invoice_items;
-CREATE POLICY "purchase_invoice_items_member_update" ON purchase_invoice_items FOR UPDATE
-  USING (
-    invoice_id IN (
-      SELECT id FROM purchase_invoices
-      WHERE public.can_member_write(user_id)
-    )
-  )
-  WITH CHECK (
-    invoice_id IN (
-      SELECT id FROM purchase_invoices
-      WHERE public.can_member_write(user_id)
-    )
-  );
+-- company_settings: members can read (cs_member_select above) but NOT write.
+-- Owner writes via the existing cs_user policy.
 
 -- ── 5. AUTO-LINK MEMBER ON FIRST LOGIN ───────────────────────
 -- When an invited user signs up / logs in, link their auth.users ID to the
