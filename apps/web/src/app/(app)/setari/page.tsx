@@ -469,7 +469,7 @@ export default function SetariPage() {
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className="w-full">
       <PageHeader title="Setari" subtitle="Configurare firma si produse" />
 
       {/* Tabs */}
@@ -502,8 +502,8 @@ export default function SetariPage() {
             <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded p-2">
               Aceste date apar ca <strong>Furnizor</strong> pe facturile fiscale si avizele de insotire a marfii.
             </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+              <div className="col-span-2 xl:col-span-4">
                 <label className={labelCls}>Denumire firma *</label>
                 <input className={inputCls} value={company.name} onChange={e => setCompany(p => ({...p, name: e.target.value}))} required />
               </div>
@@ -515,7 +515,7 @@ export default function SetariPage() {
                 <label className={labelCls}>Nr. Reg. Comert</label>
                 <input className={inputCls} value={company.reg_com} onChange={e => setCompany(p => ({...p, reg_com: e.target.value}))} />
               </div>
-              <div className="col-span-2">
+              <div className="col-span-2 xl:col-span-2">
                 <label className={labelCls}>Adresa</label>
                 <input className={inputCls} value={company.address} onChange={e => setCompany(p => ({...p, address: e.target.value}))} />
               </div>
@@ -547,7 +547,7 @@ export default function SetariPage() {
                 <label className={labelCls}>Serie factura</label>
                 <input className={inputCls} value={company.invoice_series} onChange={e => setCompany(p => ({...p, invoice_series: e.target.value.toUpperCase()}))} maxLength={5} />
               </div>
-              <div className="col-span-2">
+              <div className="col-span-2 xl:col-span-4">
                 <label className={labelCls}>Logo firmă (apare pe facturi, avize, contracte)</label>
                 <div className="flex items-center gap-3 mt-1">
                   {company.logo_url && (
