@@ -10,10 +10,13 @@ import { AppSidebar } from '@/components/layout/AppSidebar'
 import { AppTopbar } from '@/components/layout/AppTopbar'
 import { SidebarOverlay } from '@/components/layout/SidebarOverlay'
 import { MobileNav } from '@/components/layout/MobileNav'
+import { FarmContextLoader } from '@/components/layout/FarmContextLoader'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Farm context bootstrapper — no UI */}
+      <FarmContextLoader />
       {/* Mobile overlay backdrop */}
       <SidebarOverlay />
 

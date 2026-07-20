@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { toast } from 'sonner'
-import { Plus, Trash2, Building2, Package, Upload, X, FileSpreadsheet, Shield, Wheat, Tractor } from 'lucide-react'
+import { Plus, Trash2, Building2, Package, Upload, X, FileSpreadsheet, Shield, Wheat, Tractor, Users, Mail, UserPlus, Ban, CheckCircle2, Pencil, ChevronDown } from 'lucide-react'
 import { VALID_CASA_ANG } from '@/lib/d112Validator'
 import type { Campaign } from '@/lib/campaign-types'
 import { PREDEFINED_PRODUCTS } from '@/lib/predefined-products'
@@ -75,7 +75,7 @@ const EMPTY_D112: D112Settings = {
 }
 
 export default function SetariPage() {
-  const [tab, setTab] = useState<'company' | 'products' | 'd112' | 'asigurator' | 'campanii' | 'utilaje'>('company')
+  const [tab, setTab] = useState<'company' | 'products' | 'd112' | 'asigurator' | 'campanii' | 'utilaje' | 'utilizatori'>('company')
   const [company, setCompany] = useState<CompanySettings>(EMPTY_COMPANY)
   const [savingCompany, setSavingCompany] = useState(false)
   const [d112, setD112] = useState<D112Settings>(EMPTY_D112)
@@ -99,6 +99,55 @@ export default function SetariPage() {
   const [machines, setMachines] = useState<Machine[]>([])
   const [newMachine, setNewMachine] = useState({ name: '', type: 'TRACTOR', brand: '', model: '', year: '', plate: '', fuel_type: 'motorina', notes: '' })
   const [savingMachine, setSavingMachine] = useState(false)
+
+  // ── Utilizatori state ──────────────────────────────────────────
+  type MemberStatus = 'active' | 'suspended' | 'pending'
+  type MemberRole = 'administrator' | 'contabil' | 'operator' | 'vizualizare'
+  interface FarmMember {
+    id: string
+    member_id: string | null
+    email: string
+    display_name: string | null
+    role: MemberRole
+    status: MemberStatus
+    section_permissions: Record<string, boolean>
+    created_at: string
+  }
+  const ROLE_LABELS: Record<MemberRole, string> = {
+    administrator: 'Administrator',
+    contabil: 'Contabil',
+    operator: 'Operator',
+    vizualizare: 'Vizualizare',
+  }
+  const SECTION_KEYS: { key: string; label: string }[] = [
+    { key: 'can_dashboard', label: 'Dashboard & Alerte' },
+    { key: 'can_arendasi', label: 'Arendatori' },
+    { key: 'can_contracte', label: 'Contracte' },
+    { key: 'can_parcele', label: 'Parcele' },
+    { key: 'can_tranzactii', label: 'Tranzacții' },
+    { key: 'can_facturi', label: 'Facturi & e-Transport' },
+    { key: 'can_rapoarte', label: 'Rapoarte' },
+    { key: 'can_declaratii', label: 'Declarații & APIA' },
+    { key: 'can_fitosanitar', label: 'Fitosanitar' },
+    { key: 'can_setari', label: 'Setări' },
+  ]
+  const DEFAULT_PERMS: Record<string, boolean> = {
+    can_dashboard: true, can_arendasi: true, can_contracte: true, can_parcele: true,
+    can_tranzactii: true, can_facturi: true, can_rapoarte: true, can_declaratii: true,
+    can_fitosanitar: true, can_setari: false,
+  }
+  const [members, setMembers] = useState<FarmMember[]>([])
+  const [loadingMembers, setLoadingMembers] = useState(false)
+  const [addMode, setAddMode] = useState<'invite' | 'create'>('invite')
+  const [addEmail, setAddEmail] = useState('')
+  const [addRole, setAddRole] = useState<MemberRole>('operator')
+  const [addPassword, setAddPassword] = useState('')
+  const [addDisplayName, setAddDisplayName] = useState('')
+  const [addPerms, setAddPerms] = useState<Record<string, boolean>>({ ...DEFAULT_PERMS })
+  const [savingMember, setSavingMember] = useState(false)
+  const [editingPermsMemberId, setEditingPermsMemberId] = useState<string | null>(null)
+  const [editPerms, setEditPerms] = useState<Record<string, boolean>>({})
+  const [savingPerms, setSavingPerms] = useState(false)
 
   const inputCls = 'w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-500'
   const labelCls = 'block text-xs font-medium text-gray-700 mb-1'
@@ -148,6 +197,94 @@ export default function SetariPage() {
     loadCampaigns(db)
     loadMachines(db)
   }, [])
+
+  // ── Utilizatori: load on tab switch ────────────────────────
+  useEffect(() => {
+    if (tab !== 'utilizatori') return
+    loadMembers()
+  }, [tab])
+
+  async function loadMembers() {
+    setLoadingMembers(true)
+    try {
+      const res = await fetch('/api/farm-members')
+      if (res.ok) {
+        const { members: data } = await res.json() as { members: FarmMember[] }
+        setMembers(data ?? [])
+      }
+    } finally {
+      setLoadingMembers(false)
+    }
+  }
+
+  async function handleAddMember(e: React.FormEvent) {
+    e.preventDefault()
+    if (!addEmail) return
+    setSavingMember(true)
+    try {
+      const body: Record<string, unknown> = {
+        mode: addMode,
+        email: addEmail,
+        role: addRole,
+        sectionPermissions: addPerms,
+      }
+      if (addMode === 'create') {
+        body.password = addPassword
+        body.displayName = addDisplayName
+      }
+      const res = await fetch('/api/farm-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Eroare'); return }
+      toast.success(addMode === 'invite' ? 'Invitație trimisă!' : 'Utilizator creat!')
+      setAddEmail(''); setAddPassword(''); setAddDisplayName('')
+      setAddPerms({ ...DEFAULT_PERMS })
+      await loadMembers()
+    } finally {
+      setSavingMember(false)
+    }
+  }
+
+  async function handleSuspend(m: FarmMember) {
+    const newStatus = m.status === 'suspended' ? 'active' : 'suspended'
+    const res = await fetch(`/api/farm-members/${m.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    })
+    if (res.ok) {
+      toast.success(newStatus === 'suspended' ? 'Acces suspendat' : 'Acces reactivat')
+      await loadMembers()
+    } else {
+      const d = await res.json()
+      toast.error(d.error ?? 'Eroare')
+    }
+  }
+
+  async function handleRemove(m: FarmMember) {
+    if (!confirm(`Elimini ${m.email} din fermă? Acțiunea este ireversibilă.`)) return
+    const res = await fetch(`/api/farm-members/${m.id}`, { method: 'DELETE' })
+    if (res.ok) { toast.success('Utilizator eliminat'); await loadMembers() }
+    else { const d = await res.json(); toast.error(d.error ?? 'Eroare') }
+  }
+
+  async function handleSavePerms(m: FarmMember) {
+    setSavingPerms(true)
+    try {
+      const res = await fetch(`/api/farm-members/${m.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sectionPermissions: editPerms }),
+      })
+      if (res.ok) { toast.success('Permisiuni salvate'); setEditingPermsMemberId(null); await loadMembers() }
+      else { const d = await res.json(); toast.error(d.error ?? 'Eroare') }
+    } finally {
+      setSavingPerms(false)
+    }
+  }
 
   async function loadMachines(db = createClient()) {
     const { data } = await db.from('machines').select('*').order('name')
@@ -341,6 +478,7 @@ export default function SetariPage() {
           ['products', Package, 'Produse arenda'],
           ['campanii', Wheat, 'Campanii'],
           ['utilaje', Tractor, 'Utilaje'],
+          ['utilizatori', Users, 'Utilizatori & Acces'],
           ['d112', FileSpreadsheet, 'Date Declaratie 112'],
           ['asigurator', Shield, 'Date Asigurator'],
         ] as const).map(([key, Icon, label]) => (
@@ -863,6 +1001,307 @@ export default function SetariPage() {
             </button>
           </div>
         </form>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          UTILIZATORI & ACCES TAB
+          ═══════════════════════════════════════════════════════ */}
+      {tab === 'utilizatori' && (
+        <div className="space-y-6">
+
+          {/* ── Info banner ─────────────────────────────────── */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex gap-3">
+            <Shield className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-900">Acces multi-utilizator</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Adaugă colaboratori care pot accesa ferma ta. Poți controla ce secțiuni vede fiecare utilizator
+                și ce rol are: <strong>Administrator</strong> (acces complet), <strong>Contabil</strong> (financiar),{' '}
+                <strong>Operator</strong> (operațional) sau <strong>Vizualizare</strong> (citire).
+              </p>
+            </div>
+          </div>
+
+          {/* ── Members list ────────────────────────────────── */}
+          <div className="bg-white rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-800">Utilizatori activi</h3>
+              <span className="text-xs text-gray-400">{members.length} {members.length === 1 ? 'utilizator' : 'utilizatori'}</span>
+            </div>
+
+            {loadingMembers ? (
+              <div className="px-5 py-8 text-center text-sm text-gray-400">Se încarcă...</div>
+            ) : members.length === 0 ? (
+              <div className="px-5 py-8 text-center">
+                <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Niciun colaborator adăugat încă.</p>
+                <p className="text-xs text-gray-400 mt-1">Adaugă primul utilizator folosind formularul de mai jos.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {members.map(m => (
+                  <div key={m.id} className="px-5 py-3.5">
+                    <div className="flex items-start gap-3">
+                      {/* Avatar */}
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0 uppercase">
+                        {(m.display_name ?? m.email).charAt(0)}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {m.display_name && (
+                            <span className="text-sm font-medium text-gray-800">{m.display_name}</span>
+                          )}
+                          <span className="text-xs text-gray-500">{m.email}</span>
+                          {/* Role badge */}
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            m.role === 'administrator' ? 'bg-purple-100 text-purple-700' :
+                            m.role === 'contabil' ? 'bg-blue-100 text-blue-700' :
+                            m.role === 'operator' ? 'bg-green-100 text-green-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {ROLE_LABELS[m.role]}
+                          </span>
+                          {/* Status badge */}
+                          {m.status === 'suspended' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-600">
+                              Suspendat
+                            </span>
+                          )}
+                          {m.status === 'pending' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
+                              Invitație în așteptare
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          Adăugat {new Date(m.created_at).toLocaleDateString('ro-RO')}
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => {
+                            if (editingPermsMemberId === m.id) { setEditingPermsMemberId(null) }
+                            else { setEditingPermsMemberId(m.id); setEditPerms({ ...m.section_permissions }) }
+                          }}
+                          title="Permisiuni secțiuni"
+                          className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleSuspend(m)}
+                          title={m.status === 'suspended' ? 'Reactivează' : 'Suspendă acces'}
+                          className={`p-1.5 rounded transition-colors ${
+                            m.status === 'suspended'
+                              ? 'hover:bg-green-50 text-green-600 hover:text-green-700'
+                              : 'hover:bg-amber-50 text-amber-500 hover:text-amber-700'
+                          }`}
+                        >
+                          {m.status === 'suspended' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => handleRemove(m)}
+                          title="Elimină utilizator"
+                          className="p-1.5 rounded hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ── Permissions editor ─────────────────── */}
+                    {editingPermsMemberId === m.id && (
+                      <div className="mt-3 ml-11 bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        <p className="text-xs font-medium text-gray-700 mb-2">Secțiuni vizibile</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mb-3">
+                          {SECTION_KEYS.map(({ key, label }) => (
+                            <label key={key} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                                checked={editPerms[key] !== false}
+                                onChange={e => setEditPerms(p => ({ ...p, [key]: e.target.checked }))}
+                              />
+                              {label}
+                            </label>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSavePerms(m)}
+                            disabled={savingPerms}
+                            className="px-3 py-1.5 bg-brand-600 text-white text-xs rounded hover:bg-brand-700 disabled:opacity-50"
+                          >
+                            {savingPerms ? 'Se salvează...' : 'Salvează'}
+                          </button>
+                          <button
+                            onClick={() => setEditingPermsMemberId(null)}
+                            className="px-3 py-1.5 bg-gray-100 text-gray-600 text-xs rounded hover:bg-gray-200"
+                          >
+                            Anulează
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Add member form ─────────────────────────────── */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <h3 className="text-sm font-semibold text-gray-800 mb-4">Adaugă utilizator nou</h3>
+
+            {/* Mode selector */}
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-5 w-fit">
+              <button
+                onClick={() => setAddMode('invite')}
+                className={`flex items-center gap-1.5 px-4 py-1.5 text-xs rounded-md transition-colors ${
+                  addMode === 'invite' ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Mail className="w-3.5 h-3.5" /> Invitație email
+              </button>
+              <button
+                onClick={() => setAddMode('create')}
+                className={`flex items-center gap-1.5 px-4 py-1.5 text-xs rounded-md transition-colors ${
+                  addMode === 'create' ? 'bg-white shadow text-brand-700 font-medium' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <UserPlus className="w-3.5 h-3.5" /> Creare directă
+              </button>
+            </div>
+
+            <form onSubmit={handleAddMember} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Email *</label>
+                  <input
+                    type="email"
+                    required
+                    className={inputCls}
+                    value={addEmail}
+                    onChange={e => setAddEmail(e.target.value)}
+                    placeholder="colaborator@exemplu.ro"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Rol *</label>
+                  <select className={inputCls} value={addRole} onChange={e => setAddRole(e.target.value as MemberRole)}>
+                    <option value="administrator">Administrator — acces complet (fără utilizatori)</option>
+                    <option value="contabil">Contabil — financiar + vizualizare</option>
+                    <option value="operator">Operator — date operaționale + vizualizare</option>
+                    <option value="vizualizare">Vizualizare — doar citire</option>
+                  </select>
+                </div>
+
+                {addMode === 'create' && (
+                  <>
+                    <div>
+                      <label className={labelCls}>Nume afișat</label>
+                      <input
+                        className={inputCls}
+                        value={addDisplayName}
+                        onChange={e => setAddDisplayName(e.target.value)}
+                        placeholder="ex: Ion Popescu"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Parolă temporară *</label>
+                      <input
+                        type="password"
+                        required={addMode === 'create'}
+                        minLength={8}
+                        className={inputCls}
+                        value={addPassword}
+                        onChange={e => setAddPassword(e.target.value)}
+                        placeholder="Minim 8 caractere"
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        Comunică parola utilizatorului pe un canal separat (SMS, telefon).
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Permissions for new member */}
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <p className="text-xs font-medium text-gray-700 mb-3">Secțiuni vizibile pentru utilizatorul nou</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  {SECTION_KEYS.map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                        checked={addPerms[key] !== false}
+                        onChange={e => setAddPerms(p => ({ ...p, [key]: e.target.checked }))}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button type="button" onClick={() => setAddPerms(Object.fromEntries(SECTION_KEYS.map(s => [s.key, true])))}
+                    className="text-[10px] text-brand-600 hover:underline">Selectează tot</button>
+                  <span className="text-gray-300">·</span>
+                  <button type="button" onClick={() => setAddPerms(Object.fromEntries(SECTION_KEYS.map(s => [s.key, false])))}
+                    className="text-[10px] text-gray-500 hover:underline">Deselectează tot</button>
+                </div>
+              </div>
+
+              {addMode === 'invite' && (
+                <p className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-2.5">
+                  <strong>Invitație email:</strong> Utilizatorul va primi un email Supabase cu un link de activare.
+                  După ce accesează linkul, contul îi este activat automat și are acces la ferma ta.
+                </p>
+              )}
+              {addMode === 'create' && (
+                <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded p-2.5">
+                  <strong>Creare directă:</strong> Contul este creat imediat și activ. Comunică emailul și parola
+                  utilizatorului pe un canal securizat (nu prin email).
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={savingMember}
+                className="flex items-center gap-2 px-5 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700 disabled:opacity-50 transition-colors"
+              >
+                <UserPlus className="w-4 h-4" />
+                {savingMember
+                  ? 'Se procesează...'
+                  : addMode === 'invite' ? 'Trimite invitație' : 'Creează utilizator'}
+              </button>
+            </form>
+          </div>
+
+          {/* ── Role descriptions ────────────────────────────── */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Descriere roluri</h3>
+            <div className="space-y-2.5">
+              {[
+                { role: 'administrator', color: 'purple', desc: 'Acces complet la toate secțiunile. Poate adăuga/modifica date operaționale, financiare și de raportare. Nu poate gestiona alți administratori sau contul proprietarului.' },
+                { role: 'contabil', color: 'blue', desc: 'Vizualizare completă + editare în secțiunile financiare (facturi, tranzacții, declarații). Nu poate modifica contracte, parcele sau utilaje.' },
+                { role: 'operator', color: 'green', desc: 'Vizualizare completă + editare date operaționale (arendatori, contracte, parcele, utilaje, fitosanitar). Nu poate accesa secțiunile financiare.' },
+                { role: 'vizualizare', color: 'gray', desc: 'Citire în secțiunile permise. Nu poate adăuga sau modifica niciun date.' },
+              ].map(({ role, color, desc }) => (
+                <div key={role} className="flex gap-3">
+                  <span className={`inline-flex items-center self-start mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-${color}-100 text-${color}-700 flex-shrink-0`}>
+                    {ROLE_LABELS[role as MemberRole]}
+                  </span>
+                  <p className="text-xs text-gray-600">{desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
       )}
     </div>
   )

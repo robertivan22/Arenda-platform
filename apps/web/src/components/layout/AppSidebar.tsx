@@ -4,11 +4,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, MapPin, CreditCard,
-  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Settings2, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen, Package, Bot, Truck,
+  BarChart3, ChevronDown, X, FileSpreadsheet, Leaf, Settings, Settings2, Shield, Wheat, Tractor, Activity, Receipt, FolderOpen, Package, Bot, Truck, Building2, ChevronRight,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
 import { useSidebarStore } from '@/store/sidebar.store'
+import { useFarmStore, type FarmOption } from '@/store/farm.store'
 import { createClient } from '@/lib/supabase/client'
 
 // ─── Sidebar themes ───────────────────────────────────────────────────────────
@@ -187,6 +188,9 @@ export function AppSidebar() {
   const [userEmail, setUserEmail] = useState<string>('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [theme, setTheme] = useState<SidebarTheme>('green')
+  const [farmPickerOpen, setFarmPickerOpen] = useState(false)
+
+  const { effectiveUserId, userId, role, availableFarms, loaded, switchFarm } = useFarmStore()
 
   useEffect(() => {
     const saved = localStorage.getItem('sidebar-theme') as SidebarTheme | null
@@ -495,6 +499,80 @@ export function AppSidebar() {
         </div>
       )}
 
+      {/* ── Farm switcher (only if user is member of multiple farms) ─ */}
+      {loaded && availableFarms.length > 1 && (
+        <div className="px-2 pb-1 flex-shrink-0">
+          <div className={clsx('mx-0 h-px mb-1', t.divider)} />
+          <div className="relative">
+            <button
+              onClick={() => setFarmPickerOpen(p => !p)}
+              className={clsx(
+                'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors',
+                t.inactiveItem,
+              )}
+            >
+              <Building2 className={clsx('w-3.5 h-3.5 flex-shrink-0', t.inactiveIcon)} />
+              <div className="flex-1 text-left min-w-0">
+                <div className="truncate font-medium" style={{ fontSize: 10 }}>
+                  {effectiveUserId === userId
+                    ? 'Ferma mea'
+                    : (availableFarms.find(f => f.farmOwnerId === effectiveUserId)?.farmName ?? 'Fermă membră')}
+                </div>
+                {effectiveUserId !== userId && (
+                  <div style={{ fontSize: 9 }} className="opacity-60 capitalize">{role}</div>
+                )}
+              </div>
+              <ChevronRight className={clsx('w-3 h-3 flex-shrink-0 transition-transform', t.chevron, farmPickerOpen && 'rotate-90')} />
+            </button>
+
+            {farmPickerOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
+                {availableFarms.map((farm: FarmOption) => (
+                  <button
+                    key={farm.farmOwnerId}
+                    onClick={() => {
+                      setFarmPickerOpen(false)
+                      switchFarm(farm.farmOwnerId === userId ? null : farm.farmOwnerId)
+                    }}
+                    className={clsx(
+                      'w-full flex items-center gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50 transition-colors',
+                      farm.farmOwnerId === effectiveUserId && 'bg-amber-50',
+                    )}
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-800 truncate">{farm.farmName}</div>
+                      <div className="text-gray-400 capitalize" style={{ fontSize: 9 }}>
+                        {farm.farmOwnerId === userId ? 'proprietar' : farm.role}
+                      </div>
+                    </div>
+                    {farm.farmOwnerId === effectiveUserId && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Member badge — visible when acting as farm member */}
+      {loaded && effectiveUserId !== userId && availableFarms.length === 1 && (
+        <div className="px-2 pb-1 flex-shrink-0">
+          <div className={clsx('mx-0 h-px mb-1', t.divider)} />
+          <div className={clsx('flex items-center gap-2 px-3 py-1.5 rounded-lg mx-0', t.inactiveItem)}>
+            <Building2 className={clsx('w-3.5 h-3.5 flex-shrink-0', t.inactiveIcon)} />
+            <div className="flex-1 min-w-0">
+              <div className="truncate font-medium" style={{ fontSize: 10 }}>
+                {availableFarms[0]?.farmName ?? 'Fermă membră'}
+              </div>
+              <div style={{ fontSize: 9 }} className="opacity-60 capitalize">{role}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Settings + Profile ────────────── */}
       <div className="flex-shrink-0">
         <Link
@@ -521,7 +599,9 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col leading-none min-w-0 flex-1">
             <span className={clsx('text-[11px] font-medium truncate', t.userText)}>{userEmail || 'admin@arenda.ro'}</span>
-            <span className={clsx('text-[9px] mt-0.5', t.userSubText)}>Administrator</span>
+            <span className={clsx('text-[9px] mt-0.5 capitalize', t.userSubText)}>
+              {loaded ? (role === 'proprietar' ? 'Proprietar' : role) : 'Administrator'}
+            </span>
           </div>
           {/* ── Theme switcher ── */}
           <div className="flex items-center gap-1 flex-shrink-0">
