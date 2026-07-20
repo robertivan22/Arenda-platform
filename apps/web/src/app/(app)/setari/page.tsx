@@ -129,7 +129,7 @@ export default function SetariPage() {
     { key: 'can_rapoarte', label: 'Rapoarte' },
     { key: 'can_declaratii', label: 'Declarații & APIA' },
     { key: 'can_fitosanitar', label: 'Fitosanitar' },
-    { key: 'can_setari', label: 'Setări' },
+    // can_setari is intentionally excluded — invited users never get Settings access
   ]
   const DEFAULT_PERMS: Record<string, boolean> = {
     can_dashboard: true, can_arendasi: true, can_contracte: true, can_parcele: true,
@@ -226,7 +226,7 @@ export default function SetariPage() {
         mode: addMode,
         email: addEmail,
         role: addRole,
-        sectionPermissions: addPerms,
+        sectionPermissions: { ...addPerms, can_setari: false }, // always false
       }
       if (addMode === 'create') {
         body.password = addPassword
@@ -275,10 +275,12 @@ export default function SetariPage() {
   async function handleSavePerms(m: FarmMember) {
     setSavingPerms(true)
     try {
+      // can_setari is always false — invited users never get Settings access
+      const safePerms = { ...editPerms, can_setari: false }
       const res = await fetch(`/api/farm-members/${m.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sectionPermissions: editPerms }),
+        body: JSON.stringify({ sectionPermissions: safePerms }),
       })
       if (res.ok) { toast.success('Permisiuni salvate'); setEditingPermsMemberId(null); await loadMembers() }
       else { const d = await res.json(); toast.error(d.error ?? 'Eroare') }

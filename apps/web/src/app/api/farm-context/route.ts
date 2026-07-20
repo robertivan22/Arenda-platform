@@ -60,6 +60,8 @@ export async function GET() {
       farmOwnerId: user.id,
       farmName: ownSettings?.name || user.email || user.id,
       role: 'proprietar',
+      // true = user has a real farm of their own (company settings configured)
+      hasOwnFarm: !!ownSettings,
     },
     memberFarms,
   })

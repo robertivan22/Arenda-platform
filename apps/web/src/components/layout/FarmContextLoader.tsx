@@ -22,15 +22,19 @@ export function FarmContextLoader() {
       if (!res.ok) return
 
       const { ownFarm, memberFarms } = await res.json() as {
-        ownFarm: { farmOwnerId: string; farmName: string; role: string }
+        ownFarm: { farmOwnerId: string; farmName: string; role: string; hasOwnFarm: boolean }
         memberFarms: FarmOption[]
       }
 
       // Get active farm from cookie (read via a tiny endpoint or just check document.cookie)
       const activeFarmCookie = getCookie('arenda_active_farm')
 
+      // Only include the user's own farm entry in the switcher if they actually have
+      // a farm configured (company settings exist) OR they have no member farms
+      // (so they still see their own workspace).
+      const includeOwnFarm = ownFarm.hasOwnFarm || memberFarms.length === 0
       const allFarms: FarmOption[] = [
-        { ...ownFarm, role: 'proprietar' as FarmRole },
+        ...(includeOwnFarm ? [{ ...ownFarm, role: 'proprietar' as FarmRole }] : []),
         ...memberFarms,
       ]
 
