@@ -575,8 +575,8 @@ export function AppSidebar() {
 
       {/* ── Settings + Profile ────────────── */}
       <div className="flex-shrink-0">
-        {/* Hide Settings for users with can_setari explicitly set to false */}
-        {perms?.can_setari !== false && (
+        {/* Hide Settings only for non-owner members with can_setari explicitly false */}
+        {(role === 'proprietar' || perms?.can_setari !== false) && (
         <Link
           href="/setari"
           onClick={close}
