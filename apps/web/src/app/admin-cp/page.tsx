@@ -44,6 +44,12 @@ interface ContactMessage {
   created_at: string
 }
 
+interface FarmMembership {
+  farmName: string
+  role: string
+  status: string
+}
+
 interface Template {
   id?: string
   user_id: string | null
@@ -95,6 +101,7 @@ export default function AdminPage() {
   // Users
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [permissions, setPermissions] = useState<Record<string, Permissions>>({})
+  const [farmMemberships, setFarmMemberships] = useState<Record<string, FarmMembership>>({})
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
   const [savingPerms, setSavingPerms] = useState(false)
 
@@ -150,11 +157,13 @@ export default function AdminPage() {
   }, [])
 
   const loadAll = useCallback(async (db: ReturnType<typeof createClient>) => {
-    const [{ data: profs }, { data: perms }, { data: tmpls }, { data: msgs }] = await Promise.all([
+    const [{ data: profs }, { data: perms }, { data: tmpls }, { data: msgs }, { data: members }, { data: companySettings }] = await Promise.all([
       db.from('profiles').select('id, email, display_name, is_admin').order('email'),
       db.from('user_permissions').select('*'),
       db.from('document_templates').select('*'),
       db.from('contact_messages').select('*').order('created_at', { ascending: false }).limit(200),
+      db.from('farm_members').select('member_id, farm_owner_id, role, status'),
+      db.from('company_settings').select('user_id, name'),
     ])
 
     setProfiles((profs ?? []) as Profile[])
@@ -163,6 +172,19 @@ export default function AdminPage() {
     const permMap: Record<string, Permissions> = {}
     ;(perms ?? []).forEach((p: Permissions) => { permMap[p.user_id] = p })
     setPermissions(permMap)
+
+    // Build farm membership map: member_id → { farmName, role, status }
+    const csMap: Record<string, string> = {}
+    ;(companySettings ?? []).forEach((cs: { user_id: string; name: string }) => { csMap[cs.user_id] = cs.name })
+    const profEmailMap: Record<string, string> = {}
+    ;(profs ?? []).forEach((p: { id: string; email: string | null }) => { profEmailMap[p.id] = p.email ?? p.id })
+    const memberMap: Record<string, FarmMembership> = {}
+    ;(members ?? []).forEach((m: { member_id: string; farm_owner_id: string; role: string; status: string }) => {
+      if (!m.member_id) return
+      const farmName = csMap[m.farm_owner_id] || profEmailMap[m.farm_owner_id] || m.farm_owner_id
+      memberMap[m.member_id] = { farmName, role: m.role, status: m.status }
+    })
+    setFarmMemberships(memberMap)
 
     // Index templates by user_id ('' for system) + docType
     const tmplMap: Record<string, Record<DocType, Template | null>> = { '': { CONTRACT: null, FACTURA: null, AVIZ: null } }
@@ -393,6 +415,7 @@ export default function AdminPage() {
                     <th className={thCls}>Email</th>
                     <th className={thCls}>Nume afișat</th>
                     <th className={thCls}>Admin</th>
+                    <th className={thCls}>Fermă / Rol</th>
                     <th className={thCls}>Permisiuni</th>
                     <th className={thCls}>Acțiuni</th>
                   </tr>
@@ -435,6 +458,32 @@ export default function AdminPage() {
                             </button>
                           </td>
                           <td className={tdCls}>
+                            {farmMemberships[profile.id] ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs font-medium text-gray-700 truncate max-w-[160px]" title={farmMemberships[profile.id].farmName}>
+                                  {farmMemberships[profile.id].farmName}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                    farmMemberships[profile.id].role === 'administrator' ? 'bg-purple-100 text-purple-700' :
+                                    farmMemberships[profile.id].role === 'contabil' ? 'bg-blue-100 text-blue-700' :
+                                    farmMemberships[profile.id].role === 'operator' ? 'bg-green-100 text-green-700' :
+                                    'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {farmMemberships[profile.id].role}
+                                  </span>
+                                  {farmMemberships[profile.id].status !== 'active' && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                                      {farmMemberships[profile.id].status}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className={tdCls}>
                             <button
                               onClick={() => setExpandedUser(isExpanded ? null : profile.id)}
                               className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800 font-medium"
@@ -453,7 +502,7 @@ export default function AdminPage() {
                         {/* Expanded permissions row */}
                         {isExpanded && (
                           <tr key={`${profile.id}-perms`}>
-                            <td colSpan={5} className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                            <td colSpan={6} className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                               <div className="flex items-center gap-2 mb-3">
                                 <Shield className="w-3.5 h-3.5 text-gray-400" />
                                 <span className="text-xs font-semibold text-gray-500 uppercase">Permisiuni acces secțiuni</span>
