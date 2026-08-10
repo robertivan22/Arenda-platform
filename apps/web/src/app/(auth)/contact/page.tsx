@@ -97,8 +97,8 @@ export default function ContactPage() {
           {/* Contact info */}
           <div className="space-y-3">
             {[
-              { icon: Mail, text: 'admin@arendapro.com' },
               { icon: Phone, text: '0720809872' },
+              { icon: Phone, text: '0729160398' },
               { icon: MapPin, text: 'București, România' },
             ].map(({ icon: Icon, text }) => (
               <div key={text} className="flex items-center gap-3">
@@ -148,8 +148,7 @@ export default function ContactPage() {
 
           <h1 className="text-3xl font-bold text-gray-900 mb-1">Contactează-ne</h1>
           <p className="text-sm text-gray-400 mb-6">
-            Mesajul tău va fi trimis direct către{' '}
-            <span className="text-[#16a34a] font-medium">admin@arendapro.com</span>
+            Echipa noastră îți răspunde în maximum 24 de ore.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
