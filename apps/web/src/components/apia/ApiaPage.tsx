@@ -13,10 +13,11 @@ import {
   Btn, Card, Disclaimer, EmptyState, ErrorState, H, ProgressBar, ProgressCard, SectionNavigationItem, SecIcon, SkeletonBlock, StatusBadge, WarningCard, Select,
 } from "./ui";
 import { SECTION_ICONS } from "./icons";
+import { Guidance, GuidanceDrawer, GuideButton } from "./GuidanceUI";
 
 const SECTIONS: Record<SectionKey, (p: { a: ReturnType<typeof useApia>; bp: BP }) => React.ReactElement> = {
   overview: Overview, applicant: Applicant, bank: Bank, parcels: Parcels, usage: Usage, cultures: Cultures, interventions: Interventions,
-  notebooks: Notebooks, zoo: Zoo, documents: Documents, verification: Verification, export: ExportPage, modifications: Modifications,
+  notebooks: Notebooks, zoo: Zoo, documents: Documents, verification: Verification, export: ExportPage, modifications: Modifications, guidance: Guidance,
 };
 
 export function ApiaPage() {
@@ -27,6 +28,7 @@ export function ApiaPage() {
   const error = a.error;
   const [panel, setPanel] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
     const el = ref.current; if (!el) return;
@@ -51,6 +53,8 @@ export function ApiaPage() {
           </div>
         );
       })}
+      <div className="my-1.5 border-t" style={{ borderColor: C.lineSoft }} />
+      <SectionNavigationItem icon={<SECTION_ICONS.guidance size={16} />} title="Ghidaj APIA" active={a.section === "guidance"} onClick={() => { a.setSection("guidance"); setNavOpen(false); }} />
     </nav>
   );
 
@@ -81,6 +85,7 @@ export function ApiaPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="w-[140px]"><Select value={a.campaign} onChange={a.setCampaign}>{a.years.map(c => <option key={c} value={c}>Campania {c}</option>)}</Select></div>
+            <Btn onClick={() => a.setSection("guidance")} icon={<SECTION_ICONS.guidance size={14} />}>Ghidaj APIA</Btn>
             {bp !== "desktop" && <Btn onClick={() => setPanel(true)} icon={<Eye size={14} />}>Vezi verificările{a.open.length ? ` (${a.open.length})` : ""}</Btn>}
             {hasDossier && <Btn v="primary" onClick={() => a.setSection(a.lastSection)} icon={<Play size={14} />}>Continuă pregătirea</Btn>}
           </div>
@@ -102,6 +107,7 @@ export function ApiaPage() {
                 </div>
               )}
               {a.section !== "overview" && !loading && !error && acc !== "none" && <div className="mb-4"><ProgressCard a={a} compact /></div>}
+              {a.section !== "guidance" && <GuideButton onClick={() => setGuideOpen(true)} />}
               {loading ? <SkeletonBlock rows={6} /> : error ? <ErrorState onRetry={reload} /> : acc === "none" ? (
                 <EmptyState icon={<Layers size={22} />} title="Nu ai acces la această secțiune" text={`Rolul „${ROLE_LABEL[a.role]}” nu include această secțiune. Contactează administratorul fermei.`} action={<Btn onClick={() => a.setSection("overview")}>Înapoi la prezentare</Btn>} />
               ) : <Current a={a} bp={bp} />}
@@ -121,6 +127,7 @@ export function ApiaPage() {
         </div>
       )}
 
+      <GuidanceDrawer a={a} open={guideOpen} onOpenChange={setGuideOpen} />
       <Sheet open={panel} onOpenChange={setPanel}>
         <SheetContent side="right" className="w-[92vw] max-w-[400px] overflow-y-auto p-4" style={{ background: C.bg }}>
           <SheetHeader className="p-0"><SheetTitle className="sr-only">Verificări</SheetTitle></SheetHeader>

@@ -73,27 +73,28 @@ export const STATUS: Record<string, { label: string; tone: Tone }> = {
   m_anulata: { label: "Anulată", tone: "red" },
 };
 
-export type SectionKey = "overview" | "applicant" | "bank" | "parcels" | "usage" | "cultures" | "interventions" | "notebooks" | "zoo" | "documents" | "verification" | "export" | "modifications";
+export type SectionKey = "overview" | "applicant" | "bank" | "parcels" | "usage" | "cultures" | "interventions" | "notebooks" | "zoo" | "documents" | "verification" | "export" | "modifications" | "guidance";
 
 export const SECTION_TITLES: Record<SectionKey, string> = {
   overview: "Prezentare generală", applicant: "Date solicitant", bank: "Cont bancar", parcels: "Parcele pregătite",
   usage: "Documente de utilizare", cultures: "Culturi", interventions: "Intervenții pentru analiză", notebooks: "Eco-scheme și caiete",
   zoo: "Sector zootehnic", documents: "Documente justificative", verification: "Verificare informații",
-  export: "Export și înregistrare depunere", modifications: "Pregătire modificări după depunere",
+  export: "Export și înregistrare depunere", modifications: "Pregătire modificări după depunere", guidance: "Ghidaj APIA",
 };
-export const SECTION_ORDER = Object.keys(SECTION_TITLES) as SectionKey[];
+// Ghidajul nu este o secțiune a dosarului: nu intră în completare și nu are verificări.
+export const SECTION_ORDER = (Object.keys(SECTION_TITLES) as SectionKey[]).filter(k => k !== "guidance") as SectionKey[];
 
 // Rolurile ArendaPro (farm_members.role) mapate pe nivelurile de acces ale modulului.
 export type Role = "admin" | "contabil" | "colaborator" | "vizualizare";
 export const ROLE_LABEL: Record<Role, string> = { admin: "Administrator", contabil: "Contabil", colaborator: "Colaborator", vizualizare: "Vizualizare" };
 type Acc = "edit" | "view" | "none";
-const ACCESS: Record<Role, Record<SectionKey, Acc>> = {
-  admin: Object.fromEntries(SECTION_ORDER.map(k => [k, "edit"])) as Record<SectionKey, Acc>,
+const ACCESS: Record<Role, Record<Exclude<SectionKey, "guidance">, Acc>> = {
+  admin: Object.fromEntries(SECTION_ORDER.map(k => [k, "edit"])) as Record<Exclude<SectionKey, "guidance">, Acc>,
   contabil: { overview: "view", applicant: "view", bank: "edit", parcels: "view", usage: "view", cultures: "view", interventions: "view", notebooks: "view", zoo: "view", documents: "edit", verification: "view", export: "edit", modifications: "view" },
   colaborator: { overview: "view", applicant: "none", bank: "none", parcels: "none", usage: "edit", cultures: "none", interventions: "none", notebooks: "edit", zoo: "none", documents: "edit", verification: "none", export: "none", modifications: "none" },
-  vizualizare: Object.fromEntries(SECTION_ORDER.map(k => [k, "view"])) as Record<SectionKey, Acc>,
+  vizualizare: Object.fromEntries(SECTION_ORDER.map(k => [k, "view"])) as Record<Exclude<SectionKey, "guidance">, Acc>,
 };
-export const access = (r: Role, s: SectionKey): Acc => ACCESS[r][s];
+export const access = (r: Role, s: SectionKey): Acc => s === "guidance" ? "view" : ACCESS[r][s];
 
 // ── Parcele ──────────────────────────────────────────────────────────────────
 export interface Parcel {
