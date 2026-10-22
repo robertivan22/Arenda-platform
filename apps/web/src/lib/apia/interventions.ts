@@ -429,12 +429,12 @@ export const DOSSIER_STATUS_CFG: Record<
   string,
   { label: string; color: string }
 > = {
-  DRAFT:        { label: 'Ciornă',             color: 'bg-gray-100 text-gray-500' },
-  CHECKING:     { label: 'În verificare',       color: 'bg-yellow-100 text-yellow-700' },
-  READY:        { label: 'Pregătit depunere',   color: 'bg-blue-100 text-blue-700' },
-  SUBMITTED:    { label: 'Depus APIA',          color: 'bg-indigo-100 text-indigo-700' },
-  UNDER_REVIEW: { label: 'În analiză APIA',     color: 'bg-purple-100 text-purple-700' },
-  ACCEPTED:     { label: 'Acceptat',            color: 'bg-green-100 text-green-700' },
-  CORRECTED:    { label: 'Corectat (M form)',   color: 'bg-orange-100 text-orange-700' },
-  ARCHIVED:     { label: 'Arhivat',             color: 'bg-gray-100 text-gray-400' },
+  DRAFT:        { label: 'În pregătire',                     color: 'bg-gray-100 text-gray-500' },
+  CHECKING:     { label: 'Necesită verificare',              color: 'bg-yellow-100 text-yellow-700' },
+  READY:        { label: 'Pregătit pentru revizuire finală',  color: 'bg-blue-100 text-blue-700' },
+  SUBMITTED:    { label: 'Depunere înregistrată manual',     color: 'bg-indigo-100 text-indigo-700' },
+  UNDER_REVIEW: { label: 'În control · confirmat de utilizator', color: 'bg-purple-100 text-purple-700' },
+  ACCEPTED:     { label: 'Rezultat extern înregistrat',      color: 'bg-green-100 text-green-700' },
+  CORRECTED:    { label: 'Modificat după depunere',          color: 'bg-orange-100 text-orange-700' },
+  ARCHIVED:     { label: 'Arhivat',                          color: 'bg-gray-100 text-gray-400' },
 }

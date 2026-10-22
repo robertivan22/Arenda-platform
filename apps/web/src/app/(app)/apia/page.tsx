@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/layout/PageHeader'
 import {
   FolderOpen, Plus, ChevronRight, CheckCircle2, AlertCircle,
-  Clock, Archive, Loader2, FileText, Wheat, BarChart3, RefreshCw, Trash2,
+  Clock, Archive, Loader2, FileText, Wheat, BarChart3, RefreshCw,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ApiaDossier } from '@/lib/apia/types'
@@ -119,7 +119,7 @@ function CreateDossierModal({
       new_value: { campaign_year: year },
     })
 
-    toast.success(`Dosar APIA ${year} creat${importParcels ? ' cu parcele importate automat' : ''}`)
+    toast.success(`Pregătirea APIA ${year} a fost creată${importParcels ? ' cu parcele importate' : ''}`)
     setSaving(false)
     onCreated(dossier.id)
   }
@@ -128,7 +128,7 @@ function CreateDossierModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
         <h2 className="text-base font-semibold text-gray-800 mb-4">
-          Creare Dosar APIA {year}
+          Creează pregătire APIA {year}
         </h2>
         <form onSubmit={handleCreate} className="space-y-4">
           <div>
@@ -150,10 +150,10 @@ function CreateDossierModal({
                 onChange={e => setImportParcels(e.target.checked)}
                 className="rounded accent-brand-600"
               />
-              <span>Importă automat parcelele APIA-eligibile din registru</span>
+              <span>Importă automat parcelele marcate pentru analiză APIA</span>
             </label>
             <p className="text-xs text-gray-400 mt-0.5 ml-5">
-              Parcelele cu „Eligibil APIA" activ și bloc fizic completat
+              Câmpul intern „Eligibil APIA” filtrează importul, dar nu confirmă eligibilitatea oficială.
             </p>
           </div>
           <div>
@@ -274,17 +274,23 @@ export default function ApiaPage() {
 
   useEffect(() => { setLoading(true); loadDossiers() }, [loadDossiers])
 
-  async function deleteDossier(id: string) {
-    if (!confirm('Sterge dosarul si toate parcelele, interventiile si documentele asociate?\n\nAceasta actiune este ireversibila.')) return
+  async function archiveDossier(id: string) {
+      if (!confirm('Arhivezi pregătirea APIA? Datele și documentele asociate vor fi păstrate.')) return
     const db = createClient()
-    const { error } = await db.from('apia_dossiers').delete().eq('id', id)
-    if (error) toast.error(error.message)
-    else { toast.success('Dosar sters'); loadDossiers() }
+      const { data: { user } } = await db.auth.getUser()
+      if (!user) { toast.error('Sesiune expirată'); return }
+      const { error } = await db.from('apia_dossiers').update({ status: 'ARCHIVED', updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', user.id)
+      if (error) toast.error(error.message)
+      else {
+        await db.from('apia_audit_log').insert({ user_id: user.id, dossier_id: id, action: 'STATUS_CHANGE', old_value: {}, new_value: { status: 'ARCHIVED' }, notes: 'Pregătirea a fost arhivată; datele au fost păstrate.' })
+        toast.success('Pregătirea APIA a fost arhivată')
+        loadDossiers()
+      }
   }
 
   // Stats
   const totalHa = dossiers.reduce((s, d) => s + (d.real_declared_ha ?? 0), 0)
-  const readyCount = dossiers.filter(d => d.status === 'READY' || d.status === 'SUBMITTED' || d.status === 'ACCEPTED').length
+  const readyCount = dossiers.filter(d => d.status === 'READY').length
 
   if (loading) {
     return (
@@ -306,8 +312,8 @@ export default function ApiaPage() {
 
       <div className="flex items-start justify-between gap-4">
         <PageHeader
-          title="Dosar APIA"
-          subtitle="Gestionarea cererii unice de plată și a dosarului de subvenții agricole"
+          title="Pregătire dosar APIA"
+          subtitle="Centralizează datele fermei și pregătește informațiile pentru revizuire."
         />
         <div className="flex items-center gap-2 mt-1">
           <select
@@ -334,7 +340,7 @@ export default function ApiaPage() {
         {[
           { label: 'Dosare', value: dossiers.length, icon: FolderOpen, color: 'text-brand-700' },
           { label: 'Ha declarate', value: totalHa.toFixed(2), icon: Wheat, color: 'text-green-700' },
-          { label: 'Gata depunere', value: readyCount, icon: CheckCircle2, color: 'text-blue-700' },
+          { label: 'Revizuire finală', value: readyCount, icon: CheckCircle2, color: 'text-blue-700' },
           { label: 'An campanie', value: year, icon: BarChart3, color: 'text-gray-600' },
         ].map(s => (
           <div key={s.label} className="bg-white border border-gray-200 rounded-lg px-4 py-3">
@@ -348,10 +354,8 @@ export default function ApiaPage() {
       </div>
 
       {/* ── Campaign info banner ───────────────────────────────────────────── */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-700">
-        <strong>Campania {year}:</strong>{' '}
-        Completați declarația de suprafețe în <strong>AGI Online</strong>, verificați parcelele față de <strong>LPIS</strong>, și asigurați-vă că documentele de utilizare a terenului sunt valabile la data depunerii.
-        {' '}<a href="https://www.apia.org.ro" target="_blank" rel="noopener noreferrer" className="underline font-medium">apia.org.ro →</a>
+      <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-xs leading-relaxed text-emerald-900">
+        ArendaPro te ajută să centralizezi și să verifici informațiile necesare. Completarea și depunerea oficială se realizează prin canalele puse la dispoziție de APIA.
       </div>
 
       {/* ── Dossier list ──────────────────────────────────────────────────── */}
@@ -359,27 +363,27 @@ export default function ApiaPage() {
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
           <FolderOpen className="w-4 h-4 text-brand-600" />
           <span className="font-semibold text-sm text-gray-800">
-            Dosare campania {year} ({dossiers.length})
+            Pregătiri pentru campania {year} ({dossiers.length})
           </span>
           <button
             onClick={() => setShowCreate(true)}
             className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-600 hover:bg-brand-700 text-white rounded font-medium"
           >
             <Plus className="w-3.5 h-3.5" />
-            Dosar nou
+            Pregătește campania
           </button>
         </div>
 
         {dossiers.length === 0 ? (
           <div className="py-16 text-center space-y-3">
             <FolderOpen className="w-10 h-10 text-gray-300 mx-auto" />
-            <p className="text-sm text-gray-500">Nu există dosare pentru campania {year}.</p>
+              <p className="text-sm text-gray-500">Nu există încă o pregătire pentru campania {year}.</p>
             <button
               onClick={() => setShowCreate(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-brand-600 hover:bg-brand-700 text-white rounded font-medium"
             >
               <Plus className="w-4 h-4" />
-              Creează primul dosar {year}
+              Începe pregătirea pentru {year}
             </button>
           </div>
         ) : (
@@ -411,7 +415,7 @@ export default function ApiaPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm text-gray-800">
-                        Dosar APIA {d.campaign_year}
+                        Pregătire APIA {d.campaign_year}
                       </span>
                       {d.agi_dossier_number && (
                         <span className="text-xs text-gray-500 font-mono">#{d.agi_dossier_number}</span>
@@ -436,20 +440,21 @@ export default function ApiaPage() {
                     {d.submission_date ? (
                       <div className="text-xs text-gray-500">
                         <div className="font-medium text-gray-700">{d.submission_date}</div>
-                        <div>depus</div>
+                        <div>înregistrat manual</div>
                       </div>
                     ) : (
-                      <div className="text-xs text-gray-400">nedepus</div>
+                      <div className="text-xs text-gray-400">fără depunere înregistrată</div>
                     )}
                   </div>
 
                   {/* Delete */}
                   <button
-                    onClick={e => { e.stopPropagation(); deleteDossier(d.id) }}
-                    className="shrink-0 p-1.5 text-gray-300 hover:text-red-500 transition-colors rounded"
-                    title="Sterge dosarul"
+                    onClick={e => { e.stopPropagation(); archiveDossier(d.id) }}
+                    className="shrink-0 p-1.5 text-gray-400 hover:text-amber-700 transition-colors rounded"
+                    title="Arhivează pregătirea și păstrează datele"
+                    aria-label={`Arhivează pregătirea APIA ${d.campaign_year}`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Archive className="w-4 h-4" />
                   </button>
 
                   <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
