@@ -343,8 +343,8 @@ export function VerificationSummary({ rows, onGo }: { rows: { key: SectionKey | 
   );
 }
 
-export function ExportCard({ title, desc, formats, onExport, disabled }: { title: string; desc: string; formats: "CSV"[]; onExport: (f: string) => void; disabled?: boolean }) {
-  const ic = { CSV: <FileSpreadsheet size={13} /> };
+export function ExportCard({ title, desc, formats, onExport, disabled }: { title: string; desc: string; formats: "XLSX"[]; onExport: (f: string) => void; disabled?: boolean }) {
+  const ic = { XLSX: <FileSpreadsheet size={13} /> };
   return (
     <Card className="flex flex-col gap-3">
       <div><div className="text-[14px] font-bold" style={{ ...H, color: C.text }}>{title}</div><div className="mt-0.5 text-[12.5px]" style={{ color: C.muted }}>{desc}</div></div>
@@ -376,4 +376,18 @@ export function download(name: string, content: string, mime = "text/csv;charset
   a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
 }
 export const csv = (rows: (string | number)[][]) => rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\n");
+export async function downloadXlsx(name: string, info: (string | number)[][], data: (string | number)[][], sheetName = "Date") {
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  const head = (ws: import("exceljs").Worksheet) => { const r = ws.getRow(1); r.font = { bold: true, color: { argb: "FFFFFFFF" } }; r.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2A6240" } }; ws.views = [{ state: "frozen", ySplit: 1 }]; };
+  const fit = (ws: import("exceljs").Worksheet, max: number) => ws.columns.forEach(c => { let w = 10; c.eachCell?.({ includeEmpty: false }, cell => { w = Math.max(w, Math.min(max, String(cell.value ?? "").length + 2)); }); c.width = w; });
+  const ds = wb.addWorksheet(sheetName.slice(0, 31));
+  data.forEach(r => ds.addRow(r)); head(ds); fit(ds, 50);
+  if (data.length > 1) ds.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: data[0].length } };
+  const is = wb.addWorksheet("Info");
+  is.addRow(["Câmp", "Valoare"]); info.filter(r => r.length).forEach(r => is.addRow(r)); head(is); is.getColumn(1).width = 30; is.getColumn(2).width = 90; is.getColumn(2).alignment = { wrapText: true, vertical: "top" };
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
+}
 export { Download, X, USAGE_TYPES };

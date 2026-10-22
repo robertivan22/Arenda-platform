@@ -7,6 +7,7 @@ import type { SP } from "./sections1";
 import {
   Btn, Card, csv, Disclaimer, DocumentRow, DocumentUploader, download, EmptyState, ExportCard, Field, H, Input, Modal, ProgressBar, ReadOnlyBanner,
   SectionHeader, Select, StatusBadge, SubmissionConfirmation, Tabs, VerificationSummary, fmtDate, inputCls, inputStyle, Card as _C,
+  downloadXlsx,
 } from "./ui";
 
 // ── Zootehnie ────────────────────────────────────────────────────────────────
@@ -154,29 +155,29 @@ export function ExportPage({ a }: SP) {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [ask, setAsk] = useState(false);
   const [tried, setTried] = useState(false);
-  const opts: [string, string, "CSV"[]][] = [
-    ["Rezumat dosar", "Starea dosarului, secțiuni, secțiuni omise și avertizări deschise.", ["CSV"]],
-    ["Lista parcelelor", "Parcele, suprafețe, culturi și documente asociate.", ["CSV"]],
-    ["Centralizator documente", "Toate documentele, cu status și valabilitate.", ["CSV"]],
-    ["Centralizator intervenții", "Intervențiile selectate și starea lor.", ["CSV"]],
-    ["Caiete și evidențe", "Activitățile înregistrate pe fiecare caiet.", ["CSV"]],
-    ["Lista avertizărilor", "Critice, de verificat și recomandări.", ["CSV"]],
+  const opts: [string, string, "XLSX"[]][] = [
+    ["Rezumat dosar", "Starea dosarului, secțiuni, secțiuni omise și avertizări deschise.", ["XLSX"]],
+    ["Lista parcelelor", "Parcele, suprafețe, culturi și documente asociate.", ["XLSX"]],
+    ["Centralizator documente", "Toate documentele, cu status și valabilitate.", ["XLSX"]],
+    ["Centralizator intervenții", "Intervențiile selectate și starea lor.", ["XLSX"]],
+    ["Caiete și evidențe", "Activitățile înregistrate pe fiecare caiet.", ["XLSX"]],
+    ["Lista avertizărilor", "Critice, de verificat și recomandări.", ["XLSX"]],
   ];
-  const exportIt = (name: string, fmt: string) => {
+  const exportIt = async (name: string, fmt: string) => {
     const skippedList = [...a.skipped].map(k => SECTION_TITLES[k as keyof typeof SECTION_TITLES] ?? k);
     const draft = skippedList.length > 0 || a.count("critic") > 0;
-    const head: (string | number)[][] = [["Atentionare", DISCLAIMER], ["Tip document", "Document de lucru generat de ArendaPro"], ["Status export", draft ? "DRAFT INCOMPLET — necesită revizuire" : "Document de lucru"], ["Secțiuni omise", skippedList.join("; ") || "niciuna"], ["Avertizări critice deschise", a.count("critic")], ["Fermă", a.farmName], ["Campanie", a.campaign], ["Data", a.today], ["Utilizator", a.scope?.userEmail ?? ""], ["Versiune dosar", a.version], ["Status", STATUS[a.dossierStatus].label], []];
+    const head: (string | number)[][] = [["Atentionare", DISCLAIMER], ["Tip document", "Document de lucru generat de ArendaPro"], ["Status export", draft ? "DRAFT INCOMPLET — necesită revizuire" : "Document de lucru"], ["Secțiuni omise", skippedList.join("; ") || "niciuna"], ["Avertizări critice deschise", a.count("critic")], ["Fermă", a.farmName], ["Campanie", a.campaign], ["Data", a.today], ["Utilizator", a.scope?.userEmail ?? ""], ["Versiune dosar", a.version], ["Status", STATUS[a.dossierStatus].label]];
     const rows: Record<string, (string | number)[][]> = {
-      "Rezumat dosar": [["Completare", `${a.percent}%`], ["Documente verificate", `${a.docsOk}/${a.docsTotal}`], ["Avertizări deschise", a.open.length], ...[...a.skipped].map(k => ["Omis pentru moment", SECTION_TITLES[k as keyof typeof SECTION_TITLES] ?? k])],
+      "Rezumat dosar": [["Indicator", "Valoare"], ["Completare", `${a.percent}%`], ["Documente verificate", `${a.docsOk}/${a.docsTotal}`], ["Avertizări deschise", a.open.length], ...[...a.skipped].map(k => ["Omis pentru moment", SECTION_TITLES[k as keyof typeof SECTION_TITLES] ?? k])],
       "Lista parcelelor": [["Parcelă", "Bloc", "UAT", "Cultură", "Suprafață ArendaPro (ha)", "Suprafață document (ha)", "Declarată (ha)"], ...a.parcels.map(p => [p.code, p.bloc, p.uat, p.culture, p.areaApp, p.areaDoc ?? "", p.declared ?? ""])],
       "Centralizator documente": [["Document", "Categorie", "Status", "Expiră"], ...a.docs.filter(d => !d.archived).map(d => [d.name, d.cat, STATUS[d.status].label, d.expiry ?? ""])],
       "Centralizator intervenții": [["Cod", "Denumire", "Status", "Versiune regulă"], ...a.ivs.filter(i => i.selected).map(i => [i.code, i.name, STATUS[a.ivStatus(i)].label, i.ruleVersion ?? ""])],
       "Caiete și evidențe": [["Caiet", "Dată", "Parcelă", "Activitate", "Produs", "Cantitate", "Sursă"], ...a.notebooks.flatMap(n => n.entries.map(e => [n.name, e.date, e.parcel, e.activity, e.input, e.qty, e.sourceType ?? ""]))],
       "Lista avertizărilor": [["Tip", "Titlu", "Secțiune"], ...a.warnings.map(w => [w.sev, w.title, SECTION_TITLES[w.section]])],
     };
-    download(`${name.toLowerCase().replace(/\s+/g, "-")}-${a.campaign}.csv`, csv([...head, ...(rows[name] ?? [])]));
+    try { await downloadXlsx(`${name.toLowerCase().replace(/\s+/g, "-")}-${a.campaign}.xlsx`, head, rows[name] ?? [["(fără date)"]], name); } catch { a.notify("Nu am putut genera fișierul Excel."); return; }
     a.setExportsDone(e => [{ id: String(Math.random()), name, format: fmt, time: new Date().toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" }) }, ...e]);
-    a.notify("Fișierul CSV a fost descărcat.");
+    a.notify("Fișierul Excel a fost descărcat.");
     a.log(`Export generat: ${name} (${fmt})`);
   };
   const valid = f.date && f.number.trim() && f.center.trim();
