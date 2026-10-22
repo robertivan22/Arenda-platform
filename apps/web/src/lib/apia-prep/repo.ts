@@ -66,7 +66,7 @@ export async function loadSources(scope: Scope, year: number): Promise<Sources> 
   if (cids.length) {
     const [cp, wo] = await Promise.all([
       db.from("crop_plans").select("parcel_id, crop, planned_area_ha").eq("user_id", o).in("campaign_id", cids).limit(5000),
-      db.from("work_orders").select("id, parcel_id, operation_type, title, status, completed_date, planned_date, area_ha, operators(name), work_order_inputs(id, product_name, unit, actual_qty, planned_qty)").eq("user_id", o).in("campaign_id", cids).limit(5000),
+      db.from("work_orders").select("id, parcel_id, operation_type, title, status, completed_date, planned_date, area_ha, work_order_inputs(id, product_name, unit, actual_qty, planned_qty)").eq("user_id", o).in("campaign_id", cids).limit(5000),
     ]);
     cropPlans = must(cp, "planuri cultură"); workOrders = must(wo, "lucrări");
   }
