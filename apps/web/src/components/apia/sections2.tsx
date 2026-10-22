@@ -97,7 +97,7 @@ export function Cultures({ a }: SP) {
         <div className="flex h-3 overflow-hidden rounded-full" role="img" aria-label="Ponderea culturilor">{groups.map((g, i) => <div key={g.name} title={`${g.name}: ${ha(g.area)}`} style={{ width: `${(g.area / total) * 100}%`, background: PALETTE[i % PALETTE.length] }} />)}</div>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">{groups.map((g, i) => <span key={g.name} className="flex items-center gap-1.5 text-[11.5px]" style={{ color: C.muted }}><span className="h-2.5 w-2.5 rounded-sm" style={{ background: PALETTE[i % PALETTE.length] }} />{g.name} · {Math.round((g.area / total) * 100)}%</span>)}</div>
       </Card>
-      <Card pad={false} className="overflow-x-auto">
+      <Card pad={false} className="max-h-[70vh] overflow-auto">
         <table className="w-full min-w-[720px] text-left">
           <thead><tr style={{ background: "#F7F5EE" }}>{["Cultură", "Parcele", "Suprafață", "Intervenții asociate", "Avertizări", "Verificare", ""].map(h => <th key={h} className="px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: C.muted }}>{h}</th>)}</tr></thead>
           <tbody>
@@ -176,7 +176,8 @@ export function Interventions({ a }: SP) {
   const [cat, setCat] = useState<string>("");
   const [openCode, setOpenCode] = useState<string | null>(null);
   const [wiz, setWiz] = useState(false);
-  const list = a.ivs.filter(i => !cat || i.cat === cat);
+  const [onlySel, setOnlySel] = useState(false);
+  const list = a.ivs.filter(i => (!cat || i.cat === cat) && (!onlySel || i.selected));
   const none = a.ivs.every(i => !i.selected);
   return (
     <div>
@@ -184,6 +185,7 @@ export function Interventions({ a }: SP) {
       <SectionHeader title="Intervenții și scheme solicitate" desc="Selectează intervențiile pe care dorești să le pregătești și verifică informațiile necesare pentru fiecare." action={<Btn v="primary" disabled={!edit} icon={<Wand2 size={14} />} onClick={() => setWiz(true)}>Ajută-mă să identific intervențiile</Btn>} />
       <div className="mb-4 flex flex-wrap gap-1.5">
         {["", ...IV_CATS].map(c => <button key={c} onClick={() => setCat(c)} className="rounded-full px-3 py-1.5 text-[12px] font-semibold transition" style={{ background: cat === c ? C.primary : "#fff", color: cat === c ? "#fff" : C.text, border: `1px solid ${cat === c ? C.primary : C.line}` }}>{c || "Toate"}</button>)}
+        <button onClick={() => setOnlySel(v => !v)} className="ml-auto rounded-full px-3 py-1.5 text-[12px] font-semibold" style={{ background: onlySel ? C.primary : "#fff", color: onlySel ? "#fff" : C.text, border: `1px solid ${onlySel ? C.primary : C.line}` }}>{onlySel ? "Arată toate" : "Ascunde neselectate"}</button>
       </div>
       {none && <div className="mb-4"><EmptyState icon={<Sprout size={22} />} title="Nu ai selectat nicio intervenție" text="Adaugă intervențiile pe care dorești să le analizezi pentru campania curentă." action={<Btn v="primary" onClick={() => setWiz(true)}>Selectează intervenții</Btn>} /></div>}
       <div className="space-y-2.5">
@@ -208,17 +210,14 @@ function Wizard({ a, open, onClose }: { a: Apia; open: boolean; onClose: () => v
   const chips = (opts: string[], val: string[], set: (x: string[]) => void) => <div className="flex flex-wrap gap-2">{opts.map(o => <button key={o} onClick={() => tog(val, o, set)} className="rounded-full px-3 py-1.5 text-[12.5px] font-semibold" style={{ background: val.includes(o) ? C.primary : "#fff", color: val.includes(o) ? "#fff" : C.text, border: `1px solid ${val.includes(o) ? C.primary : C.line}` }}>{o}</button>)}</div>;
   const ha_ = Number(area.replace(",", ".")) || 0;
   const sugg = useMemo(() => {
-    const s: { code: string; why: string; check: string }[] = [{ code: "PS1-1", why: "Se analizează de regulă pentru orice exploatație cu teren agricol.", check: "Documentele de utilizare pentru toate parcelele." }];
-    if (ha_ > 0 && ha_ <= 100) s.push({ code: "PS1-2", why: `Suprafața de ${fmt(ha_)} ha poate fi relevantă pentru sprijinul redistributiv.`, check: "Pragurile de suprafață și zona din ghidul campaniei." });
-    if (pr.includes("Tânăr fermier")) s.push({ code: "PS2", why: "Ai indicat că ai statut de tânăr fermier.", check: "Vârsta și data instalării în agricultură." });
-    if (cults.some(c => /Grâu/i.test(c))) s.push({ code: "ANT-1", why: "Ai culturi de grâu.", check: "Suprafața cultivată și documentele pentru sămânță." });
-    if (cults.some(c => /Soia/i.test(c))) s.push({ code: "ANT-9", why: "Ai culturi de soia.", check: "Suprafața cultivată și documentele pentru sămânță." });
-    if (cults.some(c => /Floarea/i.test(c))) s.push({ code: "ANT-10", why: "Ai culturi de floarea-soarelui.", check: "Suprafața cultivată." });
-    if (cults.some(c => /Rapiț/i.test(c))) s.push({ code: "ANT-11", why: "Ai culturi de rapiță.", check: "Suprafața cultivată." });
-    if (cults.some(c => /Pajiș/i.test(c))) s.push({ code: "ECO-M2", why: "Ai indicat terenuri cu pajiști.", check: "Tipul de utilizare al terenului." });
-    if (cults.length) s.push({ code: "ECO-M1", why: "Ai culturi pe teren arabil.", check: "Rotația, culturile de acoperire și evidențele din caiet." });
-    if (animals.includes("Bovine")) s.push({ code: "ANT-12", why: "Ai bovine în exploatație.", check: "Efectivul din BND și adeverința ANSVSA." });
-    if (animals.includes("Ovine / caprine")) s.push({ code: "ANT-14", why: "Ai ovine sau caprine.", check: "Efectivul minim și perioada de deținere." });
+    const s: { code: string; why: string; check: string }[] = [{ code: "PD-01", why: "Se analizează de regulă pentru orice exploatație cu teren agricol.", check: "Documentele de utilizare pentru toate parcelele." }];
+    if (ha_ > 0 && ha_ <= 100) s.push({ code: "PD-02", why: `Suprafața de ${fmt(ha_)} ha poate fi relevantă pentru sprijinul redistributiv (CRISS).`, check: "Pragurile de suprafață din ghidul campaniei." });
+    if (pr.includes("Tânăr fermier")) s.push({ code: "PD-03", why: "Ai indicat că ai statut de tânăr fermier.", check: "Vârsta și data instalării în agricultură." });
+    if (cults.some(c => /Vi[ție]|Livad|Pom|Vie/i.test(c))) s.push({ code: "PD-06", why: "Ai plantații pomicole sau viticole.", check: "Înierbarea intervalului dintre rânduri și evidențele din caiet." });
+    if (ha_ > 0 && ha_ <= 5) s.push({ code: "PD-05", why: "Exploatația are suprafață mică.", check: "Condițiile pentru fermele mici din ghidul campaniei." });
+    if (cults.length) s.push({ code: "PD-04", why: "Ai culturi pe teren arabil.", check: "Rotația, culturile de acoperire și evidențele din caiet." });
+    if (animals.includes("Bovine")) s.push({ code: "PD-22", why: "Ai bovine în exploatație (carne; pentru lapte vezi PD-21).", check: "Efectivul din BND și adeverința ANSVSA." });
+    if (animals.includes("Ovine / caprine")) s.push({ code: "PD-24", why: "Ai ovine sau caprine.", check: "Efectivul minim și perioada de deținere." });
     return s.filter(x => a.ivs.some(i => i.code === x.code));
   }, [ha_, pr, cults, animals]);
   const reset = () => { setStep(0); onClose(); };
@@ -289,7 +288,7 @@ export function Notebooks({ a }: SP) {
           </Card>
         )}
         <div className="mb-3 max-w-[220px]"><Select value={fp} onChange={setFp}><option value="">Toate parcelele</option>{[...new Set(nb.entries.map(e => e.parcel))].map(p => <option key={p}>{p}</option>)}</Select></div>
-        <Card pad={false} className="overflow-x-auto"><table className="w-full min-w-[900px] text-left">
+        <Card pad={false} className="max-h-[70vh] overflow-auto"><table className="w-full min-w-[900px] text-left">
           <thead><tr style={{ background: "#F7F5EE" }}>{["Dată", "Parcelă", "Cultură", "Activitate", "Suprafață", "Produs / input", "Cantitate", "Document", "Înregistrat de", "Observații"].map(h => <th key={h} className="whitespace-nowrap px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: C.muted }}>{h}</th>)}</tr></thead>
           <tbody>{rows.map(e => <tr key={e.id} className="border-t text-[12.5px]" style={{ borderColor: C.lineSoft }}>
             <td className="px-3 py-2.5">{fmtDate(e.date)}</td><td className="px-3 py-2.5 font-bold">{e.parcel}</td><td className="px-3 py-2.5">{e.culture}</td><td className="px-3 py-2.5">{e.activity}</td><td className="px-3 py-2.5">{ha(e.area)}</td><td className="px-3 py-2.5">{e.input}</td><td className="px-3 py-2.5">{e.qty}</td>

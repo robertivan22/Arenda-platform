@@ -195,6 +195,13 @@ export function useApia() {
   // ── Acțiuni ────────────────────────────────────────────────────────────────
   const createDossier = () => run(async () => { if (!scope) throw new Error("Fără sesiune"); await createDossierRepo(scope, year); }, `Dosar creat pentru campania ${campaign}.`);
 
+  const MISSING_DOC_CODES = ["BANK_NO_DOC", "PARCEL_NO_DOC", "DOC_NO_FILE", "DOC_EXPIRED", "DOC_EXPIRING", "DOC_INCOMPLETE"];
+  const missingDocWarnings = open.filter(w => !!w.code && MISSING_DOC_CODES.includes(w.code));
+  const ignoreMissingDocs = () => run(async () => {
+    const { sc, id: d } = need();
+    for (const w of missingDocWarnings) await setConfirmation(sc, d, "WARNING_REVIEWED", w.id, "ignorat de utilizator");
+    await auditRepo(sc, d, "WARNING_REVIEWED", "warning", null, null, { count: missingDocWarnings.length }, `Utilizatorul a ignorat ${missingDocWarnings.length} avertizări despre documente lipsă`);
+  }, "Avertizările despre documente lipsă au fost marcate ca ignorate.");
   const resolve = (id: string, why?: string) => run(async () => { const { sc, id: d } = need(); await setConfirmation(sc, d, "WARNING_REVIEWED", id, why); await auditRepo(sc, d, "WARNING_REVIEWED", "warning", null, null, { id }, `Verificare marcată de utilizator: ${activeWarnings.find(w => w.id === id)?.title ?? id}${why ? ` (${why})` : ""}`); });
 
   const updateParcel = (code: string, patch: Partial<Parcel>) => run(async () => {
@@ -317,7 +324,7 @@ export function useApia() {
   return {
     campaign, setCampaign, years, hasDossier: !!dossier, dossiers: { [campaign]: !!dossier } as Record<string, boolean>, role, section, setSection, lastSection, parcels, usage, docs, warnings: activeWarnings, open, ivs, notebooks, mods, activity,
     zoo: prep.livestockApplicable, setZoo, bndDate: prep.bndConfirmedOn, verifRan, setVerifRan, signMethod, setSignMethod, submission, inControl, setInControl, exportsDone, setExportsDone, toast, notify, openNb, setOpenNb,
-    focusParcel, setFocusParcel, log, percent, count, resolve, docsOk, docsTotal: liveDocs.length, docsMissing, ivStatus, ivReq, nbStatus, sectionInfo, secComplete, secIncomplete, applicableCount: applicable.length,
+    focusParcel, setFocusParcel, log, percent, count, resolve, ignoreMissingDocs, missingDocCount: missingDocWarnings.length, docsOk, docsTotal: liveDocs.length, docsMissing, ivStatus, ivReq, nbStatus, sectionInfo, secComplete, secIncomplete, applicableCount: applicable.length,
     needsCheck, nextTarget, dossierStatus, can, canSubmit, updateParcel, confirmArea, uploadUsageFile, addDoc, uploadBank, addActivity, confirmNotebook, toggleIv, addMod, updateMod,
     submit, confirmBnd, createDossier, goFirstIssue, MOD_TYPES, SECTION_ORDER,
     // date reale

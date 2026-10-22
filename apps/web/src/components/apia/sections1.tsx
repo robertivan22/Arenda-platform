@@ -167,7 +167,7 @@ export function Applicant({ a }: SP) {
 export function Bank({ a }: SP) {
   const edit = a.can("bank");
   const [show, setShow] = useState(false);
-  const doc = a.docs.find(d => d.cat === "Băncă" && !d.archived)!;
+  const doc = a.docs.find(d => d.cat === "Bancă" && !d.archived) ?? { id: "req-bank", status: "doc_lipsa", file: null, date: "" } as typeof a.docs[number];
   const iban = (a.company?.iban ?? "").replace(/\s+/g, "");
   const masked = iban ? `${iban.slice(0, 4)} •••• •••• •••• ${iban.slice(-4)}` : "";
   const full = iban.replace(/(.{4})/g, "$1 ").trim();
@@ -300,7 +300,7 @@ export function Parcels({ a, bp }: SP) {
 
       {rows.length === 0 ? <EmptyState icon={<Table2 size={22} />} title="Nicio parcelă pentru filtrele alese" text="Încearcă să elimini unul dintre filtre." /> : view === "tabel" ? (
         bp === "mobile" ? <div className="space-y-2.5">{rows.map(p => <ParcelRow key={p.code} a={a} p={p} mode="card" onOpen={() => setDetail(p.code)} onCompare={() => openCompare(p.code)} />)}</div> : (
-          <Card pad={false} className="overflow-x-auto">
+          <Card pad={false} className="max-h-[70vh] overflow-auto">
             <table className="w-full min-w-[1080px] border-collapse text-left">
               <thead><tr style={{ background: "#F7F5EE" }}>{["Bloc fizic", "Parcelă", "Denumire", "Localitate/UAT", "Suprafață ArendaPro", "Suprafață documentată", "Pregătită pentru declarare", "Cultură", "Document de utilizare", "Status", ""].map(h => <th key={h} className="whitespace-nowrap px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: C.muted }}>{h}</th>)}</tr></thead>
               <tbody>{rows.map(p => <ParcelRow key={p.code} a={a} p={p} mode="row" onOpen={() => setDetail(p.code)} onCompare={() => openCompare(p.code)} />)}</tbody>

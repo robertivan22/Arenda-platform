@@ -182,7 +182,7 @@ export function buildView(src: Sources, prep: Prep, year: number, today: string)
   for (const iv of ivs) {
     if (!iv.selected || !iv.notebook) continue;
     const scope = new Set((iv.parcelIds?.length ? iv.parcelIds : included.map(p => p.id)));
-    const sources = iv.code === "ECO-M6" ? ["FITOSANITAR"] : ["WORK_ORDER_INPUT", "FITOSANITAR"];
+    const sources = ["WORK_ORDER_INPUT", "FITOSANITAR"];
     const stored = new Map(prep.nbRows.filter(r => r.intervention_code === iv.code).map(r => [`${r.source_type}:${r.source_id ?? r.id}`, r]));
     const entries: Activity[] = []; const suggestions: Activity[] = [];
     const push = (key: string, a: Omit<Activity, "id" | "status" | "dbId">) => {
