@@ -147,6 +147,10 @@ export async function insertNbManual(scope: Scope, dossierId: string, row: Recor
   const { error } = await sb().from("apia_prep_notebook_rows").insert({ user_id: scope.ownerId, dossier_id: dossierId, source_type: "MANUAL", inclusion_status: "ACCEPTED", ...row });
   if (error) throw new Error(error.message);
 }
+export async function clearConfirmation(dossierId: string, kind: string, key: string) {
+  const { error } = await sb().from("apia_prep_confirmations").delete().eq("dossier_id", dossierId).eq("kind", kind).eq("entity_key", key);
+  if (error) throw new Error(error.message);
+}
 export async function setConfirmation(scope: Scope, dossierId: string, kind: string, key: string, note?: string) {
   const { error } = await sb().from("apia_prep_confirmations").upsert({ user_id: scope.ownerId, dossier_id: dossierId, kind, entity_key: key, note: note ?? null, confirmed_by: scope.userId, confirmed_at: new Date().toISOString() }, { onConflict: "dossier_id,kind,entity_key" });
   if (error) throw new Error(error.message);

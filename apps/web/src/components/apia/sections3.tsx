@@ -155,7 +155,7 @@ export function ExportPage({ a }: SP) {
   const [ask, setAsk] = useState(false);
   const [tried, setTried] = useState(false);
   const opts: [string, string, "CSV"[]][] = [
-    ["Rezumat dosar", "Starea dosarului, secțiuni și avertizări deschise.", ["CSV"]],
+    ["Rezumat dosar", "Starea dosarului, secțiuni, secțiuni omise și avertizări deschise.", ["CSV"]],
     ["Lista parcelelor", "Parcele, suprafețe, culturi și documente asociate.", ["CSV"]],
     ["Centralizator documente", "Toate documentele, cu status și valabilitate.", ["CSV"]],
     ["Centralizator intervenții", "Intervențiile selectate și starea lor.", ["CSV"]],
@@ -163,9 +163,11 @@ export function ExportPage({ a }: SP) {
     ["Lista avertizărilor", "Critice, de verificat și recomandări.", ["CSV"]],
   ];
   const exportIt = (name: string, fmt: string) => {
-    const head: (string | number)[][] = [["Atenționare", DISCLAIMER], ["Fermă", a.farmName], ["Campanie", a.campaign], ["Data", a.today], ["Utilizator", a.scope?.userEmail ?? ""], ["Versiune dosar", a.version], ["Status", STATUS[a.dossierStatus].label], []];
+    const skippedList = [...a.skipped].map(k => SECTION_TITLES[k as keyof typeof SECTION_TITLES] ?? k);
+    const draft = skippedList.length > 0 || a.count("critic") > 0;
+    const head: (string | number)[][] = [["Atentionare", DISCLAIMER], ["Tip document", "Document de lucru generat de ArendaPro"], ["Status export", draft ? "DRAFT INCOMPLET — necesită revizuire" : "Document de lucru"], ["Secțiuni omise", skippedList.join("; ") || "niciuna"], ["Avertizări critice deschise", a.count("critic")], ["Fermă", a.farmName], ["Campanie", a.campaign], ["Data", a.today], ["Utilizator", a.scope?.userEmail ?? ""], ["Versiune dosar", a.version], ["Status", STATUS[a.dossierStatus].label], []];
     const rows: Record<string, (string | number)[][]> = {
-      "Rezumat dosar": [["Completare", `${a.percent}%`], ["Documente verificate", `${a.docsOk}/${a.docsTotal}`], ["Avertizări deschise", a.open.length]],
+      "Rezumat dosar": [["Completare", `${a.percent}%`], ["Documente verificate", `${a.docsOk}/${a.docsTotal}`], ["Avertizări deschise", a.open.length], ...[...a.skipped].map(k => ["Omis pentru moment", SECTION_TITLES[k as keyof typeof SECTION_TITLES] ?? k])],
       "Lista parcelelor": [["Parcelă", "Bloc", "UAT", "Cultură", "Suprafață ArendaPro (ha)", "Suprafață document (ha)", "Declarată (ha)"], ...a.parcels.map(p => [p.code, p.bloc, p.uat, p.culture, p.areaApp, p.areaDoc ?? "", p.declared ?? ""])],
       "Centralizator documente": [["Document", "Categorie", "Status", "Expiră"], ...a.docs.filter(d => !d.archived).map(d => [d.name, d.cat, STATUS[d.status].label, d.expiry ?? ""])],
       "Centralizator intervenții": [["Cod", "Denumire", "Status", "Versiune regulă"], ...a.ivs.filter(i => i.selected).map(i => [i.code, i.name, STATUS[a.ivStatus(i)].label, i.ruleVersion ?? ""])],
@@ -185,6 +187,12 @@ export function ExportPage({ a }: SP) {
       {!gen && <ReadOnlyBanner role={ROLE_LABEL[a.role]} />}
       <SectionHeader title="Export și depunere" desc="Pregătește fișierele, apoi înregistrează depunerea făcută prin canalele oficiale APIA." />
       <h3 className="mb-2 text-[15px] font-extrabold" style={H}>Pregătește exportul</h3>
+      {a.skipped.size > 0 && (
+        <div className="mb-3 rounded-xl p-3 text-[13px]" style={{ background: "#FFF6EA", border: "1px solid #F6D3A9" }}>
+          <b style={{ color: "#A24A07" }}>Există pași omiși</b> — exporturile vor fi marcate „DRAFT INCOMPLET — necesită revizuire”. Revizuiește:
+          <div className="mt-2 flex flex-wrap gap-1.5">{[...a.skipped].map(k => <Btn key={k} size="sm" onClick={() => a.setSection(k as SectionKey)}>{SECTION_TITLES[k as SectionKey] ?? k}</Btn>)}</div>
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{opts.map(([t, d, fm]) => <ExportCard key={t} title={t} desc={d} formats={fm} disabled={!gen} onExport={x => exportIt(t, x)} />)}</div>
       {a.exportsDone.length > 0 && <Card className="mt-3"><div className="mb-1 text-[12px] font-bold uppercase tracking-wide" style={{ color: C.muted }}>Exporturi generate</div>{a.exportsDone.slice(0, 5).map(e => <div key={e.id} className="flex justify-between py-1 text-[12.5px]"><span>{e.name} · {e.format}</span><span style={{ color: C.muted }}>{e.time}</span></div>)}</Card>}
 

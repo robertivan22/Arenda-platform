@@ -20,6 +20,8 @@ const SECTIONS: Record<SectionKey, (p: { a: ReturnType<typeof useApia>; bp: BP }
   notebooks: Notebooks, zoo: Zoo, documents: Documents, verification: Verification, export: ExportPage, modifications: Modifications, guidance: Guidance,
 };
 
+const STEP_KEYS: SectionKey[] = ["applicant", "bank", "parcels", "usage", "cultures", "interventions", "notebooks", "zoo", "documents", "verification"];
+
 export function ApiaPage() {
   const a = useApia();
   const ref = useRef<HTMLDivElement>(null);
@@ -72,19 +74,21 @@ export function ApiaPage() {
   );
 
   return (
-    <div ref={ref} className="h-full overflow-y-auto" style={{ background: C.bg, color: C.text, fontFamily: "'Inter',sans-serif" }}>
-      <div className="mx-auto max-w-[1560px] px-4 pb-24 pt-5 md:px-6">
+    <div ref={ref} className="h-full overflow-y-auto overflow-x-hidden" style={{ background: C.bg, color: C.text, fontFamily: "'Inter',sans-serif", WebkitTextSizeAdjust: "100%" }}>
+      {/* Pe mobil: câmpuri de 16px (fără zoom iOS) și ținte tactile de minimum 40px. */}
+      {bp === "mobile" && <style>{`.apia-m input,.apia-m select,.apia-m textarea{font-size:16px!important}.apia-m button,.apia-m [role=tab]{min-height:40px}`}</style>}
+      <div className={`mx-auto max-w-[1560px] px-3 pb-24 pt-4 sm:px-4 md:px-6 ${bp === "mobile" ? "apia-m" : ""}`}>
         {/* Header */}
         <header className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-3">
           <div className="min-w-[220px] flex-1">
-            <div className="flex flex-wrap items-center gap-2"><h1 className="text-[26px] font-extrabold leading-tight" style={H}>Pregătire dosar APIA</h1></div>
+            <div className="flex flex-wrap items-center gap-2"><h1 className="text-[22px] font-extrabold leading-tight sm:text-[26px]" style={H}>Pregătire dosar APIA</h1></div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <StatusBadge status={a.dossierStatus} />
               <span className="text-[12.5px]" style={{ color: C.muted }}>Campania {a.campaign}{a.farmName ? ` · ${a.farmName}` : ""} · Acces: {ROLE_LABEL[a.role]}</span>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="w-[140px]"><Select value={a.campaign} onChange={a.setCampaign}>{a.years.map(c => <option key={c} value={c}>Campania {c}</option>)}</Select></div>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <div className="w-full sm:w-[140px]"><Select value={a.campaign} onChange={a.setCampaign}>{a.years.map(c => <option key={c} value={c}>Campania {c}</option>)}</Select></div>
             <Btn onClick={() => a.setSection("guidance")} icon={<SECTION_ICONS.guidance size={14} />}>Ghidaj APIA</Btn>
             {bp !== "desktop" && <Btn onClick={() => setPanel(true)} icon={<Eye size={14} />}>Vezi verificările{a.open.length ? ` (${a.open.length})` : ""}</Btn>}
             {hasDossier && <Btn v="primary" onClick={() => a.setSection(a.lastSection)} icon={<Play size={14} />}>Continuă pregătirea</Btn>}
@@ -101,7 +105,7 @@ export function ApiaPage() {
               {bp === "mobile" && (
                 <div className="relative z-10 mb-4">
                   <button onClick={() => setNavOpen(o => !o)} className="flex w-full items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-left text-[13.5px] font-bold" style={{ border: `1px solid ${C.line}` }} aria-expanded={navOpen}>
-                    <span className="flex-1">{SECTION_TITLES[a.section]}</span><span className="text-[11.5px] font-semibold" style={{ color: C.muted }}>{SECTION_ORDER.indexOf(a.section) + 1}/13</span><ChevronDown size={16} />
+                    <span className="flex-1">{SECTION_TITLES[a.section]}</span><span className="text-[11.5px] font-semibold" style={{ color: C.muted }}>{SECTION_ORDER.indexOf(a.section) + 1}/{SECTION_ORDER.length}</span><ChevronDown size={16} />
                   </button>
                   {navOpen && <div className="absolute inset-x-0 top-full mt-1 max-h-[60vh] overflow-y-auto rounded-2xl bg-white p-2 shadow-xl" style={{ border: `1px solid ${C.line}` }}>{nav}</div>}
                 </div>
@@ -111,6 +115,19 @@ export function ApiaPage() {
               {loading ? <SkeletonBlock rows={6} /> : error ? <ErrorState onRetry={reload} /> : acc === "none" ? (
                 <EmptyState icon={<Layers size={22} />} title="Nu ai acces la această secțiune" text={`Rolul „${ROLE_LABEL[a.role]}” nu include această secțiune. Contactează administratorul fermei.`} action={<Btn onClick={() => a.setSection("overview")}>Înapoi la prezentare</Btn>} />
               ) : <Current a={a} bp={bp} />}
+              {STEP_KEYS.includes(a.section) && !loading && !error && acc !== "none" && (() => {
+                const i = SECTION_ORDER.indexOf(a.section); const prev = SECTION_ORDER[i - 1]; const next = SECTION_ORDER[i + 1]; const isSk = a.skipped.has(a.section);
+                return (
+                  <div className="mt-6 flex flex-wrap items-center gap-2 border-t pt-4" style={{ borderColor: C.lineSoft }}>
+                    {isSk && <span className="mr-auto rounded-full px-2.5 py-1 text-[11.5px] font-bold" style={{ background: "#F1EFE6", color: C.muted }}>Omis pentru moment</span>}
+                    <Btn disabled={!prev} onClick={() => prev && a.setSection(prev)}>Înapoi</Btn>
+                    {isSk
+                      ? <Btn disabled={a.role === "vizualizare"} onClick={() => void a.resumeSection(a.section)}>Reia pasul</Btn>
+                      : <button disabled={a.role === "vizualizare"} onClick={() => { void a.skipSection(a.section); if (next) a.setSection(next); }} className="rounded-lg px-3 py-2 text-[12.5px] font-semibold disabled:opacity-50" style={{ color: C.muted }}>Omite pentru moment</button>}
+                    <Btn v="primary" disabled={!next} onClick={() => next && a.setSection(next)}>Continuă</Btn>
+                  </div>
+                );
+              })()}
             </main>
             {bp === "desktop" && <aside className="sticky top-3 max-h-[calc(100vh-2rem)] self-start overflow-y-auto"><Card>{checks}</Card></aside>}
           </div>
@@ -118,7 +135,7 @@ export function ApiaPage() {
       </div>
 
       {hasDossier && bp !== "desktop" && (
-        <div className="sticky bottom-0 z-20 border-t bg-white/95 px-4 py-2.5 backdrop-blur" style={{ borderColor: C.line }}>
+        <div className="sticky bottom-0 z-20 border-t bg-white/95 px-4 py-2.5 backdrop-blur" style={{ borderColor: C.line, paddingBottom: "max(0.625rem, env(safe-area-inset-bottom))" }}>
           <div className="mx-auto flex max-w-[1560px] items-center gap-3">
             <div className="min-w-0 flex-1"><div className="mb-1 flex justify-between text-[11.5px] font-bold"><span>Pregătirea dosarului</span><span>{a.percent}%</span></div><ProgressBar value={a.percent} h={6} /></div>
             <Btn size="sm" onClick={() => setPanel(true)} icon={<Bell size={13} />}>{a.open.length}</Btn>

@@ -1,11 +1,11 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity, Activity2, HubDoc, Intervention, MOD_TYPES, Modification, Notebook, Parcel, SectionKey, SECTION_ORDER, UsageDoc, Warning, access,
+  Activity, Activity2, HubDoc, Intervention, MOD_TYPES, Modification, Notebook, Parcel, SectionKey, SECTION_ORDER, SECTION_TITLES, UsageDoc, Warning, access,
 } from "./data";
 import {
   AuditRow, ChangeRow, DossierRow, Scope, SnapshotRow, audit as auditRepo, createDossier as createDossierRepo, getDossier, getScope, insertNbManual, loadPrep, loadSources,
-  patchDossier, recordSubmission, saveChange, setConfirmation, signedUrl, updateCompany, uploadDocument, upsertIntervention, upsertNbRow, upsertPrepParcel,
+  patchDossier, recordSubmission, saveChange, setConfirmation, clearConfirmation, signedUrl, updateCompany, uploadDocument, upsertIntervention, upsertNbRow, upsertPrepParcel,
 } from "@/lib/apia-prep/repo";
 import {
   DiffItem, Prep, Sources, buildSnapshotPayload, buildView, completionPercent, diffSnapshot, verify,
@@ -87,6 +87,7 @@ export function useApia() {
   // ── Model derivat ──────────────────────────────────────────────────────────
   const view = useMemo(() => (src ? buildView(src, prep, year, today) : null), [src, prep, year, today]);
   const confSet = useMemo(() => new Set(prep.confirmations.filter(c => c.kind === "WARNING_REVIEWED").map(c => c.entity_key)), [prep.confirmations]);
+  const skipped = useMemo(() => new Set(prep.confirmations.filter(c => c.kind === "SECTION_SKIPPED").map(c => c.entity_key)), [prep.confirmations]);
   const overrides = dossier?.applicant_overrides ?? {};
   const baseWarnings = useMemo(() => (view ? verify({ view, company: src?.company ?? null, applicantOverrides: overrides, livestockApplicable: prep.livestockApplicable, bndConfirmed: !!prep.bndConfirmedOn, confirmations: confSet, today }) : []), [view, src, overrides, prep.livestockApplicable, prep.bndConfirmedOn, confSet, today]);
 
@@ -145,6 +146,8 @@ export function useApia() {
   const activity: Activity2[] = auditRows.map(r => ({ id: r.id, text: r.notes ?? r.action, time: new Date(r.created_at).toLocaleString("ro-RO", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }), who: r.actor_id === scope?.userId ? "Tu" : "Coleg" }));
 
   const sectionInfo = (k: SectionKey): { status: SecStatus; issues: number } => {
+    // O secțiune omisă rămâne incompletă și nu este niciodată marcată completă.
+    if (skipped.has(k)) return { status: "s_incomplet", issues: 0 };
     const inSec = open.filter(w => w.section === k && w.sev !== "recomandare");
     switch (k) {
       case "overview": return { status: "s_neinceput", issues: 0 };
@@ -202,6 +205,14 @@ export function useApia() {
     for (const w of missingDocWarnings) await setConfirmation(sc, d, "WARNING_REVIEWED", w.id, "ignorat de utilizator");
     await auditRepo(sc, d, "WARNING_REVIEWED", "warning", null, null, { count: missingDocWarnings.length }, `Utilizatorul a ignorat ${missingDocWarnings.length} avertizări despre documente lipsă`);
   }, "Avertizările despre documente lipsă au fost marcate ca ignorate.");
+  const skipSection = (k: SectionKey) => run(async () => {
+    const { sc, id: d } = need(); await setConfirmation(sc, d, "SECTION_SKIPPED", k, "omis pentru moment");
+    await auditRepo(sc, d, "SECTION_SKIPPED", "section", null, null, { section: k }, `Secțiune omisă pentru moment: ${SECTION_TITLES[k]}`);
+  }, "Secțiunea a fost omisă pentru moment și rămâne în lista de finalizat.");
+  const resumeSection = (k: SectionKey) => run(async () => {
+    const { sc, id: d } = need(); await clearConfirmation(d, "SECTION_SKIPPED", k);
+    await auditRepo(sc, d, "SECTION_RESUMED", "section", null, null, { section: k }, `Secțiune reluată: ${SECTION_TITLES[k]}`);
+  });
   const resolve = (id: string, why?: string) => run(async () => { const { sc, id: d } = need(); await setConfirmation(sc, d, "WARNING_REVIEWED", id, why); await auditRepo(sc, d, "WARNING_REVIEWED", "warning", null, null, { id }, `Verificare marcată de utilizator: ${activeWarnings.find(w => w.id === id)?.title ?? id}${why ? ` (${why})` : ""}`); });
 
   const updateParcel = (code: string, patch: Partial<Parcel>) => run(async () => {
@@ -324,7 +335,7 @@ export function useApia() {
   return {
     campaign, setCampaign, years, hasDossier: !!dossier, dossiers: { [campaign]: !!dossier } as Record<string, boolean>, role, section, setSection, lastSection, parcels, usage, docs, warnings: activeWarnings, open, ivs, notebooks, mods, activity,
     zoo: prep.livestockApplicable, setZoo, bndDate: prep.bndConfirmedOn, verifRan, setVerifRan, signMethod, setSignMethod, submission, inControl, setInControl, exportsDone, setExportsDone, toast, notify, openNb, setOpenNb,
-    focusParcel, setFocusParcel, log, percent, count, resolve, ignoreMissingDocs, missingDocCount: missingDocWarnings.length, docsOk, docsTotal: liveDocs.length, docsMissing, ivStatus, ivReq, nbStatus, sectionInfo, secComplete, secIncomplete, applicableCount: applicable.length,
+    focusParcel, setFocusParcel, log, percent, count, resolve, skipped, skipSection, resumeSection, ignoreMissingDocs, missingDocCount: missingDocWarnings.length, docsOk, docsTotal: liveDocs.length, docsMissing, ivStatus, ivReq, nbStatus, sectionInfo, secComplete, secIncomplete, applicableCount: applicable.length,
     needsCheck, nextTarget, dossierStatus, can, canSubmit, updateParcel, confirmArea, uploadUsageFile, addDoc, uploadBank, addActivity, confirmNotebook, toggleIv, addMod, updateMod,
     submit, confirmBnd, createDossier, goFirstIssue, MOD_TYPES, SECTION_ORDER,
     // date reale
