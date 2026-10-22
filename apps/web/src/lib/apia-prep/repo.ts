@@ -66,9 +66,12 @@ export async function loadSources(scope: Scope, year: number): Promise<Sources> 
   if (cids.length) {
     const [cp, wo] = await Promise.all([
       db.from("crop_plans").select("parcel_id, crop, planned_area_ha").eq("user_id", o).in("campaign_id", cids).limit(5000),
-      db.from("work_orders").select("id, parcel_id, operation_type, title, status, completed_date, planned_date, area_ha, work_order_inputs(id, product_name, unit, actual_qty, planned_qty)").eq("user_id", o).in("campaign_id", cids).limit(5000),
+      db.from("work_orders").select("id, parcel_id, operation_type, title, status, completed_date, planned_date, area_ha, work_order_inputs(id, product_name, unit, quantity)").eq("user_id", o).in("campaign_id", cids).limit(5000),
     ]);
-    cropPlans = must(cp, "planuri cultură"); workOrders = must(wo, "lucrări");
+    cropPlans = must(cp, "planuri cultură"); workOrders = (must(wo, "lucrări") as Array<Record<string, unknown>>).map(w => ({
+      ...w,
+      work_order_inputs: ((w.work_order_inputs as Array<Record<string, unknown>> | null) ?? []).map(i => ({ id: i.id, product_name: i.product_name, unit: i.unit, actual_qty: i.quantity ?? null, planned_qty: i.quantity ?? null })),
+    }));
   }
   const tr = await db.from("registru_fitosanitar").select("id, data_tratament, cultura, nr_parcela, nr_bloc_fizic, denumire_produs, cantitate_utilizata, unitate_cantitate, suprafata_tratata, nume_prenume_responsabil, numar_document")
     .eq("user_id", o).eq("is_deleted", false).gte("data_tratament", `${year}-01-01`).lte("data_tratament", `${year}-12-31`).limit(10000);
