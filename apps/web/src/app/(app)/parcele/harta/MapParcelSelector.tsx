@@ -450,7 +450,7 @@ function ParcelItem({
       isSelected ? 'border-blue-400 ring-2 ring-blue-100' : 'border-gray-200 hover:border-green-300 hover:shadow-md'
     }`}>
       {/* Card header */}
-      <div className="px-3 pt-3 pb-2 flex-1">
+      <div className="px-3 pt-3 pb-2 flex-1 cursor-pointer" onClick={onView}>
         <div className="flex items-start justify-between gap-2 mb-0.5">
           <div className="font-semibold text-sm text-gray-900 leading-tight truncate">{parcel.nume_parcela}{parcelNr ? ` / ${parcelNr}` : ''}</div>
           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border flex-shrink-0 ${
@@ -1392,7 +1392,7 @@ export default function MapParcelSelector({
     onParcelSelected?.(parcel)
     // Scroll map into view (layout is vertical, map may be above the card list)
     if (mapWrapperRef.current) {
-      mapWrapperRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      mapWrapperRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }
     const layer = parcelLayersRef.current.get(parcel.id)
     if (layer && mapRef.current) {
@@ -1837,7 +1837,7 @@ export default function MapParcelSelector({
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className={isModal ? 'flex flex-col-reverse gap-4' : 'flex flex-col-reverse gap-3'}>
+    <div className={isModal ? 'flex flex-col-reverse lg:flex-row gap-4 lg:items-start' : 'flex flex-col-reverse gap-3'}>
 
 
 
@@ -1845,7 +1845,7 @@ export default function MapParcelSelector({
       {showList && (
         <>
         <aside className={isModal
-          ? 'flex flex-col gap-3'
+          ? 'flex flex-col gap-3 lg:w-[400px] lg:shrink-0 lg:h-[75vh] lg:overflow-y-auto lg:pr-1'
           : 'space-y-3'
         }>
 
@@ -2160,7 +2160,7 @@ export default function MapParcelSelector({
                 })
               : parcels
             return (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className={isModal ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3'}>
                 {loading ? (
                   <div className="text-center py-10">
                     <div className="inline-block w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
@@ -2215,7 +2215,7 @@ export default function MapParcelSelector({
       {/* ── Map + status bar ── */}
       <div
         ref={mapWrapperRef}
-        className={`relative flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm${isModal ? ' h-[65vh] min-h-[400px]' : ' order-1'}`}
+        className={`relative flex flex-col rounded-xl overflow-hidden border border-gray-200 shadow-sm${isModal ? ' h-[65vh] min-h-[400px] lg:h-[75vh] lg:flex-1 lg:min-w-0' : ' order-1'}`}
         style={!isModal ? { height, isolation: 'isolate' } : { isolation: 'isolate' }}
       >
         <div
