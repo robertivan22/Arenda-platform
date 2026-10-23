@@ -49,6 +49,7 @@ export default function DashboardMap({ polygons, points }: { polygons: DashPolyg
 
   useEffect(() => {
     let map: any
+    let timer: ReturnType<typeof setTimeout> | undefined
     let cancelled = false
     import('leaflet').then(({ default: L }) => {
       if (cancelled || !ref.current) return
@@ -92,11 +93,12 @@ export default function DashboardMap({ polygons, points }: { polygons: DashPolyg
 
       if (bounds.length) map.fitBounds(L.latLngBounds(bounds), { padding: [36, 36], maxZoom: 15 })
       else map.setView([45.9432, 24.9668], 6)
-      setTimeout(() => map.invalidateSize(), 100)
-    })
+      timer = setTimeout(() => { if (!cancelled) map?.invalidateSize() }, 100)
+    }).catch(() => { /* map is optional; never break the page */ })
     return () => {
       cancelled = true
-      map?.remove()
+      clearTimeout(timer)
+      try { map?.remove() } catch { /* already torn down */ }
     }
   }, [polygons, points])
 
