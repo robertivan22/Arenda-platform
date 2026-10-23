@@ -29,6 +29,7 @@ interface ParcelRow {
   locality: string | null; culture: string | null; surface: number | null; status: string | null
   apia_eligible: boolean | null; created_at: string | null; lat: number | null; lng: number | null
   lessors: { first_name: string | null; last_name: string | null; company_name: string | null; type: string | null } | null
+  contracts: { contract_number: string | null; end_date: string | null } | null
 }
 interface ContractRow { id: string; contract_number: string | null; status: string | null; end_date: string | null; created_at: string | null }
 interface TxRow { ron_net: number | null; is_paid: boolean | null }
@@ -116,7 +117,7 @@ export default function DashboardPage() {
       const db = createClient()
       const [p, c, t, f, l] = await Promise.all([
         db.from('parcels')
-          .select('id,bloc_fizic,tarla_nr,parcel_nr,locality,culture,surface,status,apia_eligible,created_at,lat,lng,lessors(first_name,last_name,company_name,type)')
+          .select('id,bloc_fizic,tarla_nr,parcel_nr,locality,culture,surface,status,apia_eligible,created_at,lat,lng,lessors(first_name,last_name,company_name,type),contracts(contract_number,end_date)')
           .order('created_at', { ascending: false }).limit(5000),
         db.from('contracts').select('id,contract_number,status,end_date,created_at').order('created_at', { ascending: false }).limit(2000),
         db.from('transactions').select('ron_net,is_paid').eq('is_previzionata', false).limit(5000),
@@ -179,20 +180,33 @@ export default function DashboardPage() {
     const cropColor = new Map(d.crops.map((c, i) => [c.name, CROP_COLORS[i % CROP_COLORS.length]]))
     const colorOf = (p?: ParcelRow) => STATUS_COLOR[p?.status ?? 'ACTIVE'] ?? STATUS_COLOR.INACTIVE
 
+    const infoOf = (p: ParcelRow | undefined, ha: number | null | undefined): string[] => {
+      const lines: string[] = []
+      if (ha != null) lines.push(`Suprafață: ${fmt(Number(ha), 2)} ha`)
+      if (!p) return lines
+      if (p.culture) lines.push(`Cultură: ${p.culture}`)
+      if (p.locality) lines.push(`Localitate: ${p.locality}`)
+      if (p.lessors) lines.push(`Arendator: ${lessorName(p.lessors)}`)
+      if (p.contracts?.contract_number) lines.push(`Contract: ${p.contracts.contract_number}${p.contracts.end_date ? ` (până la ${fmtDate(p.contracts.end_date)})` : ''}`)
+      lines.push(`Status: ${STATUS_LABEL[p.status ?? 'ACTIVE'] ?? p.status}${p.apia_eligible ? ' · eligibilă APIA' : ''}`)
+      return lines
+    }
+
     const polys: DashPolygon[] = fito
       .filter((f) => f.geometry_geojson?.coordinates?.[0]?.length)
       .map((f) => {
         const lp = f.parcela_id ? byId.get(f.parcela_id) : undefined
         return {
-          id: f.id, name: f.nume_parcela ?? 'Parcelă', ha: f.suprafata_ha,
+          id: f.id, parcelId: f.parcela_id, name: lp ? parcelName(lp) : f.nume_parcela ?? 'Parcelă',
           color: f.cultura_color ?? (lp?.culture ? cropColor.get(lp.culture) ?? BRAND : colorOf(lp)),
           ring: f.geometry_geojson!.coordinates![0], fresh: !!(f.parcela_id && newest.has(f.parcela_id)),
+          info: infoOf(lp, lp?.surface ?? f.suprafata_ha),
         }
       })
     const withPoly = new Set(fito.filter((f) => f.parcela_id).map((f) => f.parcela_id))
     const pts: DashPoint[] = parcels
       .filter((p) => p.lat != null && p.lng != null && !withPoly.has(p.id))
-      .map((p) => ({ id: p.id, name: parcelName(p), ha: p.surface, color: colorOf(p), lat: p.lat!, lng: p.lng!, fresh: newest.has(p.id) }))
+      .map((p) => ({ id: p.id, name: parcelName(p), color: colorOf(p), lat: p.lat!, lng: p.lng!, fresh: newest.has(p.id), info: infoOf(p, p.surface) }))
 
     if (mapMode === 'noi') {
       return { polygons: polys.filter((x) => x.fresh), points: pts.filter((x) => x.fresh) }
