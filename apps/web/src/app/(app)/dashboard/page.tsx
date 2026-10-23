@@ -1,284 +1,345 @@
 ﻿'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import type { DashParcel } from '@/components/dashboard/DashboardMap'
+import { ArrowUpRight, Banknote, FileText, Layers, MapPin, MessageSquare, Plus, Ruler, Wheat } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { Users, FileText, MapPin, CreditCard, AlertTriangle, Clock, Plus, BarChart3, MessageSquare, Wheat, Tractor, ArrowRight } from 'lucide-react'
+import type { DashPoint, DashPolygon } from '@/components/dashboard/DashboardMap'
 
 export const runtime = 'edge'
 
-interface CampaignWidget {
-  id: string
-  name: string
-  year: number
-  totalParcels: number
-  plannedParcels: number
-  harvestedParcels: number
-  opsFinished: number
-  opsTotal: number
+const DashboardMap = dynamic(() => import('@/components/dashboard/DashboardMap'), { ssr: false })
+
+const BRAND = '#4a6640'
+const CROP_COLORS = ['#4a6640', '#f59e0b', '#7e9e6a', '#b45309', '#a8bd96', '#5c7f4c', '#d6c7a1']
+const STATUS_COLOR: Record<string, string> = { ACTIVE: '#4a6640', INACTIVE: '#9ca3af', EXPIRED: '#b91c1c' }
+const STATUS_LABEL: Record<string, string> = { ACTIVE: 'Activă', INACTIVE: 'Inactivă', EXPIRED: 'Expirată' }
+
+const fmt = (n: number, d = 0) => n.toLocaleString('ro-RO', { minimumFractionDigits: d, maximumFractionDigits: d })
+const MONTHS = ['ian', 'feb', 'mar', 'apr', 'mai', 'iun', 'iul', 'aug', 'sep', 'oct', 'nov', 'dec']
+const fmtDate = (iso?: string | null) => {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '—' : `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 
-interface Stats {
-  lessorsTotal: number
-  contractsActive: number
-  contractsExpiring: number
-  parcelsTotal: number
-  surfaceTotal: string
-  paymentsOverdue: number
-  paymentsOverdueAmount: string
+interface ParcelRow {
+  id: string; bloc_fizic: string | null; tarla_nr: string | null; parcel_nr: string | null
+  locality: string | null; culture: string | null; surface: number | null; status: string | null
+  apia_eligible: boolean | null; created_at: string | null; lat: number | null; lng: number | null
+  lessors: { first_name: string | null; last_name: string | null; company_name: string | null; type: string | null } | null
+}
+interface ContractRow { id: string; contract_number: string | null; status: string | null; end_date: string | null; created_at: string | null }
+interface TxRow { ron_net: number | null; is_paid: boolean | null }
+interface FitoRow {
+  id: string; parcela_id: string | null; nume_parcela: string | null; suprafata_ha: number | null
+  cultura_color: string | null; geometry_geojson: { coordinates?: number[][][] } | null; created_at: string | null
 }
 
-const EMPTY: Stats = {
-  lessorsTotal: 0, contractsActive: 0, contractsExpiring: 0,
-  parcelsTotal: 0, surfaceTotal: '0.00', paymentsOverdue: 0, paymentsOverdueAmount: '0.00',
+const parcelName = (p: ParcelRow) => `Bloc ${p.bloc_fizic ?? '-'} · T${p.tarla_nr ?? '-'} · P${p.parcel_nr ?? '-'}`
+const lessorName = (l: ParcelRow['lessors']) =>
+  !l ? '—' : l.type === 'LEGAL' ? l.company_name ?? '—' : `${l.last_name ?? ''} ${l.first_name ?? ''}`.trim() || '—'
+
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm ${className}`}>{children}</div>
 }
 
-interface StatCardProps {
-  label: string
-  value: string | number
-  icon: React.ElementType
-  sub?: string
-  iconColor: string
-}
-
-function StatCard({ label, value, icon: Icon, sub, iconColor }: StatCardProps) {
+function CardHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
-    <div className="rounded-xl p-4 flex flex-col gap-1.5 border border-white/[0.07]" style={{ background: 'rgba(255,255,255,0.05)' }}>
-      <div className="flex items-center gap-1.5 text-xs" style={{ color: iconColor }}>
-        <Icon className="w-3 h-3" />
-        <span className="text-white/60">{label}</span>
-      </div>
-      <div className="text-white text-2xl font-semibold">{value}</div>
-      {sub && <div className="text-white/45 text-xs leading-snug">{sub}</div>}
+    <div className="flex items-center justify-between mb-4">
+      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+      {action && (
+        <button onClick={onAction} className="text-xs font-medium text-brand-600 hover:text-brand-800 flex items-center gap-0.5">
+          {action} <ArrowUpRight size={12} />
+        </button>
+      )}
     </div>
   )
 }
 
-const DashboardMap = dynamic(() => import('@/components/dashboard/DashboardMap'), { ssr: false })
+function Kpi({ icon, label, value, unit, sub, tone }: { icon: React.ReactNode; label: string; value: string; unit?: string; sub: string; tone: string }) {
+  return (
+    <Card className="p-4 flex items-start gap-3.5">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: tone + '1F', color: tone }}>{icon}</div>
+      <div className="min-w-0">
+        <div className="text-xs text-gray-500">{label}</div>
+        <div className="text-[22px] leading-tight font-bold text-gray-900 mt-0.5 tabular-nums">
+          {value}{unit && <span className="text-[13px] font-semibold text-gray-500 ml-1">{unit}</span>}
+        </div>
+        <div className="text-xs text-gray-500 mt-1">{sub}</div>
+      </div>
+    </Card>
+  )
+}
+
+function Donut({ data, total }: { data: { name: string; ha: number }[]; total: number }) {
+  const r = 70, c = 2 * Math.PI * r
+  let acc = 0
+  return (
+    <div className="relative h-[190px] flex items-center justify-center">
+      <svg width={190} height={190} viewBox="0 0 190 190" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={95} cy={95} r={r} fill="none" stroke="#f3f4f6" strokeWidth={24} />
+        {total > 0 && data.map((d, i) => {
+          const len = (d.ha / total) * c
+          const el = (
+            <circle key={d.name} cx={95} cy={95} r={r} fill="none" stroke={CROP_COLORS[i % CROP_COLORS.length]} strokeWidth={24}
+              strokeDasharray={`${Math.max(len - 2, 0)} ${c}`} strokeDashoffset={-acc} />
+          )
+          acc += len
+          return el
+        })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <div className="text-xl font-bold text-gray-900 tabular-nums">{fmt(total)} ha</div>
+        <div className="text-[11px] text-gray-500">Total</div>
+      </div>
+    </div>
+  )
+}
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [mapParcels, setMapParcels] = useState<DashParcel[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [s, setS] = useState<Stats>(EMPTY)
   const [loading, setLoading] = useState(true)
+  const [name, setName] = useState('')
+  const [parcels, setParcels] = useState<ParcelRow[]>([])
+  const [contracts, setContracts] = useState<ContractRow[]>([])
+  const [txs, setTxs] = useState<TxRow[]>([])
+  const [fito, setFito] = useState<FitoRow[]>([])
+  const [lessorsCount, setLessorsCount] = useState(0)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [unreadMessages, setUnreadMessages] = useState(0)
-  const [campaignWidget, setCampaignWidget] = useState<CampaignWidget | null>(null)
+  const [unread, setUnread] = useState(0)
+  const [mapMode, setMapMode] = useState<'toate' | 'noi'>('toate')
 
   useEffect(() => {
     async function load() {
       const db = createClient()
-      const now = new Date()
-      const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      const today = now.toISOString().split('T')[0]
-      const [
-        { count: lessorsTotal },
-        { count: contractsActive },
-        { count: contractsExpiring },
-        { data: parcelsData },
-        { data: overdueData },
-      ] = await Promise.all([
+      const [p, c, t, f, l] = await Promise.all([
+        db.from('parcels')
+          .select('id,bloc_fizic,tarla_nr,parcel_nr,locality,culture,surface,status,apia_eligible,created_at,lat,lng,lessors(first_name,last_name,company_name,type)')
+          .order('created_at', { ascending: false }).limit(5000),
+        db.from('contracts').select('id,contract_number,status,end_date,created_at').order('created_at', { ascending: false }).limit(2000),
+        db.from('transactions').select('ron_net,is_paid').eq('is_previzionata', false).limit(5000),
+        db.from('parcele_fitosanitar').select('id,parcela_id,nume_parcela,suprafata_ha,cultura_color,geometry_geojson,created_at').order('created_at', { ascending: false }),
         db.from('lessors').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
-        db.from('contracts').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
-        db.from('contracts').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE').lte('end_date', in30).gte('end_date', today),
-        db.from('parcels').select('surface').limit(5000),
-        db.from('transactions').select('ron_net').eq('is_paid', false).eq('is_previzionata', false).limit(1000),
       ])
-      const surfaceTotal = ((parcelsData ?? []) as any[]).reduce((acc, p) => acc + Number(p.surface ?? 0), 0).toFixed(2)
-      const paymentsOverdue = (overdueData ?? []).length
-      const paymentsOverdueAmount = ((overdueData ?? []) as any[]).reduce((acc, p) => acc + Number(p.ron_net ?? 0), 0).toFixed(2)
-      setS({ lessorsTotal: lessorsTotal ?? 0, contractsActive: contractsActive ?? 0, contractsExpiring: contractsExpiring ?? 0, parcelsTotal: (parcelsData ?? []).length, surfaceTotal, paymentsOverdue, paymentsOverdueAmount })
+      setParcels((p.data ?? []) as unknown as ParcelRow[])
+      setContracts((c.data ?? []) as ContractRow[])
+      setTxs((t.data ?? []) as TxRow[])
+      setFito((f.data ?? []) as unknown as FitoRow[])
+      setLessorsCount(l.count ?? 0)
       setLoading(false)
 
-      const { data: mp } = await db.from('parcels')
-        .select('id,bloc_fizic,tarla_nr,parcel_nr,culture,surface,lat,lng,status')
-        .not('lat', 'is', null).not('lng', 'is', null).limit(1000)
-      setMapParcels(((mp ?? []) as any[]).map((p) => ({
-        id: p.id,
-        name: `Bloc ${p.bloc_fizic ?? '-'} · T${p.tarla_nr ?? '-'} · P${p.parcel_nr ?? '-'}`,
-        culture: p.culture ?? null,
-        surface: Number(p.surface ?? 0),
-        lat: p.lat,
-        lng: p.lng,
-        active: p.status === 'ACTIVE',
-      })))
-
-      // Campaign progress widget
-      try {
-        const { data: activeCampaign } = await db.from('campaigns').select('id,name,year').eq('is_active', true).maybeSingle()
-        if (activeCampaign) {
-          const [{ count: totalParcels }, { data: plans }, { count: opsTotal }, { count: opsFinished }] = await Promise.all([
-            db.from('parcels').select('id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
-            db.from('crop_plans').select('parcel_id,status').eq('campaign_id', activeCampaign.id),
-            db.from('work_orders').select('id', { count: 'exact', head: true }).eq('campaign_id', activeCampaign.id),
-            db.from('work_orders').select('id', { count: 'exact', head: true }).eq('campaign_id', activeCampaign.id).eq('status', 'FINALIZAT'),
-          ])
-          setCampaignWidget({
-            id: activeCampaign.id,
-            name: activeCampaign.name,
-            year: activeCampaign.year,
-            totalParcels: totalParcels ?? 0,
-            plannedParcels: (plans ?? []).length,
-            harvestedParcels: (plans ?? []).filter((p: any) => p.status === 'RECOLTAT').length,
-            opsFinished: opsFinished ?? 0,
-            opsTotal: opsTotal ?? 0,
-          })
-        }
-      } catch { /* campaigns table may not exist yet */ }
-      // Admin: check for unread contact messages
       const { data: { user } } = await db.auth.getUser()
       if (user) {
+        const meta = user.user_metadata as { full_name?: string } | undefined
+        setName((meta?.full_name ?? user.email?.split('@')[0] ?? '').split(' ')[0])
         const { data: profile } = await db.from('profiles').select('is_admin').eq('id', user.id).single()
         if (profile?.is_admin) {
           setIsAdmin(true)
           const { count } = await db.from('contact_messages').select('id', { count: 'exact', head: true }).eq('is_read', false)
-          setUnreadMessages(count ?? 0)
+          setUnread(count ?? 0)
         }
       }
     }
     load()
   }, [])
 
+  const d = useMemo(() => {
+    const ha = (p: ParcelRow) => Number(p.surface ?? 0)
+    const totalHa = parcels.reduce((s, p) => s + ha(p), 0)
+    const activeHa = parcels.filter((p) => p.status === 'ACTIVE').reduce((s, p) => s + ha(p), 0)
+    const apiaHa = parcels.filter((p) => p.apia_eligible).reduce((s, p) => s + ha(p), 0)
+    const activeContracts = contracts.filter((c) => c.status === 'ACTIVE')
+    const expiring = activeContracts.filter((c) => {
+      if (!c.end_date) return false
+      const diff = (new Date(c.end_date).getTime() - Date.now()) / 86400000
+      return diff >= 0 && diff <= 90
+    }).length
 
-  const dash = loading ? '—' : undefined
-  const selected = mapParcels.find((p) => p.id === selectedId) ?? null
-  const activeMap = mapParcels.filter((p) => p.active).length
-  const now = new Date().toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })
+    const byCrop = new Map<string, number>()
+    parcels.forEach((p) => byCrop.set(p.culture || 'Nespecificată', (byCrop.get(p.culture || 'Nespecificată') ?? 0) + ha(p)))
+    const crops = [...byCrop.entries()].map(([n, h]) => ({ name: n, ha: h })).sort((a, b) => b.ha - a.ha)
+
+    const paid = txs.filter((x) => x.is_paid).reduce((s, x) => s + Number(x.ron_net ?? 0), 0)
+    const unpaid = txs.filter((x) => !x.is_paid).reduce((s, x) => s + Number(x.ron_net ?? 0), 0)
+
+    const recent = parcels.slice(0, 4)
+    const acts = [
+      ...contracts.slice(0, 6).map((c) => ({ date: c.created_at, title: `Contract ${c.contract_number ?? ''} înregistrat`, sub: c.status === 'ACTIVE' ? 'Activ' : c.status ?? '', icon: <FileText size={13} /> })),
+      ...parcels.slice(0, 6).map((p) => ({ date: p.created_at, title: `Parcelă adăugată · ${parcelName(p)}`, sub: `${fmt(ha(p), 2)} ha · ${p.culture ?? 'Cultură nespecificată'}`, icon: <MapPin size={13} /> })),
+    ].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')).slice(0, 6)
+
+    return { totalHa, activeHa, apiaHa, activeContracts, expiring, crops, paid, unpaid, recent, acts }
+  }, [parcels, contracts, txs])
+
+  const { polygons, points } = useMemo(() => {
+    const newest = new Set(parcels.slice(0, 3).map((p) => p.id))
+    const byId = new Map(parcels.map((p) => [p.id, p]))
+    const cropColor = new Map(d.crops.map((c, i) => [c.name, CROP_COLORS[i % CROP_COLORS.length]]))
+    const colorOf = (p?: ParcelRow) => STATUS_COLOR[p?.status ?? 'ACTIVE'] ?? STATUS_COLOR.INACTIVE
+
+    const polys: DashPolygon[] = fito
+      .filter((f) => f.geometry_geojson?.coordinates?.[0]?.length)
+      .map((f) => {
+        const lp = f.parcela_id ? byId.get(f.parcela_id) : undefined
+        return {
+          id: f.id, name: f.nume_parcela ?? 'Parcelă', ha: f.suprafata_ha,
+          color: f.cultura_color ?? (lp?.culture ? cropColor.get(lp.culture) ?? BRAND : colorOf(lp)),
+          ring: f.geometry_geojson!.coordinates![0], fresh: !!(f.parcela_id && newest.has(f.parcela_id)),
+        }
+      })
+    const withPoly = new Set(fito.filter((f) => f.parcela_id).map((f) => f.parcela_id))
+    const pts: DashPoint[] = parcels
+      .filter((p) => p.lat != null && p.lng != null && !withPoly.has(p.id))
+      .map((p) => ({ id: p.id, name: parcelName(p), ha: p.surface, color: colorOf(p), lat: p.lat!, lng: p.lng!, fresh: newest.has(p.id) }))
+
+    if (mapMode === 'noi') {
+      return { polygons: polys.filter((x) => x.fresh), points: pts.filter((x) => x.fresh) }
+    }
+    return { polygons: polys, points: pts }
+  }, [parcels, fito, d.crops, mapMode])
+
+  const totalRon = d.paid + d.unpaid
+  const pct = (v: number) => (totalRon ? (v / totalRon) * 100 : 0)
+  const v = (x: string) => (loading ? '—' : x)
 
   return (
-    <div className="-m-4 md:-m-6 min-h-full" style={{ background: '#0b160b' }}>
-      {/* Banner */}
-      <div className="px-5 pt-4 pb-3 border-b border-white/[0.08]" style={{ background: 'linear-gradient(135deg, #0f1f0f 0%, #111e11 100%)' }}>
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <div className="text-white text-sm font-semibold">Platforma ta agricolă</div>
-            <div className="text-white/45 text-xs mt-0.5">
-              {loading ? '—' : `${s.parcelsTotal} parcele · ${s.contractsActive} contracte active`} · actualizat azi {now}
-            </div>
-          </div>
-          <button
-            onClick={() => router.push('/arendatori/nou')}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium text-white border border-white/20 hover:border-white/40 hover:bg-white/10 transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" /> Adaugă arendator
-          </button>
+    <div className="max-w-[1400px] mx-auto">
+      <div className="flex items-end justify-between mb-5 flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Bună ziua{name ? `, ${name}` : ''}!</h1>
+          <p className="text-sm text-gray-500 mt-1">Iată situația fermei tale astăzi.</p>
         </div>
+        <button onClick={() => router.push('/parcele/nou')}
+          className="h-9 px-3.5 rounded-xl text-sm font-semibold text-white flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 transition-colors">
+          <Plus size={14} /> Parcelă nouă
+        </button>
       </div>
 
-      {isAdmin && unreadMessages > 0 && (
-        <a
-          href="/admin-cp"
-          className="mx-5 mt-3 flex items-center gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 hover:bg-amber-400/15 transition-colors"
-          onClick={() => sessionStorage.setItem('admin_tab', 'messages')}
-        >
-          <MessageSquare className="w-4 h-4 text-amber-400" />
-          <span className="text-sm text-amber-300 flex-1">
-            {unreadMessages} mesaj{unreadMessages > 1 ? 'e' : ''} nou{unreadMessages > 1 ? 'ă' : ''} de contact
-          </span>
-          <span className="text-xs text-amber-300">Vezi →</span>
+      {isAdmin && unread > 0 && (
+        <a href="/admin-cp" onClick={() => sessionStorage.setItem('admin_tab', 'messages')}
+          className="mb-4 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 hover:bg-amber-100 transition-colors">
+          <MessageSquare className="w-5 h-5 text-amber-600" />
+          <span className="text-sm font-semibold text-amber-800 flex-1">{unread} mesaj{unread > 1 ? 'e' : ''} nou{unread > 1 ? 'ă' : ''} de contact</span>
+          <span className="text-xs font-semibold text-amber-700">Vezi →</span>
         </a>
       )}
 
-      {/* KPI row */}
-      <div className="px-5 py-3 border-b border-white/[0.08]">
-        <div className="text-white/35 text-[10px] uppercase tracking-widest mb-2.5 font-semibold">Sumar general</div>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5">
-          <StatCard label="Arendatori activi" value={dash ?? s.lessorsTotal} icon={Users} iconColor="#4ade80" />
-          <StatCard label="Contracte active" value={dash ?? s.contractsActive} icon={FileText} iconColor="#60a5fa" />
-          <StatCard label="Expiră în 30 zile" value={dash ?? s.contractsExpiring} icon={Clock} iconColor="#fbbf24" />
-          <StatCard label="Parcele" value={dash ?? s.parcelsTotal} icon={MapPin} iconColor="#c084fc" sub={loading ? undefined : `${s.surfaceTotal} ha total`} />
-          <StatCard label="Tranzacții neplătite" value={dash ?? s.paymentsOverdue} icon={AlertTriangle} iconColor="#f87171" />
-          <StatCard label="Neplătit (RON)" value={dash ?? s.paymentsOverdueAmount} icon={CreditCard} iconColor="#38bdf8" />
-        </div>
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+        <Kpi icon={<Ruler size={18} />} tone="#4a6640" label="Suprafață totală" value={v(fmt(d.totalHa, 0))} unit="ha" sub={`${fmt(d.activeHa)} ha în arendă activă`} />
+        <Kpi icon={<FileText size={18} />} tone="#f59e0b" label="Contracte active" value={v(String(d.activeContracts.length))}
+          sub={d.expiring ? `${d.expiring} expiră în 90 zile` : `${lessorsCount} arendatori activi`} />
+        <Kpi icon={<Layers size={18} />} tone="#7e9e6a" label="Parcele" value={v(String(parcels.length))} sub={`${fmt(d.apiaHa)} ha marcate eligibile APIA`} />
+        <Kpi icon={<Banknote size={18} />} tone="#b45309" label="Arendă plătită" value={v(fmt(d.paid, 0))} unit="RON"
+          sub={`${fmt(pct(d.paid), 0)}% din ${fmt(totalRon, 0)} RON`} />
       </div>
 
-      {/* Map */}
-      <div className="relative border-b border-white/[0.08]" style={{ height: 'clamp(320px, 50vh, 520px)', isolation: 'isolate' }}>
-        <DashboardMap parcels={mapParcels} selectedId={selectedId} onSelect={setSelectedId} />
-
-        <div className="absolute top-3 left-3 z-[1000] rounded-xl px-3 py-2.5 border border-white/10" style={{ background: 'rgba(10,20,10,0.88)', backdropFilter: 'blur(12px)' }}>
-          <div className="text-white/40 text-[10px] uppercase tracking-wider mb-2 font-semibold">Parcele</div>
-          {[{ c: '#4ade80', l: `Active (${activeMap})` }, { c: '#6b7280', l: `Inactive (${mapParcels.length - activeMap})` }].map(({ c, l }) => (
-            <div key={l} className="flex items-center gap-2 text-xs text-white/60 mb-1 last:mb-0">
-              <div className="w-3 h-3 rounded-full" style={{ background: c, boxShadow: `0 0 5px ${c}88` }} />{l}
-            </div>
-          ))}
-        </div>
-
-        {!selected && (
-          <div className="absolute bottom-4 left-4 z-[1000] rounded-xl px-3 py-2 border border-white/10 text-white/45 text-xs" style={{ background: 'rgba(10,20,10,0.75)', backdropFilter: 'blur(8px)' }}>
-            {mapParcels.length ? 'Apasă pe o parcelă pentru detalii' : loading ? 'Se încarcă…' : 'Nicio parcelă cu coordonate'}
-          </div>
-        )}
-
-        {selected && (
-          <div className="absolute bottom-4 left-4 z-[1000] w-[min(360px,calc(100%-2rem))] rounded-2xl p-4 border border-white/10" style={{ background: 'rgba(10,20,10,0.96)', backdropFilter: 'blur(16px)' }}>
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <div className="text-white text-base font-semibold">{selected.name}</div>
-                <div className="text-white/45 text-xs mt-0.5">{selected.culture ?? 'Cultură nespecificată'} · {selected.surface.toFixed(2)} ha</div>
-              </div>
-              <button onClick={() => setSelectedId(null)} className="text-white/40 hover:text-white/80 p-1 rounded-lg hover:bg-white/10 text-sm leading-none">✕</button>
-            </div>
-            <button onClick={() => router.push(`/parcele/${selected.id}`)} className="text-xs text-[#4ade80] hover:underline">Deschide parcela →</button>
-          </div>
-        )}
-      </div>
-
-      <div className="px-5 py-4 space-y-4">
-        {campaignWidget && (
-          <div className="rounded-2xl border border-white/[0.08] p-5" style={{ background: 'rgba(255,255,255,0.04)' }}>
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-green-400/15"><Wheat className="w-5 h-5 text-green-400" /></div>
-                <div>
-                  <div className="text-xs text-green-400 font-semibold uppercase tracking-wide">{campaignWidget.year}</div>
-                  <div className="text-base font-semibold text-white">{campaignWidget.name}</div>
-                </div>
-              </div>
-              <a href={`/campanie/${campaignWidget.year}`} className="flex items-center gap-1 text-xs text-white/80 border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
-                Deschide <ArrowRight className="w-3 h-3" />
-              </a>
-            </div>
-            <div className="space-y-3">
-              {[
-                { label: 'Planuri culturi', val: campaignWidget.plannedParcels, tot: campaignWidget.totalParcels, unit: 'parcele', bar: '#4ade80' },
-                ...(campaignWidget.harvestedParcels > 0 ? [{ label: 'Recoltat', val: campaignWidget.harvestedParcels, tot: campaignWidget.plannedParcels, unit: 'parcele planificate', bar: '#fbbf24' }] : []),
-                ...(campaignWidget.opsTotal > 0 ? [{ label: 'Activități câmp finalizate', val: campaignWidget.opsFinished, tot: campaignWidget.opsTotal, unit: 'operații', bar: '#2dd4bf' }] : []),
-              ].map(({ label, val, tot, unit, bar }) => (
-                <div key={label}>
-                  <div className="flex justify-between text-xs text-white/50 mb-1.5">
-                    <span>{label}</span><span className="font-medium text-white/80">{val} / {tot} {unit}</span>
-                  </div>
-                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${tot ? (val / tot) * 100 : 0}%`, background: bar }} />
-                  </div>
-                </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
+        <Card className="xl:col-span-2 p-5 flex flex-col">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="text-sm font-semibold text-gray-900">Parcele</h3>
+            <div className="flex p-0.5 rounded-lg bg-gray-100 text-xs">
+              {([['toate', 'Toate'], ['noi', 'Adăugate recent']] as const).map(([k, l]) => (
+                <button key={k} onClick={() => setMapMode(k)}
+                  className={`px-3 py-1 rounded-md font-medium transition ${mapMode === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>{l}</button>
               ))}
             </div>
           </div>
-        )}
+          <div className="relative rounded-xl overflow-hidden min-h-[340px] flex-1 border border-gray-200" style={{ isolation: 'isolate' }}>
+            {!loading && <DashboardMap key={mapMode} polygons={polygons} points={points} />}
+            <button onClick={() => router.push('/parcele/harta')}
+              className="absolute z-[500] bottom-3 right-3 h-8 px-3 rounded-lg bg-white/95 text-xs font-medium text-gray-900 shadow flex items-center gap-1 hover:bg-white">
+              Deschide harta <ArrowUpRight size={12} />
+            </button>
+            {!loading && polygons.length + points.length === 0 && (
+              <div className="absolute inset-0 z-[400] flex items-center justify-center text-sm text-gray-500 bg-white/70">Nicio parcelă pe hartă încă</div>
+            )}
+          </div>
+        </Card>
 
-        <div className="rounded-2xl border border-white/[0.08] p-5" style={{ background: 'rgba(255,255,255,0.04)' }}>
-          <div className="text-sm font-semibold text-white/80 mb-3">Acțiuni rapide</div>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { label: 'Arendator nou', href: '/arendatori/nou', icon: Users },
-              { label: 'Contract nou', href: '/contracte/nou', icon: FileText },
-              { label: 'Parcelă nouă', href: '/parcele/nou', icon: MapPin },
-              { label: 'Tranzacții', href: '/plati', icon: AlertTriangle },
-              { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3 },
-            ].map(({ label, href, icon: Icon }) => (
-              <button key={href} onClick={() => router.push(href)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-white/15 text-white/70 hover:border-[#4ade80] hover:text-[#4ade80] transition-colors font-medium">
-                <Icon className="w-3 h-3" />{label}
-              </button>
+        <Card className="p-5">
+          <CardHead title="Culturile din fermă" action="Vezi detalii" onAction={() => router.push('/parcele')} />
+          <Donut data={d.crops} total={d.totalHa} />
+          <ul className="mt-3 space-y-2">
+            {d.crops.slice(0, 6).map((c, i) => (
+              <li key={c.name} className="flex items-center gap-2 text-[13px]">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CROP_COLORS[i % CROP_COLORS.length] }} />
+                <span className="flex-1 text-gray-900 truncate">{c.name}</span>
+                <span className="text-gray-500 tabular-nums">{fmt(c.ha)} ha</span>
+                <span className="w-9 text-right text-gray-900 font-medium tabular-nums">{fmt(d.totalHa ? (c.ha / d.totalHa) * 100 : 0, 0)}%</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 pb-6">
+        <Card className="p-5">
+          <CardHead title="Distribuire arendă" action="Distribuie" onAction={() => router.push('/distribuire-arenda')} />
+          <div className="flex items-baseline gap-2">
+            <span className="text-[28px] font-bold text-gray-900 tabular-nums">{fmt(pct(d.paid), 0)}%</span>
+            <span className="text-[13px] text-gray-500">plătit</span>
+          </div>
+          <div className="mt-3 h-2.5 rounded-full overflow-hidden flex bg-gray-100">
+            <div style={{ width: `${pct(d.paid)}%`, background: BRAND }} />
+          </div>
+          <div className="mt-4 space-y-2 text-[13px]">
+            {[['Plătit', d.paid, BRAND], ['Rămas de plătit', d.unpaid, '#d1d5db']].map(([l, val, col]) => (
+              <div key={l as string} className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: col as string }} />
+                <span className="flex-1 text-gray-900">{l}</span>
+                <span className="tabular-nums text-gray-900 font-medium">{fmt(val as number, 2)} RON</span>
+              </div>
             ))}
           </div>
-        </div>
+          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-1.5 text-xs text-gray-500">
+            <Wheat size={13} /> {d.activeContracts.length} contracte active
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <CardHead title="Parcele adăugate recent" action="Toate parcelele" onAction={() => router.push('/parcele')} />
+          <ul className="divide-y divide-gray-100">
+            {d.recent.length === 0 && <li className="text-sm text-gray-500">Nicio parcelă încă.</li>}
+            {d.recent.map((p) => {
+              const st = p.status ?? 'ACTIVE'
+              const col = STATUS_COLOR[st] ?? STATUS_COLOR.INACTIVE
+              return (
+                <li key={p.id} className="py-2.5 flex items-center gap-3 first:pt-0 last:pb-0">
+                  <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0"><MapPin size={15} /></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-medium text-gray-900 truncate">{parcelName(p)} · {fmt(Number(p.surface ?? 0), 2)} ha</div>
+                    <div className="text-xs text-gray-500 truncate">{p.culture ?? '—'} · {p.locality || '—'} · {lessorName(p.lessors)}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-xs text-gray-500">{fmtDate(p.created_at)}</div>
+                    <span className="inline-block mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: col + '22', color: col }}>
+                      {STATUS_LABEL[st] ?? st}
+                    </span>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </Card>
+
+        <Card className="p-5">
+          <CardHead title="Activitate recentă" />
+          <ul className="divide-y divide-gray-100">
+            {d.acts.length === 0 && <li className="text-sm text-gray-500">Nicio activitate încă.</li>}
+            {d.acts.map((a, i) => (
+              <li key={i} className="py-2.5 flex items-center gap-3 first:pt-0 last:pb-0">
+                <div className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">{a.icon}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-medium text-gray-900 truncate">{a.title}</div>
+                  <div className="text-xs text-gray-500 truncate">{a.sub}</div>
+                </div>
+                <div className="text-[11px] text-gray-400 shrink-0">{fmtDate(a.date)}</div>
+              </li>
+            ))}
+          </ul>
+        </Card>
       </div>
     </div>
   )
