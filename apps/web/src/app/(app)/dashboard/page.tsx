@@ -1,145 +1,13 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import type { DashParcel } from '@/components/dashboard/DashboardMap'
 import { createClient } from '@/lib/supabase/client'
-import { Users, FileText, MapPin, CreditCard, AlertTriangle, Clock, Plus, BarChart3, MessageSquare, Wheat, Tractor, ArrowRight, Settings2 } from 'lucide-react'
-import { GuidedTour } from '@/components/onboarding/GuidedTour'
+import { Users, FileText, MapPin, CreditCard, AlertTriangle, Clock, Plus, BarChart3, MessageSquare, Wheat, Tractor, ArrowRight } from 'lucide-react'
 
 export const runtime = 'edge'
-
-// ─── Animated agricultural dawn SVG ──────────────────────────────────────────
-function AgriLandscape() {
-  const stalks = Array.from({ length: 46 })
-  const particles = Array.from({ length: 14 })
-  return (
-    <div className="w-full h-full" style={{ minHeight: 200, position: 'relative' }}>
-      <style>{`
-        @keyframes ap-sway-a { 0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)} }
-        @keyframes ap-sway-b { 0%,100%{transform:rotate(-3.5deg)}50%{transform:rotate(3.5deg)} }
-        @keyframes ap-cloud-a { 0%{transform:translateX(0)}100%{transform:translateX(38px)} }
-        @keyframes ap-cloud-b { 0%{transform:translateX(0)}100%{transform:translateX(-26px)} }
-        @keyframes ap-tractor { 0%{transform:translateX(895px)}100%{transform:translateX(-115px)} }
-        @keyframes ap-glow-pulse { 0%,100%{opacity:.78}50%{opacity:1} }
-        @keyframes ap-smoke { 0%{transform:translateY(0) scale(1);opacity:.45}100%{transform:translateY(-22px) scale(2.2);opacity:0} }
-        @keyframes ap-bird { 0%{transform:translate(0,0)}100%{transform:translate(130px,-18px)} }
-        @keyframes ap-pollen { 0%{transform:translateY(0);opacity:.8}100%{transform:translateY(-40px);opacity:0} }
-        @keyframes ap-beacon { 0%,100%{opacity:.6}50%{opacity:1} }
-        .ap-stalk { transform-box:fill-box; transform-origin:bottom center; }
-      `}</style>
-      <svg viewBox="0 0 900 480" xmlns="http://www.w3.org/2000/svg" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-        <defs>
-          <linearGradient id="apl-sky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#0b1828" /><stop offset="38%" stopColor="#4a1e00" stopOpacity=".9" />
-            <stop offset="68%" stopColor="#c05500" /><stop offset="88%" stopColor="#e8820a" /><stop offset="100%" stopColor="#fbbf24" />
-          </linearGradient>
-          <radialGradient id="apl-sun-aura" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#fff7aa" stopOpacity=".95" /><stop offset="30%" stopColor="#fbbf24" stopOpacity=".55" />
-            <stop offset="70%" stopColor="#f59e0b" stopOpacity=".18" /><stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
-          </radialGradient>
-          <radialGradient id="apl-horizon-glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#f59e0b" stopOpacity=".3" /><stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id="apl-hills-far" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#183a14" /><stop offset="100%" stopColor="#0c2309" />
-          </linearGradient>
-          <linearGradient id="apl-hills-mid" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#1e5218" /><stop offset="100%" stopColor="#12360d" />
-          </linearGradient>
-          <linearGradient id="apl-field" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#c28018" /><stop offset="100%" stopColor="#6e3e05" />
-          </linearGradient>
-          <linearGradient id="apl-ground" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#4a2c05" /><stop offset="100%" stopColor="#2e1a02" />
-          </linearGradient>
-          <filter id="apl-blur"><feGaussianBlur stdDeviation="2" /></filter>
-        </defs>
-        <rect width="900" height="480" fill="url(#apl-sky)" />
-        <ellipse cx="450" cy="308" rx="520" ry="90" fill="url(#apl-horizon-glow)" />
-        <circle cx="760" cy="108" r="108" fill="url(#apl-sun-aura)" style={{ animation: 'ap-glow-pulse 4.5s ease-in-out infinite' }} />
-        <circle cx="760" cy="108" r="50" fill="#fef3c7" opacity=".96"><animate attributeName="r" values="49;52;49" dur="4.5s" repeatCount="indefinite" /></circle>
-        <circle cx="760" cy="108" r="30" fill="#ffffff" opacity=".7" />
-        <rect x="0" y="304" width="900" height="3" fill="#f59e0b" opacity=".22" />
-        <g style={{ animation: 'ap-cloud-a 15s ease-in-out infinite alternate' }}>
-          <ellipse cx="155" cy="76" rx="76" ry="24" fill="rgba(255,180,90,.38)" />
-          <ellipse cx="128" cy="88" rx="46" ry="19" fill="rgba(255,160,70,.3)" />
-          <ellipse cx="184" cy="86" rx="54" ry="18" fill="rgba(255,160,70,.3)" />
-        </g>
-        <g style={{ animation: 'ap-cloud-b 20s ease-in-out infinite alternate' }}>
-          <ellipse cx="435" cy="50" rx="62" ry="18" fill="rgba(255,160,70,.28)" />
-          <ellipse cx="410" cy="61" rx="38" ry="16" fill="rgba(255,160,70,.22)" />
-          <ellipse cx="460" cy="59" rx="44" ry="15" fill="rgba(255,160,70,.22)" />
-        </g>
-        <g style={{ animation: 'ap-bird 25s linear infinite' }}>
-          <path d="M70,145 Q74,140 78,145" stroke="rgba(255,160,50,.65)" strokeWidth="1.6" fill="none" strokeLinecap="round" />
-          <path d="M83,136 Q87,131 91,136" stroke="rgba(255,160,50,.65)" strokeWidth="1.6" fill="none" strokeLinecap="round" />
-          <path d="M96,143 Q100,138 104,143" stroke="rgba(255,160,50,.5)" strokeWidth="1.3" fill="none" strokeLinecap="round" />
-        </g>
-        <g style={{ animation: 'ap-bird 32s 6s linear infinite' }}>
-          <path d="M190,108 Q194,104 198,108" stroke="rgba(255,160,50,.55)" strokeWidth="1.3" fill="none" strokeLinecap="round" />
-          <path d="M204,100 Q208,96 212,100" stroke="rgba(255,160,50,.55)" strokeWidth="1.3" fill="none" strokeLinecap="round" />
-        </g>
-        <path d="M0,305 Q100,260 210,285 Q340,248 460,278 Q580,252 710,272 Q810,254 900,265 L900,480 L0,480 Z" fill="url(#apl-hills-far)" opacity=".93" />
-        <path d="M0,345 Q130,310 270,332 Q410,308 540,328 Q670,304 820,322 Q868,312 900,316 L900,480 L0,480 Z" fill="url(#apl-hills-mid)" />
-        <path d="M0,392 Q220,370 450,380 Q700,370 900,376 L900,480 L0,480 Z" fill="url(#apl-field)" />
-        <path d="M0,434 L900,428 L900,480 L0,480 Z" fill="url(#apl-ground)" />
-        {Array.from({ length: 7 }).map((_, i) => (
-          <path key={i} d={`M${i*145-10},480 Q${i*145+62},${434+i%3} ${i*145+155},480`} stroke="#5e3806" strokeWidth="1.2" fill="none" opacity=".55" />
-        ))}
-        {stalks.map((_, i) => {
-          const x = 10 + (i/45)*880, h = 52 + Math.sin(i*1.76)*13 + (i%4)*3
-          const delay = ((i*0.16)%2.8).toFixed(2), dur = (1.9+(i%6)*0.21).toFixed(2)
-          const hc = ['#d4a017','#c8911a','#b87e14','#daa820'][i%4]
-          return (
-            <g key={i} transform={`translate(${x},402)`}>
-              <g className="ap-stalk" style={{ animation: `${i%3===1?'ap-sway-b':'ap-sway-a'} ${dur}s ${delay}s ease-in-out infinite` }}>
-                <line x1="0" y1="0" x2="0" y2={-h} stroke="#8b6914" strokeWidth="1.6" />
-                <ellipse cx="0" cy={-h*0.56} rx="1.5" ry="2.2" fill="#7a5a10" />
-                <path d={`M0,${-h*0.44} Q7,${-h*0.52} 3.5,${-h*0.63}`} stroke="#4a7a14" strokeWidth="1.3" fill="none" />
-                <ellipse cx="0" cy={-h-8} rx="3.4" ry="9.5" fill={hc} />
-                <line x1="0" y1={-h+1} x2="-6" y2={-h-9} stroke="#a07018" strokeWidth=".9" />
-                <line x1="0" y1={-h-1} x2="6" y2={-h-9} stroke="#a07018" strokeWidth=".9" />
-                <line x1="0" y1={-h-4} x2="-5" y2={-h-13} stroke="#a07018" strokeWidth=".75" />
-                <line x1="0" y1={-h-4} x2="5" y2={-h-13} stroke="#a07018" strokeWidth=".75" />
-                <line x1="0" y1={-h-7} x2="-3" y2={-h-16} stroke="#a07018" strokeWidth=".6" />
-                <line x1="0" y1={-h-7} x2="3" y2={-h-16} stroke="#a07018" strokeWidth=".6" />
-              </g>
-            </g>
-          )
-        })}
-        {particles.map((_, i) => {
-          const xP = 40+(i/13)*820, yP = 385+(i%4)*9
-          return <circle key={i} cx={xP} cy={yP} r="1.6" fill="#fbbf24" opacity=".7" style={{ animation: `ap-pollen ${(2.8+(i%5)*0.65).toFixed(1)}s ${((i*0.55)%3.2).toFixed(1)}s ease-in-out infinite` }} />
-        })}
-        <g style={{ animation: 'ap-tractor 24s linear infinite' }}>
-          <ellipse cx="52" cy="436" rx="48" ry="5.5" fill="rgba(0,0,0,.28)" filter="url(#apl-blur)" />
-          <circle cx="62" cy="414" r="27" fill="#0c0804" /><circle cx="62" cy="414" r="21" fill="#1a1008" /><circle cx="62" cy="414" r="7" fill="#0c0804" />
-          {Array.from({length:8}).map((_,wi)=>{const a=(wi/8)*Math.PI*2;return<line key={wi} x1={62+Math.cos(a)*12} y1={414+Math.sin(a)*12} x2={62+Math.cos(a)*24} y2={414+Math.sin(a)*24} stroke="#0c0804" strokeWidth="3.2"/>})}
-          <path d="M34,396 Q50,386 72,390 Q86,391 88,398 L88,403 Q85,396 72,393 Q50,389 34,401 Z" fill="#0c0804" />
-          <rect x="22" y="398" width="66" height="20" rx="3" fill="#0c0804" />
-          <rect x="6" y="398" width="24" height="19" rx="2.5" fill="#0c0804" />
-          {Array.from({length:4}).map((_,gi)=><line key={gi} x1={9} y1={402+gi*3.5} x2={27} y2={402+gi*3.5} stroke="#1e1208" strokeWidth="1" opacity=".7"/>)}
-          <rect x="18" y="382" width="5" height="18" rx="2" fill="#0c0804" />
-          <rect x="15" y="380" width="11" height="5" rx="2" fill="#0c0804" />
-          <circle cx="21" cy="377" r="4.5" fill="rgba(60,40,15,.45)" style={{animation:'ap-smoke 2.1s 0s ease-out infinite'}} />
-          <circle cx="23" cy="368" r="3.8" fill="rgba(60,40,15,.3)" style={{animation:'ap-smoke 2.1s .75s ease-out infinite'}} />
-          <circle cx="20" cy="360" r="3" fill="rgba(60,40,15,.18)" style={{animation:'ap-smoke 2.1s 1.5s ease-out infinite'}} />
-          <rect x="48" y="372" width="42" height="28" rx="3" fill="#0c0804" />
-          <rect x="52" y="376" width="15" height="20" rx="2" fill="rgba(90,160,230,.22)" />
-          <rect x="68" y="376" width="18" height="20" rx="2" fill="rgba(90,160,230,.17)" />
-          <rect x="47" y="369" width="44" height="5" rx="2.5" fill="#0c0804" />
-          <circle cx="78" cy="368" r="3.5" fill="#f59e0b" style={{animation:'ap-beacon 1.6s ease-in-out infinite'}} />
-          <circle cx="14" cy="420" r="14.5" fill="#0c0804" /><circle cx="14" cy="420" r="10" fill="#1a1008" /><circle cx="14" cy="420" r="4" fill="#0c0804" />
-          {Array.from({length:6}).map((_,wi)=>{const a=(wi/6)*Math.PI*2;return<line key={wi} x1={14+Math.cos(a)*6} y1={420+Math.sin(a)*6} x2={14+Math.cos(a)*12} y2={420+Math.sin(a)*12} stroke="#0c0804" strokeWidth="2.5"/>})}
-          <rect x="10" y="415" width="16" height="4" rx="1.5" fill="#0c0804" />
-          <line x1="88" y1="410" x2="100" y2="422" stroke="#0c0804" strokeWidth="3.5" strokeLinecap="round" />
-          <line x1="88" y1="416" x2="100" y2="428" stroke="#0c0804" strokeWidth="3.5" strokeLinecap="round" />
-          <line x1="94" y1="407" x2="100" y2="415" stroke="#0c0804" strokeWidth="2.5" strokeLinecap="round" />
-        </g>
-      </svg>
-    </div>
-  )
-}
 
 interface CampaignWidget {
   id: string
@@ -172,33 +40,33 @@ interface StatCardProps {
   value: string | number
   icon: React.ElementType
   sub?: string
-  iconBg: string
   iconColor: string
 }
 
-function StatCard({ label, value, icon: Icon, sub, iconBg, iconColor }: StatCardProps) {
+function StatCard({ label, value, icon: Icon, sub, iconColor }: StatCardProps) {
   return (
-    <div className="rounded-2xl p-5 flex items-start gap-4 relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#ffffff 0%,#f8fafb 100%)', border: '1px solid rgba(0,0,0,.06)', boxShadow: '0 2px 12px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04)' }}>
-      <div className={`p-2.5 rounded-xl flex-shrink-0 ${iconBg}`} style={{ boxShadow: '0 2px 8px rgba(0,0,0,.08)' }}>
-        <Icon className={`w-5 h-5 ${iconColor}`} />
+    <div className="rounded-xl p-4 flex flex-col gap-1.5 border border-white/[0.07]" style={{ background: 'rgba(255,255,255,0.05)' }}>
+      <div className="flex items-center gap-1.5 text-xs" style={{ color: iconColor }}>
+        <Icon className="w-3 h-3" />
+        <span className="text-white/60">{label}</span>
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-2xl font-extrabold text-gray-900 leading-none mb-1 tracking-tight">{value}</div>
-        <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</div>
-        {sub && <div className="text-xs mt-1.5 font-semibold" style={{ color: '#16a34a' }}>{sub}</div>}
-      </div>
+      <div className="text-white text-2xl font-semibold">{value}</div>
+      {sub && <div className="text-white/45 text-xs leading-snug">{sub}</div>}
     </div>
   )
 }
 
+const DashboardMap = dynamic(() => import('@/components/dashboard/DashboardMap'), { ssr: false })
+
 export default function DashboardPage() {
   const router = useRouter()
+  const [mapParcels, setMapParcels] = useState<DashParcel[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [s, setS] = useState<Stats>(EMPTY)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [campaignWidget, setCampaignWidget] = useState<CampaignWidget | null>(null)
-  const [nextExpiring, setNextExpiring] = useState<{ days: number; label: string } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -223,26 +91,20 @@ export default function DashboardPage() {
       const paymentsOverdue = (overdueData ?? []).length
       const paymentsOverdueAmount = ((overdueData ?? []) as any[]).reduce((acc, p) => acc + Number(p.ron_net ?? 0), 0).toFixed(2)
       setS({ lessorsTotal: lessorsTotal ?? 0, contractsActive: contractsActive ?? 0, contractsExpiring: contractsExpiring ?? 0, parcelsTotal: (parcelsData ?? []).length, surfaceTotal, paymentsOverdue, paymentsOverdueAmount })
-
-      // Fetch the soonest expiring contract for the hero floating card
-      try {
-        const { data: soonest } = await db
-          .from('contracts')
-          .select('contract_number, end_date, lessors(first_name, last_name, company_name, type)')
-          .eq('status', 'ACTIVE')
-          .gte('end_date', today)
-          .order('end_date', { ascending: true })
-          .limit(1)
-          .maybeSingle()
-        if (soonest) {
-          const daysLeft = Math.round((new Date(soonest.end_date).getTime() - now.getTime()) / 86400000)
-          const l = soonest.lessors as any
-          const name = l ? (l.type === 'LEGAL' ? (l.company_name ?? '') : `${l.last_name ?? ''} ${l.first_name ?? ''}`.trim()) : soonest.contract_number
-          setNextExpiring({ days: daysLeft, label: name || soonest.contract_number })
-        }
-      } catch { /* ignore */ }
-
       setLoading(false)
+
+      const { data: mp } = await db.from('parcels')
+        .select('id,bloc_fizic,tarla_nr,parcel_nr,culture,surface,lat,lng,status')
+        .not('lat', 'is', null).not('lng', 'is', null).limit(1000)
+      setMapParcels(((mp ?? []) as any[]).map((p) => ({
+        id: p.id,
+        name: `Bloc ${p.bloc_fizic ?? '-'} · T${p.tarla_nr ?? '-'} · P${p.parcel_nr ?? '-'}`,
+        culture: p.culture ?? null,
+        surface: Number(p.surface ?? 0),
+        lat: p.lat,
+        lng: p.lng,
+        active: p.status === 'ACTIVE',
+      })))
 
       // Campaign progress widget
       try {
@@ -280,200 +142,144 @@ export default function DashboardPage() {
     load()
   }, [])
 
+
   const dash = loading ? '—' : undefined
+  const selected = mapParcels.find((p) => p.id === selectedId) ?? null
+  const activeMap = mapParcels.filter((p) => p.active).length
+  const now = new Date().toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div>
-      {/* Page title */}
-      <div className="mb-5">
-        <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Vizualizare generală platformă</p>
+    <div className="-m-4 md:-m-6 min-h-full" style={{ background: '#0b160b' }}>
+      {/* Banner */}
+      <div className="px-5 pt-4 pb-3 border-b border-white/[0.08]" style={{ background: 'linear-gradient(135deg, #0f1f0f 0%, #111e11 100%)' }}>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <div className="text-white text-sm font-semibold">Platforma ta agricolă</div>
+            <div className="text-white/45 text-xs mt-0.5">
+              {loading ? '—' : `${s.parcelsTotal} parcele · ${s.contractsActive} contracte active`} · actualizat azi {now}
+            </div>
+          </div>
+          <button
+            onClick={() => router.push('/arendatori/nou')}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium text-white border border-white/20 hover:border-white/40 hover:bg-white/10 transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" /> Adaugă arendator
+          </button>
+        </div>
       </div>
 
-      {/* Notification: unread contact messages (admin only) */}
       {isAdmin && unreadMessages > 0 && (
         <a
           href="/admin-cp"
-          className="block mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 hover:bg-amber-100 transition-colors"
+          className="mx-5 mt-3 flex items-center gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 hover:bg-amber-400/15 transition-colors"
           onClick={() => sessionStorage.setItem('admin_tab', 'messages')}
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-              <MessageSquare className="w-5 h-5 text-amber-600" />
-            </div>
-            <div className="flex-1">
-              <div className="text-sm font-semibold text-amber-800">
-                {unreadMessages} mesaj{unreadMessages > 1 ? 'e' : ''} nou{unreadMessages > 1 ? 'ă' : ''} de contact
-              </div>
-              <div className="text-xs text-amber-600 mt-0.5">Deschide Admin Panel → Mesaje Contact pentru a le vizualiza</div>
-            </div>
-            <span className="text-xs font-semibold text-amber-700 border border-amber-300 px-3 py-1.5 rounded-lg">Vezi →</span>
-          </div>
+          <MessageSquare className="w-4 h-4 text-amber-400" />
+          <span className="text-sm text-amber-300 flex-1">
+            {unreadMessages} mesaj{unreadMessages > 1 ? 'e' : ''} nou{unreadMessages > 1 ? 'ă' : ''} de contact
+          </span>
+          <span className="text-xs text-amber-300">Vezi →</span>
         </a>
       )}
 
-      {/* Hero banner */}
-      <div className="rounded-2xl mb-8 relative overflow-visible" style={{ background: 'linear-gradient(155deg,#160d04 0%,#241508 45%,#1c1309 100%)' }}>
-        {/* Ambient amber orb */}
-        <div style={{ position: 'absolute', width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle,rgba(217,119,6,.14) 0%,transparent 70%)', top: '50%', left: '32%', transform: 'translate(-50%,-50%)', pointerEvents: 'none', zIndex: 0 }} />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 items-center relative" style={{ zIndex: 1 }}>
-          {/* Left — text */}
-          <div className="px-8 py-9">
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 100, background: 'rgba(217,119,6,.15)', border: '1px solid rgba(217,119,6,.32)', marginBottom: 18 }}>
-              <span style={{ fontSize: 14 }}>🌾</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', letterSpacing: '.05em', textTransform: 'uppercase' }}>Bun venit înapoi</span>
-            </div>
-            <h2 style={{ fontSize: 30, fontWeight: 900, lineHeight: 1.12, letterSpacing: '-.04em', color: '#ffffff', marginBottom: 12 }}>
-              Gestionează{' '}
-              <span style={{ background: 'linear-gradient(135deg,#fde68a,#f59e0b,#d97706)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                arenda agricolă
-              </span>
-              {' '}fără bătăi de cap
-            </h2>
-            <p style={{ fontSize: 14, lineHeight: 1.65, color: 'rgba(255,245,235,.58)', marginBottom: 26, maxWidth: 340 }}>
-              Contracte, arendatori, parcele și plăți — totul centralizat într-un singur loc.
-            </p>
-            <button
-              onClick={() => router.push('/general/configureaza-ferma')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#d97706)', cursor: 'pointer', fontSize: 13, fontWeight: 800, color: '#fff', boxShadow: '0 4px 20px rgba(217,119,6,.5), inset 0 1px 0 rgba(255,255,255,.15)' }}
-            >
-              <Settings2 className="w-3.5 h-3.5" />
-              Configurează Ferma
-            </button>
-          </div>
-
-          {/* Right — SVG animation + floating cards */}
-          <div className="hidden lg:block relative" style={{ padding: '28px 36px 36px 16px' }}>
-            {/* SVG container */}
-            <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)', boxShadow: '0 24px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04)', background: '#0a1510' }}>
-              <AgriLandscape />
-            </div>
-
-            {/* Floating stats card — bottom left */}
-            <div style={{ position: 'absolute', bottom: 12, left: -8, background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(20px)', borderRadius: 16, padding: '13px 18px', boxShadow: '0 10px 40px rgba(0,0,0,.28)', border: '1px solid rgba(255,255,255,.6)', minWidth: 175 }}>
-              <div style={{ fontSize: 9, color: '#a8998e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Total hectare gestionate</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                <span style={{ fontSize: 26, fontWeight: 900, color: '#1c1008', letterSpacing: '-.04em' }}>{s.surfaceTotal}</span>
-                <span style={{ fontSize: 11, color: '#6b5d52', fontWeight: 500 }}>ha</span>
-              </div>
-              <div style={{ fontSize: 10, color: '#a8998e', marginTop: 2 }}>{s.lessorsTotal} arendatori activi</div>
-            </div>
-
-            {/* Floating alert card — top right */}
-            {nextExpiring && (
-              <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(20,14,8,.94)', backdropFilter: 'blur(16px)', borderRadius: 14, padding: '10px 14px', boxShadow: '0 10px 36px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.07)', display: 'flex', alignItems: 'center', gap: 10, minWidth: 185 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(217,119,6,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Clock className="w-4 h-4" style={{ color: '#fbbf24' }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', marginBottom: 1 }}>Contract expiră în {nextExpiring.days} {nextExpiring.days === 1 ? 'zi' : 'zile'}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,245,235,.42)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nextExpiring.label}</div>
-                </div>
-              </div>
-            )}
-
-            {/* Floating green chip — bottom right */}
-            <div style={{ position: 'absolute', bottom: 52, right: 8, background: 'rgba(22,163,74,.95)', borderRadius: 11, padding: '8px 13px', boxShadow: '0 6px 24px rgba(22,163,74,.35)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <FileText className="w-3.5 h-3.5 text-white" />
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#ffffff' }}>{s.contractsActive} contracte active</span>
-            </div>
-          </div>
+      {/* KPI row */}
+      <div className="px-5 py-3 border-b border-white/[0.08]">
+        <div className="text-white/35 text-[10px] uppercase tracking-widest mb-2.5 font-semibold">Sumar general</div>
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5">
+          <StatCard label="Arendatori activi" value={dash ?? s.lessorsTotal} icon={Users} iconColor="#4ade80" />
+          <StatCard label="Contracte active" value={dash ?? s.contractsActive} icon={FileText} iconColor="#60a5fa" />
+          <StatCard label="Expiră în 30 zile" value={dash ?? s.contractsExpiring} icon={Clock} iconColor="#fbbf24" />
+          <StatCard label="Parcele" value={dash ?? s.parcelsTotal} icon={MapPin} iconColor="#c084fc" sub={loading ? undefined : `${s.surfaceTotal} ha total`} />
+          <StatCard label="Tranzacții neplătite" value={dash ?? s.paymentsOverdue} icon={AlertTriangle} iconColor="#f87171" />
+          <StatCard label="Neplătit (RON)" value={dash ?? s.paymentsOverdueAmount} icon={CreditCard} iconColor="#38bdf8" />
         </div>
       </div>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <StatCard label="Arendatori activi"           value={dash ?? s.lessorsTotal}         icon={Users}          iconBg="bg-green-100"   iconColor="text-green-600" />
-        <StatCard label="Contracte active"            value={dash ?? s.contractsActive}       icon={FileText}       iconBg="bg-blue-100"    iconColor="text-blue-600" />
-        <StatCard label="Contracte ce expiră (30 zile)" value={dash ?? s.contractsExpiring}  icon={Clock}          iconBg="bg-amber-100"   iconColor="text-amber-600" />
-        <StatCard label="Parcele înregistrate"        value={dash ?? s.parcelsTotal}          icon={MapPin}         iconBg="bg-violet-100"  iconColor="text-violet-600"
-          sub={loading ? undefined : `Suprafață totală: ${s.surfaceTotal} ha`} />
-        <StatCard label="Tranzacții neplătite"         value={dash ?? s.paymentsOverdue}       icon={AlertTriangle}  iconBg="bg-red-100"     iconColor="text-red-500"
-          sub={loading ? undefined : `${s.paymentsOverdueAmount} RON total neplătit`} />
-        <StatCard label="Valoare neplătită (RON)"       value={dash ?? s.paymentsOverdueAmount} icon={CreditCard}     iconBg="bg-sky-100"     iconColor="text-sky-600" />
-      </div>
+      {/* Map */}
+      <div className="relative border-b border-white/[0.08]" style={{ height: 'clamp(320px, 50vh, 520px)', isolation: 'isolate' }}>
+        <DashboardMap parcels={mapParcels} selectedId={selectedId} onSelect={setSelectedId} />
 
-      {/* Campaign Progress Widget */}
-      {campaignWidget && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm mb-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-xl"><Wheat className="w-5 h-5 text-green-700" /></div>
-              <div>
-                <div className="text-xs text-green-600 font-semibold uppercase tracking-wide">{campaignWidget.year}</div>
-                <div className="text-base font-bold text-gray-800">{campaignWidget.name}</div>
-              </div>
+        <div className="absolute top-3 left-3 z-[1000] rounded-xl px-3 py-2.5 border border-white/10" style={{ background: 'rgba(10,20,10,0.88)', backdropFilter: 'blur(12px)' }}>
+          <div className="text-white/40 text-[10px] uppercase tracking-wider mb-2 font-semibold">Parcele</div>
+          {[{ c: '#4ade80', l: `Active (${activeMap})` }, { c: '#6b7280', l: `Inactive (${mapParcels.length - activeMap})` }].map(({ c, l }) => (
+            <div key={l} className="flex items-center gap-2 text-xs text-white/60 mb-1 last:mb-0">
+              <div className="w-3 h-3 rounded-full" style={{ background: c, boxShadow: `0 0 5px ${c}88` }} />{l}
             </div>
-            <a href={`/campanie/${campaignWidget.year}`}
-              className="flex items-center gap-1 text-xs text-brand-600 border border-brand-200 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors">
-              Deschide <ArrowRight className="w-3 h-3" />
-            </a>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                <span>Planuri culturi</span>
-                <span className="font-medium text-gray-700">{campaignWidget.plannedParcels} / {campaignWidget.totalParcels} parcele</span>
-              </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-brand-500 rounded-full transition-all"
-                  style={{ width: `${campaignWidget.totalParcels ? (campaignWidget.plannedParcels / campaignWidget.totalParcels) * 100 : 0}%` }} />
-              </div>
-            </div>
-            {campaignWidget.harvestedParcels > 0 && (
-              <div>
-                <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                  <span>Recoltat</span>
-                  <span className="font-medium text-gray-700">{campaignWidget.harvestedParcels} / {campaignWidget.plannedParcels} parcele planificate</span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-400 rounded-full transition-all"
-                    style={{ width: `${campaignWidget.plannedParcels ? (campaignWidget.harvestedParcels / campaignWidget.plannedParcels) * 100 : 0}%` }} />
-                </div>
-              </div>
-            )}
-            {campaignWidget.opsTotal > 0 && (
-              <div>
-                <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                  <span>Activități câmp finalizate</span>
-                  <span className="font-medium text-gray-700">{campaignWidget.opsFinished} / {campaignWidget.opsTotal} operații</span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-teal-500 rounded-full transition-all"
-                    style={{ width: `${(campaignWidget.opsFinished / campaignWidget.opsTotal) * 100}%` }} />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Quick actions */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <div className="text-sm font-semibold text-gray-700 mb-3">Acțiuni rapide</div>
-        <div className="flex flex-wrap gap-2">
-          {[
-            { label: 'Arendator nou', href: '/arendatori/nou', icon: Users },
-            { label: 'Contract nou', href: '/contracte/nou', icon: FileText },
-            { label: 'Parcelă nouă', href: '/parcele/nou', icon: MapPin },
-            { label: 'Tranzacții', href: '/plati', icon: AlertTriangle },
-            { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3 },
-          ].map(({ label, href, icon: Icon }) => (
-            <button
-              key={href}
-              onClick={() => router.push(href)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:border-[#2d6a4f] hover:text-[#2d6a4f] transition-colors font-medium"
-            >
-              <Icon className="w-3 h-3" />
-              {label}
-            </button>
           ))}
         </div>
+
+        {!selected && (
+          <div className="absolute bottom-4 left-4 z-[1000] rounded-xl px-3 py-2 border border-white/10 text-white/45 text-xs" style={{ background: 'rgba(10,20,10,0.75)', backdropFilter: 'blur(8px)' }}>
+            {mapParcels.length ? 'Apasă pe o parcelă pentru detalii' : loading ? 'Se încarcă…' : 'Nicio parcelă cu coordonate'}
+          </div>
+        )}
+
+        {selected && (
+          <div className="absolute bottom-4 left-4 z-[1000] w-[min(360px,calc(100%-2rem))] rounded-2xl p-4 border border-white/10" style={{ background: 'rgba(10,20,10,0.96)', backdropFilter: 'blur(16px)' }}>
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <div className="text-white text-base font-semibold">{selected.name}</div>
+                <div className="text-white/45 text-xs mt-0.5">{selected.culture ?? 'Cultură nespecificată'} · {selected.surface.toFixed(2)} ha</div>
+              </div>
+              <button onClick={() => setSelectedId(null)} className="text-white/40 hover:text-white/80 p-1 rounded-lg hover:bg-white/10 text-sm leading-none">✕</button>
+            </div>
+            <button onClick={() => router.push(`/parcele/${selected.id}`)} className="text-xs text-[#4ade80] hover:underline">Deschide parcela →</button>
+          </div>
+        )}
       </div>
 
-      {/* Guided tour — runs once after onboarding completion */}
-      <GuidedTour />
+      <div className="px-5 py-4 space-y-4">
+        {campaignWidget && (
+          <div className="rounded-2xl border border-white/[0.08] p-5" style={{ background: 'rgba(255,255,255,0.04)' }}>
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-green-400/15"><Wheat className="w-5 h-5 text-green-400" /></div>
+                <div>
+                  <div className="text-xs text-green-400 font-semibold uppercase tracking-wide">{campaignWidget.year}</div>
+                  <div className="text-base font-semibold text-white">{campaignWidget.name}</div>
+                </div>
+              </div>
+              <a href={`/campanie/${campaignWidget.year}`} className="flex items-center gap-1 text-xs text-white/80 border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
+                Deschide <ArrowRight className="w-3 h-3" />
+              </a>
+            </div>
+            <div className="space-y-3">
+              {[
+                { label: 'Planuri culturi', val: campaignWidget.plannedParcels, tot: campaignWidget.totalParcels, unit: 'parcele', bar: '#4ade80' },
+                ...(campaignWidget.harvestedParcels > 0 ? [{ label: 'Recoltat', val: campaignWidget.harvestedParcels, tot: campaignWidget.plannedParcels, unit: 'parcele planificate', bar: '#fbbf24' }] : []),
+                ...(campaignWidget.opsTotal > 0 ? [{ label: 'Activități câmp finalizate', val: campaignWidget.opsFinished, tot: campaignWidget.opsTotal, unit: 'operații', bar: '#2dd4bf' }] : []),
+              ].map(({ label, val, tot, unit, bar }) => (
+                <div key={label}>
+                  <div className="flex justify-between text-xs text-white/50 mb-1.5">
+                    <span>{label}</span><span className="font-medium text-white/80">{val} / {tot} {unit}</span>
+                  </div>
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{ width: `${tot ? (val / tot) * 100 : 0}%`, background: bar }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-white/[0.08] p-5" style={{ background: 'rgba(255,255,255,0.04)' }}>
+          <div className="text-sm font-semibold text-white/80 mb-3">Acțiuni rapide</div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: 'Arendator nou', href: '/arendatori/nou', icon: Users },
+              { label: 'Contract nou', href: '/contracte/nou', icon: FileText },
+              { label: 'Parcelă nouă', href: '/parcele/nou', icon: MapPin },
+              { label: 'Tranzacții', href: '/plati', icon: AlertTriangle },
+              { label: 'Rapoarte', href: '/rapoarte', icon: BarChart3 },
+            ].map(({ label, href, icon: Icon }) => (
+              <button key={href} onClick={() => router.push(href)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-white/15 text-white/70 hover:border-[#4ade80] hover:text-[#4ade80] transition-colors font-medium">
+                <Icon className="w-3 h-3" />{label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
