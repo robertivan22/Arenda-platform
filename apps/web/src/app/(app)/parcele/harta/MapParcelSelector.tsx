@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 // Loaded ONLY in the browser via dynamic(() => import(...), { ssr: false })
 import L from 'leaflet'
@@ -903,6 +903,7 @@ export default function MapParcelSelector({
   const [newLegendColor, setNewLegendColor] = useState('#22c55e')
   const [showCulturePicker, setShowCulturePicker] = useState(false)
   const [apiaColorOverrides, setApiaColorOverrides] = useState<Record<string, string>>({})
+  const [apiaCollapsed, setApiaCollapsed] = useState(false)
 
   useEffect(() => {
     try {
@@ -1995,15 +1996,23 @@ export default function MapParcelSelector({
               .sort((a, b) => b.totalHa - a.totalHa)
             return (
               <div className="border border-green-200 rounded-xl overflow-hidden shadow-sm bg-green-50">
-                <div className="px-3 py-2 bg-green-100 border-b border-green-200 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setApiaCollapsed(v => !v)}
+                  aria-expanded={!apiaCollapsed}
+                  className={`w-full text-left px-3 py-2 bg-green-100 ${apiaCollapsed ? '' : 'border-b'} border-green-200 flex items-center justify-between`}
+                >
                   <span className="text-xs font-semibold text-green-800 uppercase tracking-wide">
                     Culturi APIA ({stats.length})
                   </span>
-                  <span className="text-xs text-green-600 font-medium">
-                    {stats.reduce((s, x) => s + x.totalHa, 0).toFixed(1)} ha total
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs text-green-600 font-medium">
+                      {stats.reduce((s, x) => s + x.totalHa, 0).toFixed(1)} ha total
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-green-700 transition-transform ${apiaCollapsed ? '-rotate-90' : ''}`} />
                   </span>
-                </div>
-                <div className="divide-y divide-green-100">
+                </button>
+                {!apiaCollapsed && <div className="divide-y divide-green-100">
                   {stats.map(s => {
                     const displayColor = apiaColorOverrides[s.name] ?? s.color
                     return (
@@ -2028,7 +2037,7 @@ export default function MapParcelSelector({
                       </div>
                     )
                   })}
-                </div>
+                </div>}
               </div>
             )
           })()}
